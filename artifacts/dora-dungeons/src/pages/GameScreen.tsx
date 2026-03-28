@@ -3,9 +3,7 @@ import { useProcessAction, GameStateResponse } from "@workspace/api-client-react
 import { useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { getGetGameStateQueryKey } from "@workspace/api-client-react";
-import {
-  Map, Skull, TerminalSquare, Volume2, VolumeX, Plus, Minus, Eye, Info,
-} from "lucide-react";
+import { Map, Skull, TerminalSquare, Volume2, VolumeX, Plus, Minus, Eye, Info } from "lucide-react";
 
 import { AudioManager } from "@/audio/AudioManager";
 import { processIntent, directionToPan } from "@/audio/IntentProcessor";
@@ -14,7 +12,7 @@ import { NarrationFeed } from "@/components/NarrationFeed";
 import { PlayerHUD } from "@/components/PlayerHUD";
 import { VoiceControl } from "@/components/VoiceControl";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function getNewLogs(prev: string[], next: string[]): string[] {
   if (next.length <= prev.length) return [];
@@ -26,58 +24,7 @@ function extractDirection(cmd: string): string | null {
   return m ? m[1]! : null;
 }
 
-// ─── Enemy HP Bar ─────────────────────────────────────────────────────────────
-
-function EnemyBar({
-  name, hp, maxHp,
-}: {
-  name: string; hp: number; maxHp: number;
-}) {
-  const pct = maxHp > 0 ? Math.max(0, Math.min(100, (hp / maxHp) * 100)) : 0;
-  const danger = pct < 30;
-
-  return (
-    <div className="flex items-center gap-2 min-w-0">
-      <span
-        className="font-code shrink-0"
-        style={{ color: "rgba(248,113,113,0.55)", fontSize: "8px" }}
-      >
-        ●
-      </span>
-      <span
-        className="font-code truncate shrink"
-        style={{ color: "rgba(248,113,113,0.8)", fontSize: "10px", minWidth: 60, maxWidth: 90 }}
-      >
-        {name}
-      </span>
-      <div
-        className="flex-1 overflow-hidden"
-        style={{ height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 2, minWidth: 40 }}
-      >
-        <motion.div
-          style={{
-            height: "100%",
-            borderRadius: 2,
-            background: danger
-              ? "linear-gradient(to right,#7f1d1d,#ef4444)"
-              : "linear-gradient(to right,#991b1b,#dc2626)",
-            width: `${pct}%`,
-          }}
-          animate={{ width: `${pct}%` }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
-        />
-      </div>
-      <span
-        className="font-code shrink-0"
-        style={{ color: "rgba(248,113,113,0.5)", fontSize: "9px", minWidth: 22, textAlign: "right" }}
-      >
-        {hp}
-      </span>
-    </div>
-  );
-}
-
-// ─── Component ────────────────────────────────────────────────────────────────
+// ─── Component ───────────────────────────────────────────────────────────────
 
 export function GameScreen({ gameState }: { gameState: GameStateResponse }) {
   const [command, setCommand] = useState("");
@@ -90,10 +37,12 @@ export function GameScreen({ gameState }: { gameState: GameStateResponse }) {
   const prevLogsRef = useRef<string[]>(gameState.logs);
   const queryClient = useQueryClient();
 
+  // Hook up AudioManager state listener
   useEffect(() => {
     AudioManager.onStateChange(setAudioSpeaking);
   }, []);
 
+  // ── Mutation ────────────────────────────────────────────────────────────────
   const { mutate: sendAction, isPending } = useProcessAction({
     mutation: {
       onSuccess: (newData) => {
@@ -121,22 +70,34 @@ export function GameScreen({ gameState }: { gameState: GameStateResponse }) {
     },
   });
 
+  // ── Submit command ──────────────────────────────────────────────────────────
   const submitCommand = useCallback((cmd: string) => {
     const trimmed = cmd.trim();
     if (!trimmed || isPending) return;
-    if (trimmed === "repeat") { AudioManager.repeatLast(); return; }
-    if (trimmed === "look" || trimmed === "status") { sendAction({ data: { command: trimmed } }); return; }
+
+    if (trimmed === "repeat") {
+      AudioManager.repeatLast();
+      return;
+    }
+
+    if (trimmed === "look" || trimmed === "status") {
+      sendAction({ data: { command: trimmed } });
+      return;
+    }
 
     const dir = extractDirection(trimmed);
     if (dir && !isMuted) {
       AudioManager.playDirectionalTone(directionToPan(dir), { frequency: 520, duration: 0.14 });
     }
+
     sendAction({ data: { command: trimmed } });
   }, [isPending, isMuted, sendAction]);
 
+  // ── Voice ───────────────────────────────────────────────────────────────────
   const { isSupported: voiceSupported, isListening, interimTranscript, toggleListening } =
     useVoiceInput({
       onFinalTranscript: (raw) => {
+        // Handle "skip intro" or "repeat" directly
         if (/^(skip intro|skip|enter)$/i.test(raw.trim())) return;
         const { canonical, wasNormalized } = processIntent(raw);
         setCommand(canonical);
@@ -147,6 +108,7 @@ export function GameScreen({ gameState }: { gameState: GameStateResponse }) {
       onInterimTranscript: (interim) => setCommand(interim),
     });
 
+  // ── Speech rate ─────────────────────────────────────────────────────────────
   const adjustRate = (delta: number) => {
     const next = Math.max(0.5, Math.min(2.0, +(speechRate + delta).toFixed(1)));
     setSpeechRateState(next);
@@ -155,14 +117,17 @@ export function GameScreen({ gameState }: { gameState: GameStateResponse }) {
   };
 
   const toggleMute = () => {
-    if (!isMuted) { AudioManager.stop(); setIsMuted(true); }
-    else { setIsMuted(false); }
+    if (!isMuted) {
+      AudioManager.stop();
+      setIsMuted(true);
+    } else {
+      setIsMuted(false);
+    }
   };
 
   const { player, currentRoom, logs, gameStatus, parsedCommand } = gameState;
   const isCombat = gameStatus === "IN_COMBAT";
   const isGameOver = gameStatus === "GAME_OVER";
-  const activeEnemies = currentRoom.enemies.filter(e => !e.isDefeated);
 
   const audioState = isListening ? "listening" : audioSpeaking ? "speaking" : "idle";
 
@@ -170,42 +135,43 @@ export function GameScreen({ gameState }: { gameState: GameStateResponse }) {
     ? { border: "rgba(179,18,47,0.5)", color: "#f87171", bg: "rgba(179,18,47,0.08)" }
     : isGameOver
     ? { border: "rgba(239,68,68,0.5)", color: "#ef4444", bg: "rgba(239,68,68,0.08)" }
-    : { border: "rgba(212,175,55,0.3)", color: "rgba(212,175,55,0.7)", bg: "rgba(212,175,55,0.04)" };
+    : { border: "rgba(212,175,55,0.35)", color: "rgba(212,175,55,0.8)", bg: "rgba(212,175,55,0.05)" };
 
   return (
     <div
-      className="relative flex flex-col w-full"
-      style={{ height: "100dvh", background: "#09080c", overflow: "hidden" }}
+      className="relative flex flex-col min-h-screen w-full"
+      style={{ background: "#09080c", overflow: "hidden" }}
     >
-      {/* ── Atmosphere layers ── */}
+      {/* ── Vignette ── */}
       <div className="vignette" />
+
+      {/* ── Combat red overlay ── */}
       {isCombat && <div className="combat-overlay" />}
+
+      {/* ── Scanline ── */}
       <div className="scanline-overlay" />
 
-      {/* ═══════════ TOP BAR (thin) ═══════════ */}
+      {/* ═══════════ TOP BAR ═══════════ */}
       <header
-        className="relative z-10 flex items-center justify-between px-4 shrink-0"
-        style={{
-          height: 34,
-          borderBottom: "1px solid rgba(255,255,255,0.04)",
-          background: "rgba(0,0,0,0.35)",
-        }}
+        className="relative z-10 flex items-center justify-between px-5 py-2"
+        style={{ borderBottom: "1px solid rgba(255,255,255,0.04)", background: "rgba(0,0,0,0.3)" }}
       >
+        {/* Left: title + status */}
         <div className="flex items-center gap-3">
           <h1
-            className="font-display text-xs tracking-widest"
-            style={{ color: "rgba(232,224,208,0.45)", letterSpacing: "0.3em" }}
+            className="font-display text-sm tracking-widest"
+            style={{ color: "rgba(232,224,208,0.6)", letterSpacing: "0.3em" }}
           >
             DORA DUNGEONS
           </h1>
           <div
-            className="font-code text-xs px-2 py-0"
+            className="font-code text-xs px-2 py-0.5 uppercase tracking-widest"
             style={{
               border: `1px solid ${statusColor.border}`,
               color: statusColor.color,
               background: statusColor.bg,
-              letterSpacing: "0.18em",
-              fontSize: "9px",
+              letterSpacing: "0.2em",
+              fontSize: "10px",
               animation: isCombat ? "combat-breathe 2s infinite" : undefined,
             }}
           >
@@ -213,133 +179,161 @@ export function GameScreen({ gameState }: { gameState: GameStateResponse }) {
           </div>
         </div>
 
+        {/* Right: audio controls */}
         <div className="flex items-center gap-3">
-          <span
-            className="font-code"
+          {/* Audio indicator */}
+          <div
+            className="font-code text-xs uppercase tracking-widest"
             style={{
               color: isListening
-                ? "rgba(248,113,113,0.55)"
+                ? "rgba(248,113,113,0.6)"
                 : audioSpeaking
-                ? "rgba(96,165,250,0.55)"
-                : "rgba(200,190,180,0.18)",
-              fontSize: "9px",
-              letterSpacing: "0.15em",
+                ? "rgba(96,165,250,0.6)"
+                : "rgba(200,190,180,0.2)",
+              fontSize: "10px",
+              letterSpacing: "0.2em",
             }}
           >
             {isListening ? "● LISTENING" : audioSpeaking ? "● SPEAKING" : "○ IDLE"}
-          </span>
+          </div>
 
-          <div className="flex items-center gap-1" style={{ color: "rgba(200,190,180,0.3)" }}>
-            <button onClick={() => adjustRate(-0.1)} aria-label="Speak slower" className="p-0.5 hover:text-white transition-colors">
-              <Minus size={9} />
+          {/* Rate */}
+          <div className="flex items-center gap-1" style={{ color: "rgba(200,190,180,0.35)" }}>
+            <button
+              onClick={() => adjustRate(-0.1)}
+              className="p-0.5 hover:text-white transition-colors"
+              aria-label="Speak slower"
+              style={{ fontSize: "12px" }}
+            >
+              <Minus size={10} />
             </button>
-            <span className="font-code w-5 text-center" style={{ color: "rgba(200,190,180,0.4)", fontSize: "10px" }}>
+            <span className="font-code text-xs w-6 text-center" style={{ color: "rgba(200,190,180,0.45)", fontSize: "11px" }}>
               {speechRate.toFixed(1)}
             </span>
-            <button onClick={() => adjustRate(0.1)} aria-label="Speak faster" className="p-0.5 hover:text-white transition-colors">
-              <Plus size={9} />
+            <button
+              onClick={() => adjustRate(0.1)}
+              className="p-0.5 hover:text-white transition-colors"
+              aria-label="Speak faster"
+              style={{ fontSize: "12px" }}
+            >
+              <Plus size={10} />
             </button>
           </div>
 
+          {/* Mute */}
           <button
             onClick={toggleMute}
-            style={{ color: isMuted ? "rgba(200,190,180,0.18)" : "rgba(200,190,180,0.4)" }}
-            aria-label={isMuted ? "Unmute" : "Mute"}
+            className="transition-colors"
+            style={{ color: isMuted ? "rgba(200,190,180,0.2)" : "rgba(200,190,180,0.45)" }}
+            aria-label={isMuted ? "Unmute" : "Mute audio"}
           >
-            {isMuted ? <VolumeX size={13} /> : <Volume2 size={13} />}
+            {isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
           </button>
 
+          {/* Session */}
           <div
             className="font-code hidden md:flex items-center gap-1"
-            style={{ color: "rgba(200,190,180,0.15)", fontSize: "9px" }}
+            style={{ color: "rgba(200,190,180,0.2)", fontSize: "10px" }}
           >
-            <TerminalSquare size={9} />
+            <TerminalSquare size={10} />
             {gameState.sessionId.slice(0, 8)}
           </div>
         </div>
       </header>
 
-      {/* ═══════════ LOCATION STRIP (thin) ═══════════ */}
-      <div
-        className="relative z-10 flex items-center gap-2 px-4 shrink-0"
-        style={{
-          height: 28,
-          borderBottom: "1px solid rgba(255,255,255,0.03)",
-          background: "rgba(0,0,0,0.18)",
-        }}
-      >
-        <Map size={10} style={{ color: "rgba(212,175,55,0.4)", flexShrink: 0 }} />
-        <span
-          className="font-display uppercase tracking-widest truncate"
-          style={{ color: "rgba(212,175,55,0.6)", fontSize: "10px", letterSpacing: "0.18em" }}
+      {/* ═══════════ MAIN AREA ═══════════ */}
+      <div className="relative z-10 flex flex-col flex-1 overflow-hidden" style={{ minHeight: 0 }}>
+
+        {/* ── Location strip (thin) ── */}
+        <div
+          className="px-5 py-2 flex items-center gap-3"
+          style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}
         >
-          {currentRoom.name}
-        </span>
-
-        {/* Parsed intent ghost */}
-        {parsedCommand && (
+          <Map size={12} style={{ color: "rgba(212,175,55,0.5)" }} />
           <span
-            className="font-code ml-1 truncate hidden sm:block"
-            style={{ color: "rgba(200,190,180,0.15)", fontSize: "9px" }}
+            className="font-display text-xs tracking-widest uppercase"
+            style={{ color: "rgba(212,175,55,0.65)", letterSpacing: "0.2em", fontSize: "11px" }}
           >
-            ·&nbsp;{parsedCommand.action}{parsedCommand.direction ? ` ${parsedCommand.direction}` : ""}
+            {currentRoom.name}
           </span>
-        )}
-
-        {/* Exit buttons */}
-        <div className="ml-auto flex items-center gap-1 shrink-0">
-          {Object.keys(currentRoom.exits).map(dir => (
+          {currentRoom.enemies.filter(e => !e.isDefeated).length > 0 && (
+            <>
+              <span style={{ color: "rgba(255,255,255,0.1)" }}>·</span>
+              <Skull size={11} style={{ color: "rgba(248,113,113,0.5)" }} />
+              <span
+                className="font-code text-xs"
+                style={{ color: "rgba(248,113,113,0.5)", fontSize: "11px" }}
+              >
+                {currentRoom.enemies.filter(e => !e.isDefeated).map(e => `${e.name} ${e.hp}HP`).join(", ")}
+              </span>
+            </>
+          )}
+          <div className="ml-auto flex gap-1.5">
+            {Object.keys(currentRoom.exits).map(dir => (
+              <button
+                key={dir}
+                onClick={() => submitCommand(`move ${dir}`)}
+                disabled={isPending || isGameOver}
+                className="font-code text-xs uppercase px-2 py-0.5 transition-all hover:scale-105"
+                style={{
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  color: "rgba(200,190,180,0.5)",
+                  background: "rgba(255,255,255,0.02)",
+                  fontSize: "10px",
+                  letterSpacing: "0.15em",
+                }}
+                aria-label={`Move ${dir}`}
+              >
+                {dir}
+              </button>
+            ))}
             <button
-              key={dir}
-              onClick={() => submitCommand(`move ${dir}`)}
+              onClick={() => submitCommand("look")}
               disabled={isPending || isGameOver}
-              aria-label={`Move ${dir}`}
-              className="font-code uppercase transition-all hover:opacity-80"
-              style={{
-                border: "1px solid rgba(255,255,255,0.08)",
-                color: "rgba(200,190,180,0.45)",
-                background: "rgba(255,255,255,0.02)",
-                fontSize: "8px",
-                letterSpacing: "0.12em",
-                padding: "1px 6px",
-                opacity: isPending || isGameOver ? 0.3 : 1,
-              }}
+              className="ml-1 transition-colors"
+              style={{ color: "rgba(200,190,180,0.25)" }}
+              aria-label="Look around"
+              title="Look around"
             >
-              {dir}
+              <Eye size={12} />
             </button>
-          ))}
-          <button
-            onClick={() => submitCommand("look")}
-            disabled={isPending || isGameOver}
-            style={{ color: "rgba(200,190,180,0.2)", marginLeft: 2 }}
-            aria-label="Look"
-            title="Look"
-          >
-            <Eye size={10} />
-          </button>
-          <button
-            onClick={() => submitCommand("status")}
-            disabled={isPending || isGameOver}
-            style={{ color: "rgba(200,190,180,0.2)" }}
-            aria-label="Status"
-            title="Status"
-          >
-            <Info size={10} />
-          </button>
+            <button
+              onClick={() => submitCommand("status")}
+              disabled={isPending || isGameOver}
+              className="transition-colors"
+              style={{ color: "rgba(200,190,180,0.25)" }}
+              aria-label="Show status"
+              title="Show status"
+            >
+              <Info size={12} />
+            </button>
+          </div>
         </div>
-      </div>
 
-      {/* ═══════════ NARRATION FEED (dominant) ═══════════ */}
-      <div className="relative z-10 flex-1 min-h-0">
+        {/* ── Narration Feed ── */}
         <NarrationFeed logs={logs} newFromIndex={newFromIndex} />
+
+        {/* ── Parsed command debug (hidden when clean) ── */}
+        {parsedCommand && (
+          <div
+            className="px-5 py-1 flex items-center gap-3"
+            style={{ borderTop: "1px solid rgba(255,255,255,0.03)" }}
+          >
+            <span className="font-code text-xs" style={{ color: "rgba(200,190,180,0.2)", fontSize: "10px", letterSpacing: "0.15em" }}>
+              {parsedCommand.action}
+              {parsedCommand.direction ? ` · ${parsedCommand.direction}` : ""}
+              {parsedCommand.target ? ` · ${parsedCommand.target}` : ""}
+            </span>
+          </div>
+        )}
       </div>
 
-      {/* ═══════════ BOTTOM HUD (compact single strip) ═══════════ */}
+      {/* ═══════════ BOTTOM HUD ═══════════ */}
       <div
-        className="relative z-10 flex items-stretch shrink-0"
-        style={{ borderTop: "1px solid rgba(255,255,255,0.05)", background: "rgba(0,0,0,0.45)" }}
+        className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-3 p-3 shrink-0"
+        style={{ borderTop: "1px solid rgba(255,255,255,0.04)", background: "rgba(0,0,0,0.35)" }}
       >
-        {/* LEFT: Player stats */}
+        {/* Left: Player HUD */}
         <PlayerHUD
           name={player.name}
           level={player.level}
@@ -354,41 +348,7 @@ export function GameScreen({ gameState }: { gameState: GameStateResponse }) {
           isCombat={isCombat}
         />
 
-        {/* CENTER: Enemy bars (combat) or spacer */}
-        <AnimatePresence>
-          {isCombat && activeEnemies.length > 0 && (
-            <motion.div
-              key="enemy-bars"
-              initial={{ opacity: 0, width: 0 }}
-              animate={{ opacity: 1, width: 180 }}
-              exit={{ opacity: 0, width: 0 }}
-              className="flex flex-col justify-center gap-2 px-4 py-3 overflow-hidden shrink-0"
-              style={{
-                borderLeft: "1px solid rgba(179,18,47,0.2)",
-                borderRight: "1px solid rgba(179,18,47,0.2)",
-                minWidth: 0,
-              }}
-            >
-              <div
-                className="font-code uppercase mb-0.5 flex items-center gap-1"
-                style={{ color: "rgba(248,113,113,0.45)", fontSize: "8px", letterSpacing: "0.15em" }}
-              >
-                <Skull size={8} />
-                ENEMIES
-              </div>
-              {activeEnemies.map(enemy => (
-                <EnemyBar
-                  key={enemy.id}
-                  name={enemy.name}
-                  hp={enemy.hp}
-                  maxHp={enemy.maxHp}
-                />
-              ))}
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* RIGHT: Voice + Actions + Command */}
+        {/* Right: Voice + Controls */}
         <VoiceControl
           isSupported={voiceSupported}
           audioState={audioState}
