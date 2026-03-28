@@ -1,39 +1,28 @@
 import crypto from "crypto";
-
-function uuidv4(): string {
-  return crypto.randomUUID();
-}
-import { GameState, GameStatus, Player, ActionType, Direction, Ability, ParsedCommand } from "../types/index.js";
+import {
+  GameState,
+  GameStatus,
+  ActionType,
+  Direction,
+  CombatState,
+  ParsedCommand,
+  Enemy,
+} from "../types/index.js";
 import { CommandParser } from "../ai/CommandParser.js";
 import { DungeonManager, createDefaultDungeon } from "../dungeon/DungeonManager.js";
-import { CombatSystem, CombatResult } from "../combat/CombatSystem.js";
+import { CombatSystem, initCombatState, refreshTurnOrder } from "../combat/CombatSystem.js";
+import { NarrationEngine } from "../narration/NarrationEngine.js";
+import { triggerRoomEvent } from "../systems/EventSystem.js";
+import { findItemByName, useConsumable, applyEquipment } from "../systems/ItemSystem.js";
+import { createPlayer, calculateXpToNextLevel } from "../entities/Player.js";
+import { ItemType } from "../types/index.js";
 
-const DEFAULT_ABILITIES: Ability[] = [
-  { id: "fireball", name: "Fireball", description: "Launch a ball of fire at an enemy", mpCost: 10, damage: 30, type: "offensive" },
-  { id: "heal", name: "Heal", description: "Restore some of your HP", mpCost: 8, healAmount: 25, type: "defensive" },
-];
-
-function createPlayer(name: string): Player {
-  return {
-    id: uuidv4(),
-    name,
-    hp: 100,
-    maxHp: 100,
-    mp: 50,
-    maxMp: 50,
-    level: 1,
-    xp: 0,
-    xpToNextLevel: 100,
-    attack: 15,
-    defense: 8,
-    abilities: DEFAULT_ABILITIES,
-    inventory: [],
-    isDefending: false,
-  };
+function uuid(): string {
+  return crypto.randomUUID();
 }
 
-function calculateXpToNextLevel(level: number): number {
-  return Math.floor(100 * Math.pow(1.5, level - 1));
+function clamp(val: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, val));
 }
 
 export class GameEngine {
@@ -46,31 +35,37 @@ export class GameEngine {
     this.combat = new CombatSystem();
   }
 
-  startGame(playerName: string = "Hero"): GameState {
+  startGame(playerName = "Hero"): GameState {
     const dungeon = createDefaultDungeon();
-    const dungeonManager = new DungeonManager(dungeon);
     const startRoomId = dungeon.startRoomId;
+    const player = createPlayer(playerName);
 
     this.state = {
-      sessionId: uuidv4(),
+      sessionId: uuid(),
       gameStatus: GameStatus.EXPLORING,
-      player: createPlayer(playerName),
+      player,
       currentRoomId: startRoomId,
       dungeon,
       logs: [
-        "Welcome to Dora Dungeons!",
-        `You are ${playerName}, a brave adventurer entering a perilous dungeon.`,
-        "Your quest: defeat the Orc Warlord and claim victory!",
-        "Commands: attack [enemy], defend, move [direction], look, status, cast [spell]",
-        "---",
+        "══════════════════════════════",
+        "   DORA DUNGEONS — BEGIN",
+        "══════════════════════════════",
+        `You are ${playerName}, a lone adventurer descending into an ancient dungeon.`,
+        "Your quest: reach the Dark Throne Room and slay the Orc Warlord.",
+        "Commands: attack [enemy] | defend | move [direction] | cast [spell] [target] | use [item] | look | status | flee",
+        "——————————————————————————————",
       ],
       parsedCommand: undefined,
       turnCount: 0,
+      combat: { active: false, enemies: [], turnOrder: [], currentTurnIndex: 0, round: 1, log: [] },
+      gold: 0,
     };
 
-    dungeonManager.markExplored(startRoomId);
-    const roomDesc = this.describeCurrentRoom();
-    this.state.logs.push(...roomDesc);
+    const mgr = new DungeonManager(dungeon);
+    mgr.markExplored(startRoomId);
+    const eventResult = triggerRoomEvent(this.state.dungeon.rooms.get(startRoomId)!.event, player);
+    if (eventResult.narration.length > 0) this.state.logs.push(...eventResult.narration);
+    this.state.logs.push(...this.describeCurrentRoom(false));
 
     return this.state;
   }
@@ -80,8 +75,14 @@ export class GameEngine {
   }
 
   processCommand(input: string): GameState {
-    if (!this.state) {
-      throw new Error("No active game session. Call startGame() first.");
+    if (!this.state) throw new Error("No active game session. Call startGame() first.");
+
+    if (
+      this.state.gameStatus === GameStatus.GAME_OVER ||
+      this.state.gameStatus === GameStatus.VICTORY
+    ) {
+      this.state.logs.push("The game is over. Start a new session to play again.");
+      return this.state;
     }
 
     const parsed = this.parser.parse(input);
@@ -103,56 +104,72 @@ export class GameEngine {
       case ActionType.CAST_SPELL:
         logs.push(...this.handleCastSpell(parsed));
         break;
-      case ActionType.LOOK:
-        logs.push(...this.describeCurrentRoom());
-        break;
-      case ActionType.STATUS:
-        logs.push(...this.describePlayerStatus());
+      case ActionType.USE_ITEM:
+        logs.push(...this.handleUseItem(parsed));
         break;
       case ActionType.TAKE:
         logs.push(...this.handleTake(parsed));
         break;
+      case ActionType.LOOK:
+        logs.push(...this.describeCurrentRoom(true));
+        break;
+      case ActionType.STATUS:
+        logs.push(...this.describePlayerStatus());
+        break;
+      case ActionType.FLEE:
+        logs.push(...this.handleFlee(parsed));
+        break;
       default:
-        logs.push(`Unknown command: "${input}". Try: attack, defend, move [direction], look, status, cast [spell]`);
+        logs.push(
+          `Unknown command: "${input}".`,
+          "Try: attack [enemy], defend, move [direction], cast [spell], use [item], look, status, flee"
+        );
     }
 
     this.state.logs.push(...logs);
-    this.updateGameStatus();
+    this.syncGameStatus();
 
     return this.state;
   }
 
   updateState(): GameState {
     if (!this.state) throw new Error("No active game session.");
-    this.updateGameStatus();
+    this.syncGameStatus();
     return this.state;
   }
 
   private handleAttack(parsed: ParsedCommand): string[] {
     const state = this.state!;
-    const dungeonManager = new DungeonManager(state.dungeon);
-    const activeEnemies = dungeonManager.getActiveEnemies(state.currentRoomId);
+    const mgr = new DungeonManager(state.dungeon);
+    const activeEnemies = mgr.getActiveEnemies(state.currentRoomId);
 
     if (activeEnemies.length === 0) {
-      return ["There are no enemies here to attack."];
+      return ["There are no enemies here to attack. Explore the dungeon."];
     }
 
-    state.gameStatus = GameStatus.IN_COMBAT;
+    this.ensureCombatStarted(activeEnemies);
 
-    let target = activeEnemies[0];
+    let target = activeEnemies[0]!;
     if (parsed.target) {
       const found = activeEnemies.find((e) =>
         e.name.toLowerCase().includes(parsed.target!.toLowerCase())
       );
-      if (found) target = found;
-      else return [`You don't see a "${parsed.target}" here. Available enemies: ${activeEnemies.map((e) => e.name).join(", ")}`];
+      if (found) {
+        target = found;
+      } else {
+        return [
+          `You search for "${parsed.target}" but find only: ${activeEnemies.map((e) => e.name).join(", ")}.`,
+        ];
+      }
     }
 
-    const result = this.combat.attack(state.player, target);
-    this.applyXpGain(result);
+    const result = this.combat.playerAttack(state.player, target, state.combat);
+    this.applyXpAndGold(result.xpGained, result.goldGained);
+    this.checkLevelUp();
 
-    const remaining = dungeonManager.getActiveEnemies(state.currentRoomId);
-    if (remaining.length === 0) {
+    if (result.allEnemiesDefeated) {
+      result.messages.push(NarrationEngine.combatVictory());
+      state.combat.active = false;
       state.gameStatus = GameStatus.EXPLORING;
     }
 
@@ -161,178 +178,314 @@ export class GameEngine {
 
   private handleDefend(): string[] {
     const state = this.state!;
-    const dungeonManager = new DungeonManager(state.dungeon);
-    const activeEnemies = dungeonManager.getActiveEnemies(state.currentRoomId);
+    const mgr = new DungeonManager(state.dungeon);
+    const activeEnemies = mgr.getActiveEnemies(state.currentRoomId);
 
     if (activeEnemies.length === 0) {
       state.player.isDefending = true;
-      return ["You take a defensive stance, but there are no enemies nearby."];
+      return ["You adopt a defensive stance, alert for threats."];
     }
 
-    state.gameStatus = GameStatus.IN_COMBAT;
-    const result = this.combat.defend(state.player, activeEnemies);
-    this.applyXpGain(result);
-    return result.messages;
-  }
+    this.ensureCombatStarted(activeEnemies);
 
-  private handleMove(parsed: ParsedCommand): string[] {
-    const state = this.state!;
-    const dungeonManager = new DungeonManager(state.dungeon);
+    const result = this.combat.playerDefend(state.player, state.combat);
+    this.applyXpAndGold(result.xpGained, result.goldGained);
 
-    const activeEnemies = dungeonManager.getActiveEnemies(state.currentRoomId);
-    if (activeEnemies.length > 0) {
-      return ["You cannot flee! Enemies block your path. Defeat them first!"];
-    }
-
-    const direction = parsed.direction;
-    if (!direction) {
-      return ["Which direction? Try: move north, move south, move east, move west"];
-    }
-
-    const nextRoomId = dungeonManager.canMove(state.currentRoomId, direction);
-    if (!nextRoomId) {
-      return [`You cannot go ${direction} from here. Check the exits.`];
-    }
-
-    state.currentRoomId = nextRoomId;
-    dungeonManager.markExplored(nextRoomId);
-    state.gameStatus = GameStatus.EXPLORING;
-
-    const msgs = [`You move ${direction}...`];
-    msgs.push(...this.describeCurrentRoom());
-    return msgs;
-  }
-
-  private handleCastSpell(parsed: ParsedCommand): string[] {
-    const state = this.state!;
-    const dungeonManager = new DungeonManager(state.dungeon);
-    const activeEnemies = dungeonManager.getActiveEnemies(state.currentRoomId);
-
-    const spellName = parsed.target ?? "fireball";
-    let targetEnemy = activeEnemies.length > 0 ? activeEnemies[0] : null;
-
-    if (parsed.target) {
-      const found = activeEnemies.find((e) =>
-        e.name.toLowerCase().includes(parsed.target!.toLowerCase())
-      );
-      if (found) targetEnemy = found;
-    }
-
-    if (activeEnemies.length > 0) {
-      state.gameStatus = GameStatus.IN_COMBAT;
-    }
-
-    const result = this.combat.castSpell(state.player, spellName, targetEnemy, activeEnemies);
-    this.applyXpGain(result);
-
-    const remaining = dungeonManager.getActiveEnemies(state.currentRoomId);
-    if (remaining.length === 0 && activeEnemies.length > 0) {
+    if (result.allEnemiesDefeated) {
+      result.messages.push(NarrationEngine.combatVictory());
+      state.combat.active = false;
       state.gameStatus = GameStatus.EXPLORING;
     }
 
     return result.messages;
   }
 
+  private handleCastSpell(parsed: ParsedCommand): string[] {
+    const state = this.state!;
+    const mgr = new DungeonManager(state.dungeon);
+    const activeEnemies = mgr.getActiveEnemies(state.currentRoomId);
+    const spellName = parsed.ability ?? parsed.target ?? "fireball";
+
+    let targetEnemy: Enemy | null = null;
+    if (activeEnemies.length > 0) {
+      this.ensureCombatStarted(activeEnemies);
+      targetEnemy = activeEnemies[0]!;
+      if (parsed.target) {
+        const found = activeEnemies.find((e) =>
+          e.name.toLowerCase().includes(parsed.target!.toLowerCase())
+        );
+        if (found) targetEnemy = found;
+      }
+    }
+
+    const result = this.combat.playerCastSpell(state.player, spellName, targetEnemy, state.combat);
+    this.applyXpAndGold(result.xpGained, result.goldGained);
+    this.checkLevelUp();
+
+    if (result.allEnemiesDefeated && activeEnemies.length > 0) {
+      result.messages.push(NarrationEngine.combatVictory());
+      state.combat.active = false;
+      state.gameStatus = GameStatus.EXPLORING;
+    }
+
+    return result.messages;
+  }
+
+  private handleMove(parsed: ParsedCommand): string[] {
+    const state = this.state!;
+    const mgr = new DungeonManager(state.dungeon);
+
+    if (state.combat.active && mgr.getActiveEnemies(state.currentRoomId).length > 0) {
+      return [NarrationEngine.moveBlocked()];
+    }
+
+    const direction = parsed.direction;
+    if (!direction) {
+      return ["Which direction? Try: move north, move south, move east, move west, move up, move down"];
+    }
+
+    const nextRoomId = mgr.canMove(state.currentRoomId, direction);
+    if (!nextRoomId) {
+      return [NarrationEngine.noExit(direction)];
+    }
+
+    state.currentRoomId = nextRoomId;
+    state.combat.active = false;
+    state.player.isDefending = false;
+
+    const nextRoom = state.dungeon.rooms.get(nextRoomId)!;
+    const wasExplored = nextRoom.isExplored;
+    mgr.markExplored(nextRoomId);
+
+    const msgs: string[] = [];
+    msgs.push(`You move ${direction}...`);
+
+    if (wasExplored) {
+      msgs.push(NarrationEngine.roomAlreadyExplored(nextRoom.name));
+    } else {
+      msgs.push(NarrationEngine.roomEntry(nextRoom.name, nextRoom.description));
+    }
+
+    if (nextRoom.ambientDescription && !wasExplored) {
+      msgs.push(nextRoom.ambientDescription);
+    }
+
+    if (!wasExplored) {
+      const eventResult = triggerRoomEvent(nextRoom.event, state.player);
+      msgs.push(...eventResult.narration);
+
+      if (eventResult.goldGained > 0) {
+        state.gold += eventResult.goldGained;
+      }
+      if (eventResult.itemFound) {
+        state.player.inventory.push(eventResult.itemFound);
+        msgs.push(NarrationEngine.itemPickedUp(eventResult.itemFound.name));
+      }
+      if (eventResult.combatTriggered && nextRoom.event.enemies) {
+        const enemies = nextRoom.event.enemies.filter((e) => !e.isDefeated);
+        if (enemies.length > 0) {
+          state.combat = initCombatState(state.player, enemies);
+          state.gameStatus = GameStatus.IN_COMBAT;
+        }
+      }
+    } else {
+      const activeEnemies = mgr.getActiveEnemies(nextRoomId);
+      if (activeEnemies.length > 0) {
+        state.combat = initCombatState(state.player, activeEnemies);
+        state.gameStatus = GameStatus.IN_COMBAT;
+        msgs.push(NarrationEngine.combatStart(activeEnemies));
+      } else {
+        state.gameStatus = GameStatus.EXPLORING;
+        msgs.push(...this.describeCurrentRoom(false).slice(1));
+      }
+    }
+
+    return msgs;
+  }
+
+  private handleUseItem(parsed: ParsedCommand): string[] {
+    const state = this.state!;
+    const searchName = parsed.item ?? parsed.target ?? "";
+
+    const item = findItemByName(state.player.inventory, searchName);
+    if (!item) {
+      const names = state.player.inventory.map((i) => i.name);
+      if (names.length === 0) return ["Your pack is empty. Nothing to use."];
+      return [`You don't have "${searchName}". Inventory: ${names.join(", ")}.`];
+    }
+
+    if (item.type === ItemType.CONSUMABLE) {
+      const result = useConsumable(state.player, item);
+      return [NarrationEngine.itemUsed(state.player.name, item.name, result.message)];
+    }
+
+    if (item.type === ItemType.WEAPON || item.type === ItemType.ARMOR || item.type === ItemType.MISC) {
+      const equipMsg = applyEquipment(state.player, item);
+      return [equipMsg];
+    }
+
+    return [`You aren't sure how to use the ${item.name}.`];
+  }
+
   private handleTake(parsed: ParsedCommand): string[] {
     const state = this.state!;
     const room = state.dungeon.rooms.get(state.currentRoomId);
-    if (!room) return ["Room not found."];
+    if (!room || room.items.length === 0) return ["There's nothing here to take."];
 
-    if (room.items.length === 0) return ["There is nothing here to take."];
-
-    const itemName = parsed.target?.toLowerCase();
-    const itemIndex = itemName
-      ? room.items.findIndex((i) => i.name.toLowerCase().includes(itemName))
+    const searchName = parsed.target ?? "";
+    const itemIndex = searchName
+      ? room.items.findIndex((i) => i.name.toLowerCase().includes(searchName.toLowerCase()))
       : 0;
 
-    if (itemIndex === -1) return [`You don't see a "${parsed.target}" here.`];
+    if (itemIndex === -1) return [`You don't see a "${searchName}" here.`];
 
     const [taken] = room.items.splice(itemIndex, 1);
+    if (!taken) return ["Nothing to take."];
     state.player.inventory.push(taken);
-    return [`You pick up the ${taken.name} and add it to your inventory.`];
+    return [NarrationEngine.itemPickedUp(taken.name)];
   }
 
-  private describeCurrentRoom(): string[] {
+  private handleFlee(parsed: ParsedCommand): string[] {
+    const state = this.state!;
+    const mgr = new DungeonManager(state.dungeon);
+
+    if (!state.combat.active || mgr.getActiveEnemies(state.currentRoomId).length === 0) {
+      return ["You aren't in combat. No need to flee."];
+    }
+
+    const exits = Object.entries(state.dungeon.rooms.get(state.currentRoomId)?.exits ?? {});
+    if (exits.length === 0) return [NarrationEngine.fleeFailed()];
+
+    const fleeChance = 0.5 + (state.player.speed - 10) * 0.03;
+    if (Math.random() < fleeChance) {
+      const [dir, roomId] = exits[Math.floor(Math.random() * exits.length)]!;
+      state.currentRoomId = roomId;
+      state.combat.active = false;
+      state.player.isDefending = false;
+      state.gameStatus = GameStatus.EXPLORING;
+      mgr.markExplored(roomId);
+      const msgs = [NarrationEngine.fleeSuccess(dir as Direction)];
+      msgs.push(...this.describeCurrentRoom(false));
+      return msgs;
+    }
+
+    return [NarrationEngine.fleeFailed(), "The enemies retaliate for your attempt!"];
+  }
+
+  private ensureCombatStarted(enemies: Enemy[]): void {
+    const state = this.state!;
+    if (!state.combat.active) {
+      state.combat = initCombatState(state.player, enemies);
+      state.gameStatus = GameStatus.IN_COMBAT;
+    } else {
+      refreshTurnOrder(state.combat, state.player);
+    }
+  }
+
+  private describeCurrentRoom(includeHeader = true): string[] {
     const state = this.state!;
     const room = state.dungeon.rooms.get(state.currentRoomId);
-    if (!room) return ["You are in an unknown location."];
+    if (!room) return ["You are lost in an unknown place."];
 
-    const msgs: string[] = [
-      `--- ${room.name} ---`,
-      room.description,
-    ];
+    const msgs: string[] = [];
+    if (includeHeader) msgs.push(`── ${room.name} ──`);
+
+    if (!includeHeader) msgs.push(`── ${room.name} ──`);
+    msgs.push(room.description);
 
     const exits = Object.keys(room.exits);
     msgs.push(`Exits: ${exits.length > 0 ? exits.join(", ") : "none"}`);
 
-    const activeEnemies = room.enemies.filter((e) => !e.isDefeated);
+    const activeEnemies = (room.event.enemies ?? []).filter((e) => !e.isDefeated);
     if (activeEnemies.length > 0) {
-      msgs.push(`Enemies: ${activeEnemies.map((e) => `${e.name} (${e.hp}/${e.maxHp} HP)`).join(", ")}`);
+      msgs.push(`Enemies present: ${activeEnemies.map((e) => `${e.name} (${e.hp}/${e.maxHp} HP)`).join(", ")}`);
     } else {
       msgs.push("The room is clear of enemies.");
     }
 
     if (room.items.length > 0) {
-      msgs.push(`Items: ${room.items.map((i) => i.name).join(", ")}`);
+      msgs.push(`Items on the ground: ${room.items.map((i) => i.name).join(", ")}`);
     }
 
     return msgs;
   }
 
   private describePlayerStatus(): string[] {
-    const player = this.state!.player;
+    const p = this.state!.player;
+    const weapon = p.equippedWeapon ? `Weapon: ${p.equippedWeapon.name}` : "Weapon: None";
+    const armor = p.equippedArmor ? `Armor: ${p.equippedArmor.name}` : "Armor: None";
+    const effects =
+      p.statusEffects.length > 0
+        ? p.statusEffects.map((e) => `${e.name} (${e.duration} turns)`).join(", ")
+        : "None";
+
     return [
-      `--- ${player.name}'s Status ---`,
-      `Level: ${player.level} | XP: ${player.xp}/${player.xpToNextLevel}`,
-      `HP: ${player.hp}/${player.maxHp} | MP: ${player.mp}/${player.maxMp}`,
-      `Attack: ${player.attack} | Defense: ${player.defense}`,
-      `Abilities: ${player.abilities.map((a) => a.name).join(", ")}`,
-      `Inventory: ${player.inventory.length > 0 ? player.inventory.map((i) => i.name).join(", ") : "empty"}`,
+      `── ${p.name} — Status ──`,
+      `Level ${p.level} | XP: ${p.xp}/${p.xpToNextLevel} | Gold: ${this.state!.gold}`,
+      `HP: ${p.hp}/${p.maxHp} | MP: ${p.mp}/${p.maxMp}`,
+      `ATK: ${p.attack} | DEF: ${p.defense} | SPD: ${p.speed}`,
+      weapon,
+      armor,
+      `Abilities: ${p.abilities.map((a) => a.name).join(", ")}`,
+      `Inventory: ${p.inventory.length > 0 ? p.inventory.map((i) => i.name).join(", ") : "empty"}`,
+      `Status Effects: ${effects}`,
     ];
   }
 
-  private applyXpGain(result: CombatResult): void {
-    if (result.xpGained <= 0) return;
-    const player = this.state!.player;
-    player.xp += result.xpGained;
+  private applyXpAndGold(xp: number, gold: number): void {
+    if (xp > 0) this.state!.player.xp += xp;
+    if (gold > 0) this.state!.gold += gold;
+  }
 
+  private checkLevelUp(): void {
+    const state = this.state!;
+    const player = state.player;
     while (player.xp >= player.xpToNextLevel) {
       player.xp -= player.xpToNextLevel;
       player.level += 1;
       player.xpToNextLevel = calculateXpToNextLevel(player.level);
       player.maxHp += 15;
-      player.hp = Math.min(player.hp + 15, player.maxHp);
+      player.hp = clamp(player.hp + 15, 0, player.maxHp);
       player.maxMp += 10;
-      player.mp = Math.min(player.mp + 10, player.maxMp);
+      player.mp = clamp(player.mp + 10, 0, player.maxMp);
       player.attack += 3;
+      player.baseAttack += 3;
       player.defense += 2;
-      this.state!.logs.push(
-        `LEVEL UP! You are now level ${player.level}! HP+15, MP+10, ATK+3, DEF+2`
-      );
+      player.baseDefense += 2;
+      player.speed += 1;
+      state.logs.push(NarrationEngine.levelUp(player));
     }
   }
 
-  private updateGameStatus(): void {
+  private syncGameStatus(): void {
     const state = this.state!;
     if (!state) return;
 
     if (state.player.hp <= 0) {
       state.gameStatus = GameStatus.GAME_OVER;
+      state.combat.active = false;
       return;
     }
 
-    const dungeonManager = new DungeonManager(state.dungeon);
-
-    if (dungeonManager.isBossRoom(state.currentRoomId) && dungeonManager.isAllClear(state.currentRoomId)) {
+    const mgr = new DungeonManager(state.dungeon);
+    if (mgr.isBossRoom(state.currentRoomId) && mgr.isAllClear(state.currentRoomId)) {
       state.gameStatus = GameStatus.VICTORY;
-      state.logs.push("VICTORY! The Orc Warlord is defeated! You are the champion of Dora Dungeons!");
+      state.combat.active = false;
+      state.logs.push(
+        "══════════════════════════════",
+        "   VICTORY! THE DUNGEON FALLS",
+        "══════════════════════════════",
+        `The Orc Warlord is slain. ${state.player.name} stands victorious in the silence.`,
+        `Final Level: ${state.player.level} | Gold: ${state.gold} | Turns: ${state.turnCount}`
+      );
       return;
     }
 
-    const activeEnemies = dungeonManager.getActiveEnemies(state.currentRoomId);
+    const activeEnemies = mgr.getActiveEnemies(state.currentRoomId);
     if (activeEnemies.length > 0) {
       state.gameStatus = GameStatus.IN_COMBAT;
-    } else if (state.gameStatus === GameStatus.IN_COMBAT) {
+    } else if (state.combat.active) {
+      state.combat.active = false;
       state.gameStatus = GameStatus.EXPLORING;
     }
   }

@@ -1,84 +1,166 @@
-import { Dungeon, Room, Enemy, Direction } from "../types/index.js";
+import { Dungeon, Room, Direction, EventType, RoomEvent } from "../types/index.js";
+import { createEnemy } from "../entities/Enemy.js";
+import { ITEMS, cloneItem } from "../systems/ItemSystem.js";
 
-function createEnemy(id: string, name: string, hp: number, attack: number, defense: number, xpReward: number): Enemy {
-  return { id, name, hp, maxHp: hp, attack, defense, xpReward, isDefeated: false };
+function makeEvent(type: EventType, opts: Partial<RoomEvent> = {}): RoomEvent {
+  return { type, triggered: false, ...opts };
 }
 
-function createRoom(
+function buildRoom(
   id: string,
   name: string,
   description: string,
   exits: Partial<Record<Direction, string>>,
-  enemies: Enemy[] = [],
-  items: string[] = []
+  event: RoomEvent,
+  items: RoomEvent["itemReward"][] = [],
+  ambientDescription?: string
 ): Room {
   return {
     id,
     name,
     description,
     exits,
-    enemies,
-    items: items.map((name) => ({ id: `item-${name}`, name, description: `A ${name}`, type: "misc" })),
+    event,
+    items: items.filter((i): i is NonNullable<typeof i> => !!i).map((i) => ({ ...i })),
     isExplored: false,
+    ambientDescription,
   };
 }
 
 export function createDefaultDungeon(): Dungeon {
   const rooms = new Map<string, Room>();
 
-  const entranceRoom = createRoom(
+  rooms.set(
     "room-entrance",
-    "Dungeon Entrance",
-    "You stand at the entrance of a dark, damp dungeon. The smell of mold and danger fills the air. Flickering torches cast eerie shadows on the stone walls. You can hear distant growls to the north.",
-    { [Direction.NORTH]: "room-hall", [Direction.EAST]: "room-armory" }
+    buildRoom(
+      "room-entrance",
+      "The Dungeon Entrance",
+      "You stand at the threshold of darkness. A damp chill seeps from the stone walls. Torches flicker and cast long shadows. Scratches on the wall read: 'Turn back.' You won't.",
+      { [Direction.NORTH]: "room-hall", [Direction.EAST]: "room-armory" },
+      makeEvent(EventType.STORY, {
+        storyText: "An ancient inscription on the archway reads: 'Only the worthy shall pass — the weak shall feed the dark.' Your quest begins.",
+      }),
+      [],
+      "The air is cold and smells of rot and old stone."
+    )
   );
 
-  const hallRoom = createRoom(
+  rooms.set(
     "room-hall",
-    "The Main Hall",
-    "A vast hall stretches before you. Cracked pillars line the walls and bones litter the floor. Two goblins patrol the far end. Exits lead south back to the entrance, east to a storage room, and north toward the throne room.",
-    { [Direction.SOUTH]: "room-entrance", [Direction.EAST]: "room-storage", [Direction.NORTH]: "room-throne" },
-    [
-      createEnemy("goblin-1", "Goblin Scout", 20, 8, 3, 30),
-      createEnemy("goblin-2", "Goblin Grunt", 25, 10, 4, 40),
-    ]
+    buildRoom(
+      "room-hall",
+      "The Main Hall",
+      "A vast corridor of crumbling stone columns. Bones crunch underfoot. Two goblins patrol the far end — a wiry scout and a brutish grunt. Their yellow eyes snap toward you.",
+      {
+        [Direction.SOUTH]: "room-entrance",
+        [Direction.EAST]: "room-storage",
+        [Direction.NORTH]: "room-crypts",
+      },
+      makeEvent(EventType.COMBAT, {
+        enemies: [createEnemy("goblin_scout"), createEnemy("goblin_grunt")],
+      }),
+      [],
+      "The distant dripping of water echoes in the dark."
+    )
   );
 
-  const armoryRoom = createRoom(
+  rooms.set(
     "room-armory",
-    "The Armory",
-    "Rusty weapons hang on the walls. Most are broken but you spot a usable sword. The room is empty of enemies for now. Exit leads west back to the entrance.",
-    { [Direction.WEST]: "room-entrance" },
-    [],
-    ["Iron Sword", "Leather Gloves"]
+    buildRoom(
+      "room-armory",
+      "The Abandoned Armory",
+      "Weapon racks line the walls, most rusted and broken. But a gleaming iron sword catches your eye — still sharp. A suit of leather armor hangs nearby. No enemies here, for now.",
+      { [Direction.WEST]: "room-entrance" },
+      makeEvent(EventType.TREASURE, {
+        storyText: "You rummage through the armory and find usable equipment!",
+        itemReward: cloneItem(ITEMS.iron_sword!),
+        goldReward: 10,
+      }),
+      [cloneItem(ITEMS.leather_armor!), cloneItem(ITEMS.health_potion!)],
+      "The smell of oil and rust fills the air."
+    )
   );
 
-  const storageRoom = createRoom(
+  rooms.set(
     "room-storage",
-    "Storage Room",
-    "Old crates and barrels fill this dusty room. A wounded skeleton lurches toward you. You spot a healing potion on a shelf. Exit leads west back to the main hall.",
-    { [Direction.WEST]: "room-hall" },
-    [createEnemy("skeleton-1", "Wounded Skeleton", 15, 6, 2, 25)],
-    ["Health Potion"]
+    buildRoom(
+      "room-storage",
+      "The Storage Room",
+      "Rotting crates and cracked barrels fill this room. A skeletal warrior rises from behind a collapsed shelf — its jaw clicks open in a silent scream.",
+      { [Direction.WEST]: "room-hall", [Direction.NORTH]: "room-library" },
+      makeEvent(EventType.COMBAT, {
+        enemies: [createEnemy("skeleton")],
+      }),
+      [cloneItem(ITEMS.health_potion!), cloneItem(ITEMS.mana_potion!)],
+      "The floorboards creak underfoot. Something skitters in the dark corners."
+    )
   );
 
-  const throneRoom = createRoom(
+  rooms.set(
+    "room-library",
+    buildRoom(
+      "room-library",
+      "The Forgotten Library",
+      "Towering shelves of crumbling tomes reach the vaulted ceiling. A robed Dark Mage turns from a glowing lectern, eyes blazing with violet fire. This one won't let you read in peace.",
+      { [Direction.SOUTH]: "room-storage", [Direction.NORTH]: "room-crypts" },
+      makeEvent(EventType.COMBAT, {
+        enemies: [createEnemy("dark_mage")],
+      }),
+      [cloneItem(ITEMS.enchanted_ring!), cloneItem(ITEMS.mana_potion!)],
+      "Whispering pages drift through the air. Knowledge and danger hang equally heavy."
+    )
+  );
+
+  rooms.set(
+    "room-crypts",
+    buildRoom(
+      "room-crypts",
+      "The Ancient Crypts",
+      "Low-hanging burial niches line the walls. Two skeleton warriors animate as you enter — their empty sockets glowing faint red. A pressure plate glints in the moonlight ahead.",
+      {
+        [Direction.SOUTH]: "room-hall",
+        [Direction.WEST]: "room-library",
+        [Direction.NORTH]: "room-throne",
+      },
+      makeEvent(EventType.COMBAT, {
+        enemies: [createEnemy("skeleton"), createEnemy("skeleton")],
+      }),
+      [],
+      "The silence here has a weight to it. You are not alone."
+    )
+  );
+
+  rooms.set(
+    "room-trap",
+    buildRoom(
+      "room-trap",
+      "The Pressure Chamber",
+      "This narrow passage is unnervingly clean — no dust, no bones. Something is wrong.",
+      { [Direction.EAST]: "room-crypts", [Direction.NORTH]: "room-throne" },
+      makeEvent(EventType.TRAP, { trapDamage: 18 }),
+      [cloneItem(ITEMS.health_potion!)],
+      "The air hums with tension."
+    )
+  );
+
+  rooms.set(
     "room-throne",
-    "The Dark Throne Room",
-    "A massive chamber with a decaying throne at its center. The Dungeon Boss — the Orc Warlord — sits upon it, flanked by two orc guards. This is the final battle. Exit leads south back to the main hall.",
-    { [Direction.SOUTH]: "room-hall" },
-    [
-      createEnemy("orc-guard-1", "Orc Guard", 40, 14, 8, 80),
-      createEnemy("orc-guard-2", "Orc Guard", 40, 14, 8, 80),
-      createEnemy("orc-boss", "Orc Warlord (Boss)", 80, 20, 12, 200),
-    ]
+    buildRoom(
+      "room-throne",
+      "The Dark Throne Room",
+      "A vast, vaulted chamber dominated by an obsidian throne. On it sits the Orc Warlord — massive, scarred, armored in black iron. Two Orc Guards flank him. The warlord's eye opens. 'Another fool has come to die.'",
+      { [Direction.SOUTH]: "room-crypts" },
+      makeEvent(EventType.COMBAT, {
+        enemies: [
+          createEnemy("orc_guard"),
+          createEnemy("orc_guard"),
+          createEnemy("orc_warlord"),
+        ],
+      }),
+      [],
+      "The torches burn black here. The air tastes of iron and dread."
+    )
   );
-
-  rooms.set(entranceRoom.id, entranceRoom);
-  rooms.set(hallRoom.id, hallRoom);
-  rooms.set(armoryRoom.id, armoryRoom);
-  rooms.set(storageRoom.id, storageRoom);
-  rooms.set(throneRoom.id, throneRoom);
 
   return {
     rooms,
@@ -109,10 +191,10 @@ export class DungeonManager {
     if (room) room.isExplored = true;
   }
 
-  getActiveEnemies(roomId: string): Enemy[] {
+  getActiveEnemies(roomId: string): import("../types/index.js").Enemy[] {
     const room = this.getRoom(roomId);
     if (!room) return [];
-    return room.enemies.filter((e) => !e.isDefeated);
+    return (room.event.enemies ?? []).filter((e) => !e.isDefeated);
   }
 
   isAllClear(roomId: string): boolean {
@@ -121,5 +203,10 @@ export class DungeonManager {
 
   isBossRoom(roomId: string): boolean {
     return roomId === this.dungeon.bossRoomId;
+  }
+
+  hasUntriggeredEvent(roomId: string): boolean {
+    const room = this.getRoom(roomId);
+    return !!room && !room.event.triggered;
   }
 }

@@ -11,10 +11,11 @@ export enum ActionType {
   DEFEND = "DEFEND",
   MOVE = "MOVE",
   CAST_SPELL = "CAST_SPELL",
+  USE_ITEM = "USE_ITEM",
   LOOK = "LOOK",
   STATUS = "STATUS",
   TAKE = "TAKE",
-  USE = "USE",
+  FLEE = "FLEE",
   UNKNOWN = "UNKNOWN",
 }
 
@@ -27,54 +28,135 @@ export enum Direction {
   DOWN = "down",
 }
 
-export interface Ability {
-  id: string;
+export enum StatusEffectType {
+  POISON = "POISON",
+  STUN = "STUN",
+  BURN = "BURN",
+  SHIELD = "SHIELD",
+  HASTE = "HASTE",
+}
+
+export enum EnemyType {
+  GOBLIN = "GOBLIN",
+  MAGE = "MAGE",
+  TANK = "TANK",
+  SKELETON = "SKELETON",
+  BOSS = "BOSS",
+}
+
+export enum AbilityTargetType {
+  SINGLE_ENEMY = "SINGLE_ENEMY",
+  ALL_ENEMIES = "ALL_ENEMIES",
+  SELF = "SELF",
+}
+
+export enum AbilityEffectType {
+  ATTACK = "attack",
+  BUFF = "buff",
+  DEBUFF = "debuff",
+  HEAL = "heal",
+}
+
+export enum ItemType {
+  CONSUMABLE = "CONSUMABLE",
+  WEAPON = "WEAPON",
+  ARMOR = "ARMOR",
+  MISC = "MISC",
+}
+
+export enum EventType {
+  COMBAT = "COMBAT",
+  TREASURE = "TREASURE",
+  TRAP = "TRAP",
+  STORY = "STORY",
+  EMPTY = "EMPTY",
+}
+
+export interface StatusEffect {
+  type: StatusEffectType;
   name: string;
-  description: string;
-  mpCost: number;
-  damage?: number;
-  healAmount?: number;
-  type: "offensive" | "defensive" | "utility";
+  duration: number;
+  damagePerTurn?: number;
+  defenseModifier?: number;
+  skipsTurn?: boolean;
+  narration: string;
+}
+
+export interface StatBlock {
+  hp: number;
+  maxHp: number;
+  mp: number;
+  maxMp: number;
+  attack: number;
+  defense: number;
+  speed: number;
+}
+
+export interface ItemEffect {
+  stat: keyof StatBlock;
+  value: number;
 }
 
 export interface Item {
   id: string;
   name: string;
   description: string;
-  type: "weapon" | "armor" | "potion" | "misc";
-  effect?: {
-    stat: "hp" | "mp" | "attack" | "defense";
-    value: number;
-  };
+  type: ItemType;
+  effect?: ItemEffect;
+  equipped?: boolean;
 }
 
-export interface Player {
+export interface Ability {
   id: string;
   name: string;
-  hp: number;
-  maxHp: number;
-  mp: number;
-  maxMp: number;
+  description: string;
+  mpCost: number;
+  targetType: AbilityTargetType;
+  effectType: AbilityEffectType;
+  baseDamage?: number;
+  healAmount?: number;
+  statusEffect?: Omit<StatusEffect, "narration">;
+  cooldown?: number;
+  currentCooldown?: number;
+  narrationTemplate: string;
+}
+
+export interface Player extends StatBlock {
+  id: string;
+  name: string;
   level: number;
   xp: number;
   xpToNextLevel: number;
-  attack: number;
-  defense: number;
   abilities: Ability[];
   inventory: Item[];
+  equippedWeapon?: Item;
+  equippedArmor?: Item;
+  statusEffects: StatusEffect[];
   isDefending: boolean;
+  baseAttack: number;
+  baseDefense: number;
 }
 
-export interface Enemy {
+export interface Enemy extends StatBlock {
   id: string;
   name: string;
-  hp: number;
-  maxHp: number;
-  attack: number;
-  defense: number;
+  type: EnemyType;
   xpReward: number;
+  goldReward: number;
   isDefeated: boolean;
+  statusEffects: StatusEffect[];
   abilities?: Ability[];
+  aiProfile: "aggressive" | "defensive" | "caster" | "balanced";
+}
+
+export interface RoomEvent {
+  type: EventType;
+  triggered: boolean;
+  enemies?: Enemy[];
+  itemReward?: Item;
+  goldReward?: number;
+  trapDamage?: number;
+  storyText?: string;
 }
 
 export interface Room {
@@ -82,9 +164,10 @@ export interface Room {
   name: string;
   description: string;
   exits: Partial<Record<Direction, string>>;
-  enemies: Enemy[];
+  event: RoomEvent;
   items: Item[];
   isExplored: boolean;
+  ambientDescription?: string;
 }
 
 export interface Dungeon {
@@ -97,7 +180,18 @@ export interface ParsedCommand {
   action: ActionType;
   target?: string;
   direction?: Direction;
+  ability?: string;
+  item?: string;
   raw: string;
+}
+
+export interface CombatState {
+  active: boolean;
+  enemies: Enemy[];
+  turnOrder: string[];
+  currentTurnIndex: number;
+  round: number;
+  log: string[];
 }
 
 export interface GameState {
@@ -109,4 +203,6 @@ export interface GameState {
   logs: string[];
   parsedCommand?: ParsedCommand;
   turnCount: number;
+  combat: CombatState;
+  gold: number;
 }

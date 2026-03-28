@@ -1,0 +1,263 @@
+You are a senior game developer.
+
+You are expanding an existing TypeScript-based game engine for an audio-first RPG called "Dora Dungeons".
+
+The current engine already supports:
+
+* Basic player system
+* Simple combat (attack only)
+* Simple dungeon navigation
+* Command parsing
+* API integration
+
+Your task is to EVOLVE this into a deeper, scalable RPG engine.
+
+---
+
+## GOAL
+
+Transform the engine from a simple demo into a system capable of supporting:
+
+* Strategic combat
+* Exploration-based gameplay
+* Rich narration (for future audio output)
+* Flexible command interpretation
+
+---
+
+1. ADVANCED COMBAT SYSTEM
+
+---
+
+Upgrade the combat system to include:
+
+* Multiple enemies per encounter
+* Enemy types (e.g., Goblin, Mage, Tank)
+* Turn order system (speed-based or simple alternating)
+
+Add player actions:
+
+* ATTACK
+* DEFEND (reduces damage next turn)
+* CAST_SPELL (uses mana)
+* USE_ITEM
+
+Add attributes:
+Player:
+
+* health
+* mana
+* attack
+* defense
+* speed
+
+Enemy:
+
+* same structure but simplified AI
+
+Add status effects:
+
+* poison (damage over time)
+* stun (skip turn)
+
+Combat must return a structured result:
+
+* damage dealt
+* effects applied
+* narration text (VERY IMPORTANT)
+
+---
+
+2. ABILITY & SPELL SYSTEM
+
+---
+
+Create a flexible system for abilities:
+
+Ability:
+
+* id
+* name
+* type (attack, buff, debuff)
+* mana cost
+* effect function
+
+Examples:
+
+* Fireball → damage + burn
+* Shield → increase defense
+
+Abilities must be reusable and extendable.
+
+---
+
+3. INVENTORY & ITEM SYSTEM
+
+---
+
+Add:
+
+* Inventory array
+* Item types:
+
+  * consumables (healing potion)
+  * equipment (weapon, armor)
+
+Equipment must affect player stats.
+
+---
+
+4. DUNGEON SYSTEM (MAJOR UPGRADE)
+
+---
+
+Replace simple linear rooms with:
+
+Room:
+
+* id
+* description
+* connected rooms (N, S, E, W or named paths)
+* possible events:
+
+  * enemy encounter
+  * treasure
+  * trap
+
+Add exploration mechanics:
+
+* Player can MOVE (north, south, etc.)
+* Each move triggers:
+
+  * narration
+  * possible event
+
+---
+
+5. EVENT SYSTEM
+
+---
+
+Create a flexible event system:
+
+Event types:
+
+* COMBAT
+* TREASURE
+* TRAP
+* STORY
+
+Each event should:
+
+* trigger logic
+* return narration text
+
+---
+
+6. COMMAND PARSER UPGRADE
+
+---
+
+Upgrade parser to handle flexible inputs:
+
+Examples:
+
+* "attack goblin"
+* "cast fireball on the mage"
+* "go north"
+* "drink potion"
+
+Output must be structured:
+{
+action: string,
+target?: string,
+direction?: string,
+ability?: string
+}
+
+Parser must be extendable for future voice AI.
+
+---
+
+7. NARRATION SYSTEM (CRITICAL FOR AUDIO)
+
+---
+
+Every action must return rich text narration.
+
+Example:
+"You raise your staff and unleash a fireball. It explodes on the goblin, leaving it burning."
+
+DO NOT return raw numbers only.
+
+All systems must produce:
+
+* structured data
+* narration string
+
+---
+
+8. GAME STATE MANAGEMENT
+
+---
+
+Improve GameEngine:
+
+* Maintain full game state
+* Track:
+
+  * current room
+  * combat state
+  * player stats
+  * active effects
+
+Ensure:
+
+* deterministic updates
+* no side effects outside engine
+
+---
+
+## CODE QUALITY RULES
+
+* Keep everything modular
+* No logic inside API routes
+* Use TypeScript strictly
+* Separate systems into folders:
+  /combat
+  /entities
+  /systems
+  /parser
+  /dungeon
+
+---
+
+## OUTPUT FORMAT
+
+1. Updated folder structure
+2. New/updated core files
+3. Explanation of systems
+4. Example gameplay flow:
+
+   * Start game
+   * Move room
+   * Trigger combat
+   * Use ability
+
+---
+
+## IMPORTANT CONSTRAINTS
+
+* Do NOT add voice/audio yet
+* Do NOT add multiplayer
+* Focus ONLY on engine depth
+
+---
+
+## END GOAL
+
+The engine should feel like a real RPG simulation, not a simple command-response system.
+
+---
+
+## BEGIN NOW
