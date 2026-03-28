@@ -1,0 +1,215 @@
+You are a senior AI developer and accessibility-focused game engineer.
+
+You are integrating a voice and audio layer into an existing TypeScript RPG engine called "Dora Dungeons".
+
+The engine is already complete and includes:
+
+* Modular game engine
+* Data-driven abilities, events, and dungeon system
+* Command parser (text-based)
+* Backend API and React frontend
+
+Your task is to add FULL voice input and audio output while keeping the system scalable and accessible.
+
+---
+
+## GOAL
+
+Transform the game into an AUDIO-FIRST experience where:
+
+* The player can control the game using voice commands
+* The game responds with spoken narration
+* The experience works for visually impaired users
+
+---
+
+1. VOICE INPUT SYSTEM (SPEECH-TO-TEXT)
+
+---
+
+Implement voice input in the React frontend using the Web Speech API.
+
+Requirements:
+
+* Continuous listening mode (not one-shot)
+* Ability to start/stop listening
+* Display transcribed text in UI (for debugging)
+
+Handle:
+
+* Background noise
+* Partial transcripts
+* Command confirmation before execution (optional)
+
+Output:
+
+* Send transcribed text to backend /game/action endpoint
+
+---
+
+2. INTENT PROCESSING LAYER (IMPORTANT)
+
+---
+
+Do NOT send raw speech directly to the game engine.
+
+Create an intermediate layer:
+
+Voice Input → Intent Processor → Command Parser → Game Engine
+
+Intent Processor must:
+
+* Clean up text
+* Normalize phrases
+* Handle variations
+
+Examples:
+"hit that goblin guy"
+→ "attack goblin"
+
+"uh go to the left door"
+→ "move west"
+
+Make this system extensible for future AI-based parsing.
+
+---
+
+3. TEXT-TO-SPEECH (AUDIO OUTPUT)
+
+---
+
+Implement narration playback:
+
+Options:
+
+* Start with browser SpeechSynthesis API
+* Design system to later support external TTS (e.g., ElevenLabs)
+
+Requirements:
+
+* Speak every narration returned by the game engine
+* Queue speech (no overlapping audio)
+* Allow interrupting speech when new action occurs
+
+---
+
+4. AUDIO MANAGER (CRITICAL SYSTEM)
+
+---
+
+Create an AudioManager module:
+
+Responsibilities:
+
+* Manage all audio playback
+* Queue narration
+* Control playback (play, stop, interrupt)
+* Handle multiple audio channels (future use)
+
+Structure:
+
+* narration channel
+* ambient channel
+* effects channel
+
+---
+
+5. SPATIAL AUDIO (BASIC IMPLEMENTATION)
+
+---
+
+Using Web Audio API:
+
+* Simulate left/right directional sound
+* Example:
+
+  * Enemy on left → audio pans left
+  * Door on right → audio pans right
+
+Keep it simple but extensible.
+
+---
+
+6. ACCESSIBILITY FEATURES (VERY IMPORTANT)
+
+---
+
+* Clear voice feedback after every action
+
+* No reliance on visuals
+
+* Optional repeat command:
+  "repeat last message"
+
+* Slow/fast speech rate control
+
+---
+
+7. FRONTEND UI UPDATE
+
+---
+
+Add:
+
+* Microphone button (start/stop listening)
+* Transcript display
+* Game log (text fallback)
+* Audio status indicator (listening / speaking)
+
+---
+
+8. ERROR HANDLING
+
+---
+
+Handle cases:
+
+* No speech detected
+* Unrecognized command
+* Ambiguous intent
+
+Respond with helpful narration:
+"I didn’t understand that. Try saying 'attack goblin' or 'move north'."
+
+---
+
+9. KEEP ENGINE SEPARATION
+
+---
+
+STRICT RULE:
+
+* Do NOT modify game engine logic for voice
+* Voice system must sit on top of existing engine
+
+---
+
+## OUTPUT FORMAT
+
+1. Updated frontend structure
+2. Voice input implementation
+3. AudioManager module
+4. Integration flow (voice → engine → audio)
+5. Example interaction:
+
+   * User speaks
+   * Command processed
+   * Audio response played
+
+---
+
+## IMPORTANT CONSTRAINTS
+
+* Do NOT implement multiplayer
+* Do NOT implement payments yet
+* Focus ONLY on voice + audio experience
+
+---
+
+## END GOAL
+
+The game must be playable WITHOUT looking at the screen.
+
+---
+
+## BEGIN NOW

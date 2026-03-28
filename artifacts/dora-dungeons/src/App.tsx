@@ -4,7 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { StartScreen } from "@/pages/StartScreen";
 import { GameScreen } from "@/pages/GameScreen";
-import { useGetGameState } from "@workspace/api-client-react";
+import { useGetGameState, getGetGameStateQueryKey } from "@workspace/api-client-react";
 import { Loader2 } from "lucide-react";
 
 // Configure query client to not retry on 404s so we can immediately show StartScreen
@@ -24,7 +24,8 @@ const queryClient = new QueryClient({
 function GameOrchestrator() {
   const { data: gameState, isLoading, isError, error } = useGetGameState({
     query: {
-      retry: false, // Explicitly disable retry for the state check
+      queryKey: getGetGameStateQueryKey(),
+      retry: false,
     }
   });
 

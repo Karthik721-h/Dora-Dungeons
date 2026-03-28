@@ -31,7 +31,7 @@ const TerminalButton = React.forwardRef<HTMLButtonElement, TerminalButtonProps>(
           },
           className
         )}
-        {...props}
+        {...props as any}
       />
     );
   }
