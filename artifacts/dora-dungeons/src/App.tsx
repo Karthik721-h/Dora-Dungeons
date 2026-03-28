@@ -9,6 +9,7 @@ import { IntroScene } from "@/components/IntroScene";
 import { useGetGameState, getGetGameStateQueryKey } from "@workspace/api-client-react";
 import { Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { AudioManager } from "@/audio/AudioManager";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -89,6 +90,10 @@ function App() {
   const [introComplete, setIntroComplete] = useState(false);
 
   useEffect(() => {
+    // Initialize TTS voice selection as early as possible.
+    // Chrome/Edge load voices asynchronously so this must fire before any speak() call.
+    AudioManager.initializeVoices();
+
     // Show intro on first visit per session
     const seen = sessionStorage.getItem(INTRO_SEEN_KEY);
     if (!seen) {

@@ -1,0 +1,134 @@
+You are a senior frontend and audio systems engineer.
+
+You are improving the Text-to-Speech system of an audio-first RPG called "Dora Dungeons".
+
+The current system uses the browser SpeechSynthesis API, but it defaults to inconsistent or deep male voices. Your task is to enforce a clear, natural-sounding FEMALE voice and improve speech clarity.
+
+---
+
+## GOAL
+
+Ensure all narration uses:
+
+* A clear female voice (when available)
+* Proper pitch and rate for clarity
+* Stable voice selection across browsers
+
+---
+
+## REQUIREMENTS
+
+1. VOICE SELECTION SYSTEM
+
+Implement a function:
+
+getPreferredVoice(): SpeechSynthesisVoice
+
+Rules:
+
+* Prefer female voices explicitly
+* Try in this priority order:
+
+  * "Google UK English Female"
+  * "Google US English"
+  * "Samantha" (macOS)
+  * "Microsoft Zira" (Windows)
+  * Any voice with "Female" in the name
+  * Fallback to first available voice
+
+---
+
+2. HANDLE ASYNC VOICE LOADING (CRITICAL)
+
+SpeechSynthesis voices are loaded asynchronously.
+
+You MUST:
+
+* Listen for `speechSynthesis.onvoiceschanged`
+* Populate voice list after it fires
+* Store selected voice in AudioManager
+
+Ensure:
+
+* Voice is always selected BEFORE speaking
+* No undefined voice usage
+
+---
+
+3. APPLY VOICE TO UTTERANCES
+
+When creating SpeechSynthesisUtterance:
+
+* Assign selected voice:
+  utterance.voice = selectedVoice
+
+* Tune parameters:
+  utterance.pitch = 1.15–1.3 (slightly higher, more feminine)
+  utterance.rate = 0.9–1.0 (clear, not rushed)
+  utterance.volume = 1
+
+---
+
+4. CREATE CENTRALIZED AUDIO CONFIG
+
+Inside AudioManager:
+
+Create:
+
+* selectedVoice (state)
+* initializeVoices() function
+* getPreferredVoice() function
+
+Ensure:
+
+* Voice is initialized once on app load
+* Reused for all speech
+
+---
+
+5. FALLBACK SAFETY
+
+If no preferred female voice is found:
+
+* Use best available voice
+* Log a warning (console.warn)
+
+---
+
+6. TESTING SUPPORT
+
+Add a test function:
+
+testVoice()
+
+It should:
+
+* Speak: "Voice system initialized. Welcome to Dora Dungeons."
+* Confirm voice is working
+
+---
+
+7. DO NOT BREAK EXISTING SYSTEM
+
+* Do NOT modify game engine
+* Do NOT change API
+* Only update AudioManager and TTS handling
+
+---
+
+## OUTPUT FORMAT
+
+1. Updated AudioManager.ts
+2. Voice initialization logic
+3. Example usage in speak() method
+4. Explanation of how voice selection works
+
+---
+
+## END GOAL
+
+All narration should consistently use a clear, natural-sounding female voice across supported browsers.
+
+---
+
+## BEGIN NOW
