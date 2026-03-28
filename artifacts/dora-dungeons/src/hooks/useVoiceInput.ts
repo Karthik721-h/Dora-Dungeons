@@ -70,14 +70,22 @@ export function useVoiceInput({
   const [interimTranscript, setInterimTranscript] = useState("");
 
   // ── Stable refs (read by event handlers — never cause re-renders on their own) ─
-  const wantListeningRef  = useRef(false); // user's intent (clicked mic on)
-  const isListeningRef    = useRef(false); // recognition currently running
-  const isSpeakingRef     = useRef(false); // TTS currently active
-  const lastCommandRef    = useRef({ text: "", time: 0 });
-  const recognitionRef    = useRef<SpeechRecognition | null>(null);
-  const micStreamRef      = useRef<MediaStream | null>(null);
-  const processingTimerRef= useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const languageRef       = useRef(language);
+  const wantListeningRef   = useRef(false); // user's intent (clicked mic on)
+  const isListeningRef     = useRef(false); // recognition currently running
+  const isSpeakingRef      = useRef(false); // TTS currently active
+  /**
+   * Post-TTS cooldown: stays true for 400ms after TTS ends.
+   * Discards any buffered recognition results that Chrome accumulates while
+   * the speaker was talking — preventing the feedback cascade where the mic
+   * picks up the last word of TTS and sends it as a new command.
+   */
+  const ttsCooldownRef     = useRef(false);
+  const ttsCooldownTimer   = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const lastCommandRef     = useRef({ text: "", time: 0 });
+  const recognitionRef     = useRef<SpeechRecognition | null>(null);
+  const micStreamRef       = useRef<MediaStream | null>(null);
+  const processingTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const languageRef        = useRef(language);
   languageRef.current = language;
 
   const isSupported =
@@ -116,9 +124,11 @@ export function useVoiceInput({
     };
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      // PRIMARY GUARD — drop anything captured while TTS is playing
-      if (isSpeakingRef.current) {
-        console.log("[useVoiceInput] Transcript discarded (TTS active)");
+      // PRIMARY GUARD — drop anything captured while TTS is playing OR during
+      // the 400ms cooldown window immediately after TTS ends (Chrome buffers
+      // interim results during speech which fire right after the lock releases).
+      if (isSpeakingRef.current || ttsCooldownRef.current) {
+        console.log("[useVoiceInput] Transcript discarded (TTS active or cooldown)");
         return;
       }
 
@@ -170,9 +180,34 @@ export function useVoiceInput({
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       if (event.error === "no-speech") return; // normal silence timeout
       if (event.error === "aborted")   return; // expected when we call .stop()
+
       console.warn("[useVoiceInput] Error:", event.error);
-      onErrorRef.current?.(`Voice error: ${event.error}`);
       isListeningRef.current = false;
+
+      // Map technical error codes to spoken, user-friendly messages
+      const messages: Record<string, string> = {
+        "not-allowed":
+          "Microphone access was denied. Please allow microphone permission and try again.",
+        "audio-capture":
+          "No microphone detected. Please check your microphone and try again.",
+        "network":
+          "Voice input lost network connection. Retrying in a moment.",
+        "service-not-allowed":
+          "Voice recognition is not available in this browser or context.",
+      };
+      const msg = messages[event.error] ??
+        `Voice input not detected. Please check your microphone. Error: ${event.error}`;
+
+      onErrorRef.current?.(msg);
+
+      // Retry transient errors (network) after a short pause
+      if (event.error === "network" && wantListeningRef.current) {
+        setTimeout(() => {
+          if (wantListeningRef.current && !isSpeakingRef.current) {
+            _startRecognition();
+          }
+        }, 2000);
+      }
     };
 
     recognition.onend = () => {
@@ -226,17 +261,22 @@ export function useVoiceInput({
           try { recognitionRef.current.stop(); } catch { /* ok */ }
         }
       } else {
-        console.log("[useVoiceInput] TTS ended — attempting mic restart");
-        if (wantListeningRef.current) {
-          // Drain buffer: wait 300ms after TTS ends before listening again
-          setTimeout(() => {
-            if (wantListeningRef.current && !isSpeakingRef.current) {
-              _startRecognition();
-            }
-          }, 300);
-        } else {
-          setVoiceState("idle");
-        }
+        console.log("[useVoiceInput] TTS ended — cooldown active, mic restarts in 400ms");
+
+        // Cooldown: keep discarding transcripts for 400ms after TTS ends.
+        // Chrome buffers recognition results during speech and fires them
+        // immediately after the lock releases — the cooldown catches those.
+        ttsCooldownRef.current = true;
+        clearTimeout(ttsCooldownTimer.current);
+        ttsCooldownTimer.current = setTimeout(() => {
+          ttsCooldownRef.current = false;
+          console.log("[useVoiceInput] Cooldown ended — listening restored");
+          if (wantListeningRef.current && !isSpeakingRef.current) {
+            _startRecognition();
+          } else if (!wantListeningRef.current) {
+            setVoiceState("idle");
+          }
+        }, 400);
       }
     });
   // _startRecognition is stable (no deps)
@@ -305,7 +345,9 @@ export function useVoiceInput({
     return () => {
       wantListeningRef.current = false;
       isListeningRef.current   = false;
+      ttsCooldownRef.current   = false;
       clearTimeout(processingTimerRef.current);
+      clearTimeout(ttsCooldownTimer.current);
       if (recognitionRef.current) {
         try { recognitionRef.current.onend = null; recognitionRef.current.stop(); } catch { /* ok */ }
       }

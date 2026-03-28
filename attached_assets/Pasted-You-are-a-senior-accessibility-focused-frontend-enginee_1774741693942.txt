@@ -1,0 +1,167 @@
+You are a senior accessibility-focused frontend engineer and voice systems architect.
+
+You are improving an audio-first RPG called "Dora Dungeons" to ensure it is fully playable by visually impaired users without any visual interaction.
+
+---
+
+## GOAL
+
+When the game starts:
+
+1. The system must automatically SPEAK the introduction narration
+2. The system must automatically START listening for voice input
+3. The user must NOT need to click anything
+
+This must feel like a voice assistant experience.
+
+---
+
+## CORE FLOW (MANDATORY)
+
+App loads →
+Intro narration plays →
+Speech ends →
+Voice recognition starts →
+User speaks commands
+
+---
+
+1. AUTO NARRATION ON GAME START
+
+---
+
+When the game initializes (after /game/start API call):
+
+* Extract narration from response
+* Immediately call AudioManager.speak(narration)
+
+Example:
+
+const response = await startGame();
+audioManager.speak(response.narration);
+
+---
+
+2. AUTO START VOICE LISTENING
+
+---
+
+After narration finishes:
+
+* Automatically start SpeechRecognition
+
+Implementation:
+
+Inside AudioManager:
+
+utterance.onend = () => {
+isSpeaking = false;
+startListening(); // trigger voice input
+};
+
+---
+
+3. INTEGRATE WITH EXISTING SPEAK-LOCK SYSTEM
+
+---
+
+Ensure:
+
+* While narration is playing → mic is OFF
+* After narration ends → mic turns ON
+
+Use shared state:
+isSpeaking
+
+---
+
+4. INITIAL SYSTEM ANNOUNCEMENT (IMPORTANT)
+
+---
+
+Before gameplay narration, add a short system intro:
+
+"Welcome to Dora Dungeons. Voice control is active. Speak your command when ready."
+
+Then follow with game narration.
+
+---
+
+5. FAIL-SAFE FOR VOICE START
+
+---
+
+If SpeechRecognition fails to start:
+
+* Retry automatically
+* Provide audio feedback:
+
+"Voice input not detected. Please check your microphone."
+
+---
+
+6. ACCESSIBILITY COMMANDS (REQUIRED)
+
+---
+
+Ensure these commands work immediately:
+
+* "repeat" → replay last narration
+* "help" → explain basic commands
+* "start game" → restart narration if needed
+
+---
+
+7. PREVENT DOUBLE START
+
+Ensure:
+
+* Narration does NOT play multiple times
+* Voice listening does NOT start multiple times
+
+Use flags:
+hasInitializedVoice = false
+
+---
+
+8. UI FEEDBACK (OPTIONAL BUT GOOD)
+
+Even though this is audio-first, still update UI state:
+
+* "Speaking..."
+* "Listening..."
+
+---
+
+9. DO NOT BREAK EXISTING SYSTEM
+
+* Do NOT modify game engine
+* Do NOT change API
+* Only update:
+
+  * GameScreen.tsx
+  * AudioManager
+  * Voice input hook
+
+---
+
+## OUTPUT FORMAT
+
+1. Updated GameScreen.tsx logic
+2. Updated AudioManager speak() lifecycle
+3. Voice auto-start integration
+4. Example flow of execution
+
+---
+
+## END GOAL
+
+A blind user should be able to:
+
+* Open the app
+* Hear narration immediately
+* Speak commands without touching anything
+
+---
+
+## BEGIN NOW

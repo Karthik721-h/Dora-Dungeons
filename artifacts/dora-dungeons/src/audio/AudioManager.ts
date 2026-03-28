@@ -71,6 +71,15 @@ class AudioManagerClass {
    */
   private speakLockCallback?: (isSpeaking: boolean) => void;
 
+  /**
+   * One-shot queue-drained callback.
+   * Fires ONCE when the narration queue fully empties (the last utterance ends
+   * and nothing is queued behind it).  Automatically clears itself after firing
+   * so it cannot trigger twice.  Used by GameScreen to auto-start listening
+   * after the welcome + room-description narration finishes.
+   */
+  private queueDrainedCallback?: () => void;
+
   // ── Voice initialisation ────────────────────────────────────────────────────
 
   /**
@@ -155,6 +164,16 @@ class AudioManagerClass {
    */
   onSpeakLock(cb: (isSpeaking: boolean) => void) {
     this.speakLockCallback = cb;
+  }
+
+  /**
+   * Register a ONE-SHOT callback that fires when the narration queue fully drains.
+   * The callback is cleared immediately after it fires — re-register if you need
+   * it again.  Used by GameScreen to auto-start listening after the welcome
+   * narration finishes without requiring any user gesture.
+   */
+  onQueueDrained(cb: () => void) {
+    this.queueDrainedCallback = cb;
   }
 
   /** Speak a line of text. interrupt=true cancels current speech immediately. */
@@ -352,7 +371,17 @@ class AudioManagerClass {
       this.isSpeaking = false;
       this.speakLockCallback?.(false);
       this.onSpeakingChange?.(false);
+
+      // Capture drained-ness BEFORE _flush consumes the next item
+      const queueNowEmpty = this.narrationQueue.length === 0;
       this._flush();
+
+      // Fire the one-shot queue-drained callback only when the last utterance ends
+      if (queueNowEmpty) {
+        const cb = this.queueDrainedCallback;
+        this.queueDrainedCallback = undefined; // self-clear — one-shot
+        cb?.();
+      }
     };
 
     utterance.onerror = () => {

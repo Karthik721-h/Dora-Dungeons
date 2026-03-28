@@ -42,19 +42,34 @@ export function GameScreen({ gameState }: { gameState: GameStateResponse }) {
     AudioManager.onStateChange(setAudioSpeaking);
   }, []);
 
-  // Speak the initial room description once on first mount (after a short delay
-  // so voices have time to load and the user has interacted with the intro).
-  const hasSpokenInitialRef = useRef(false);
+  // ── Accessibility auto-start ─────────────────────────────────────────────────
+  // On first mount: speak a welcome announcement + initial room description,
+  // then automatically start voice recognition so blind users never need to
+  // click anything.  Guard with a ref so this fires exactly once even if the
+  // component re-renders before the timeout resolves.
+  const hasAutoStartedRef = useRef(false);
   useEffect(() => {
-    if (hasSpokenInitialRef.current || isMuted) return;
+    if (hasAutoStartedRef.current || isMuted || !voiceSupported) return;
     if (!gameState.logs.length) return;
-    hasSpokenInitialRef.current = true;
-    // Give AudioManager 600ms to finish loading voices before speaking
+    hasAutoStartedRef.current = true;
+
     const t = setTimeout(() => {
-      // Speak just the last 2–3 lines so it's not overwhelming
+      // 1. System welcome — brief, clearly spoken before gameplay begins
+      AudioManager.speak(
+        "Welcome to Dora Dungeons. Voice control is active. Speak your command when ready."
+      );
+
+      // 2. Initial room description (last 3 log lines — avoids overwhelming the player)
       const lines = gameState.logs.slice(-3);
       AudioManager.speakLines(lines);
-    }, 600);
+
+      // 3. After the full queue drains, auto-start listening — no click required
+      AudioManager.onQueueDrained(() => {
+        if (!hasAutoStartedRef.current) return; // safety check
+        startListening();
+      });
+    }, 700); // 700ms gives voice engine time to load before first utterance
+
     return () => clearTimeout(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -97,6 +112,18 @@ export function GameScreen({ gameState }: { gameState: GameStateResponse }) {
       return;
     }
 
+    if (/^help$/i.test(trimmed)) {
+      AudioManager.speak(
+        "Basic commands: say north, south, east, or west to move. " +
+        "Say attack to fight. Say cast fireball to use magic. " +
+        "Say look to examine your surroundings. " +
+        "Say status to check your health and stats. " +
+        "Say repeat to hear the last message again.",
+        { interrupt: true }
+      );
+      return;
+    }
+
     if (trimmed === "look" || trimmed === "status") {
       sendAction({ data: { command: trimmed } });
       return;
@@ -111,19 +138,29 @@ export function GameScreen({ gameState }: { gameState: GameStateResponse }) {
   }, [isPending, isMuted, sendAction]);
 
   // ── Voice ───────────────────────────────────────────────────────────────────
-  const { isSupported: voiceSupported, isListening, voiceState, interimTranscript, toggleListening } =
-    useVoiceInput({
-      onFinalTranscript: (raw) => {
-        // Handle "skip intro" or "repeat" directly
-        if (/^(skip intro|skip|enter)$/i.test(raw.trim())) return;
-        const { canonical, wasNormalized } = processIntent(raw);
-        setCommand(canonical);
-        if (wasNormalized) setIntentHint(`"${raw}" → "${canonical}"`);
-        else setIntentHint(null);
-        submitCommand(canonical);
-      },
-      onInterimTranscript: (interim) => setCommand(interim),
-    });
+  const {
+    isSupported: voiceSupported,
+    isListening,
+    voiceState,
+    interimTranscript,
+    startListening,
+    toggleListening,
+  } = useVoiceInput({
+    onFinalTranscript: (raw) => {
+      // Swallow navigation phrases that belong to the intro
+      if (/^(skip intro|skip|enter)$/i.test(raw.trim())) return;
+      const { canonical, wasNormalized } = processIntent(raw);
+      setCommand(canonical);
+      if (wasNormalized) setIntentHint(`"${raw}" → "${canonical}"`);
+      else setIntentHint(null);
+      submitCommand(canonical);
+    },
+    onInterimTranscript: (interim) => setCommand(interim),
+    onError: (err) => {
+      // Speak mic errors so a blind user is informed without any visual check
+      AudioManager.speak(err, { interrupt: false });
+    },
+  });
 
   // ── Speech rate ─────────────────────────────────────────────────────────────
   const adjustRate = (delta: number) => {
