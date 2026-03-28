@@ -94,7 +94,7 @@ export function GameScreen({ gameState }: { gameState: GameStateResponse }) {
   }, [isPending, isMuted, sendAction]);
 
   // ── Voice ───────────────────────────────────────────────────────────────────
-  const { isSupported: voiceSupported, isListening, interimTranscript, toggleListening } =
+  const { isSupported: voiceSupported, isListening, voiceState, interimTranscript, toggleListening } =
     useVoiceInput({
       onFinalTranscript: (raw) => {
         // Handle "skip intro" or "repeat" directly
@@ -129,7 +129,13 @@ export function GameScreen({ gameState }: { gameState: GameStateResponse }) {
   const isCombat = gameStatus === "IN_COMBAT";
   const isGameOver = gameStatus === "GAME_OVER";
 
-  const audioState = isListening ? "listening" : audioSpeaking ? "speaking" : "idle";
+  // Derive display audio state from the hook's voiceState (which reflects the speak-lock)
+  // "processing" shows briefly after a command fires, "speaking" when TTS is active.
+  const audioState: "idle" | "listening" | "speaking" | "processing" =
+    voiceState === "speaking" || audioSpeaking ? "speaking"
+    : voiceState === "processing" ? "processing"
+    : voiceState === "listening" ? "listening"
+    : "idle";
 
   const statusColor = isCombat
     ? { border: "rgba(179,18,47,0.5)", color: "#f87171", bg: "rgba(179,18,47,0.08)" }
@@ -185,16 +191,21 @@ export function GameScreen({ gameState }: { gameState: GameStateResponse }) {
           <div
             className="font-code text-xs uppercase tracking-widest"
             style={{
-              color: isListening
+              color: audioState === "listening"
                 ? "rgba(248,113,113,0.6)"
-                : audioSpeaking
+                : audioState === "speaking"
                 ? "rgba(96,165,250,0.6)"
+                : audioState === "processing"
+                ? "rgba(212,175,55,0.7)"
                 : "rgba(200,190,180,0.2)",
               fontSize: "10px",
               letterSpacing: "0.2em",
             }}
           >
-            {isListening ? "● LISTENING" : audioSpeaking ? "● SPEAKING" : "○ IDLE"}
+            {audioState === "listening" ? "● LISTENING"
+              : audioState === "speaking" ? "● SPEAKING"
+              : audioState === "processing" ? "● PROCESSING"
+              : "○ IDLE"}
           </div>
 
           {/* Rate */}

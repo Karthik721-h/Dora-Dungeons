@@ -2,7 +2,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Mic, MicOff, RotateCcw, Swords, Shield, Flame, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Zap } from "lucide-react";
 import { AudioManager } from "@/audio/AudioManager";
 
-type AudioState = "idle" | "listening" | "speaking";
+type AudioState = "idle" | "listening" | "speaking" | "processing";
 
 interface VoiceControlProps {
   isSupported: boolean;

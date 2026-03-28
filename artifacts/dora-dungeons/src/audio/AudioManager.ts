@@ -63,6 +63,14 @@ class AudioManagerClass {
   private audioCtx: AudioContext | null = null;
   private onSpeakingChange?: (speaking: boolean) => void;
 
+  /**
+   * Speak-lock callback.
+   * Registered by useVoiceInput so recognition stops while TTS is active
+   * and restarts when TTS finishes.  Fired BEFORE onSpeakingChange so the
+   * hook can abort recognition before the UI repaints.
+   */
+  private speakLockCallback?: (isSpeaking: boolean) => void;
+
   // ── Voice initialisation ────────────────────────────────────────────────────
 
   /**
@@ -137,6 +145,16 @@ class AudioManagerClass {
   /** Attach a listener for speaking state changes (drives the UI indicator). */
   onStateChange(cb: (speaking: boolean) => void) {
     this.onSpeakingChange = cb;
+  }
+
+  /**
+   * Register the speak-lock callback used by useVoiceInput.
+   * Called with `true` when TTS starts (mic should pause)
+   * and `false` when TTS finishes (mic may resume).
+   * Only one subscriber is supported (the voice hook).
+   */
+  onSpeakLock(cb: (isSpeaking: boolean) => void) {
+    this.speakLockCallback = cb;
   }
 
   /** Speak a line of text. interrupt=true cancels current speech immediately. */
@@ -322,18 +340,25 @@ class AudioManagerClass {
     utterance.lang   = voice?.lang ?? "en-US";
 
     utterance.onstart = () => {
+      console.log("[AudioManager] TTS started:", entry.text.slice(0, 60));
       this.isSpeaking = true;
+      // Speak-lock fires FIRST so the hook stops recognition before UI repaints
+      this.speakLockCallback?.(true);
       this.onSpeakingChange?.(true);
     };
 
     utterance.onend = () => {
+      console.log("[AudioManager] TTS ended");
       this.isSpeaking = false;
+      this.speakLockCallback?.(false);
       this.onSpeakingChange?.(false);
       this._flush();
     };
 
     utterance.onerror = () => {
+      console.log("[AudioManager] TTS error — releasing speak-lock");
       this.isSpeaking = false;
+      this.speakLockCallback?.(false);
       this.onSpeakingChange?.(false);
       this._flush();
     };

@@ -1,0 +1,170 @@
+You are a senior frontend audio engineer and real-time voice systems architect.
+
+You are fixing a CRITICAL issue in an audio-first RPG called "Dora Dungeons".
+
+---
+
+## PROBLEM
+
+The microphone (SpeechRecognition) is capturing the game's own Text-to-Speech (TTS) output, causing:
+
+* Feedback loops
+* Duplicate or incorrect commands
+* Poor user experience
+
+---
+
+## GOAL
+
+Ensure the system behaves like a professional voice assistant:
+
+Listen → Process → Speak → Pause Listening → Resume Listening
+
+The microphone MUST NEVER capture TTS output.
+
+---
+
+## CORE REQUIREMENTS
+
+1. IMPLEMENT "SPEAK-LOCK" SYSTEM (MANDATORY)
+
+Create a shared state:
+
+isSpeaking: boolean
+
+Behavior:
+
+* When TTS starts → set isSpeaking = true
+* When TTS ends → set isSpeaking = false
+
+---
+
+2. STOP LISTENING DURING SPEECH
+
+Inside AudioManager (or wherever TTS is triggered):
+
+* On utterance.onstart:
+
+  * Set isSpeaking = true
+  * Stop SpeechRecognition (recognition.stop())
+
+* On utterance.onend:
+
+  * Set isSpeaking = false
+  * Restart SpeechRecognition (recognition.start())
+
+---
+
+3. PROTECT TRANSCRIPT PROCESSING
+
+Inside your voice input hook (useVoiceInput.ts):
+
+Before processing any transcript:
+
+if (isSpeaking) return;
+
+This prevents TTS audio from being interpreted as user input.
+
+---
+
+4. ADD COMMAND DEBOUNCE SYSTEM
+
+Prevent duplicate triggers:
+
+* Track last processed command
+* Add 500–1000ms debounce window
+
+Example:
+
+* If same command appears within short time → ignore
+
+---
+
+5. ADD LISTENING STATE CONTROL
+
+Introduce states:
+
+* IDLE
+* LISTENING
+* SPEAKING
+* PROCESSING
+
+Ensure:
+
+* Recognition only runs in LISTENING state
+* UI reflects current state
+
+---
+
+6. MICROPHONE INPUT QUALITY IMPROVEMENTS
+
+When requesting mic access:
+
+navigator.mediaDevices.getUserMedia({
+audio: {
+echoCancellation: true,
+noiseSuppression: true,
+autoGainControl: true
+}
+});
+
+This reduces system audio bleed and improves voice clarity.
+
+---
+
+7. SAFE RESTART MECHANISM
+
+SpeechRecognition often stops automatically.
+
+Implement:
+
+* On recognition.onend:
+
+  * If NOT speaking → restart recognition
+  * If speaking → do nothing
+
+---
+
+8. DO NOT BREAK EXISTING SYSTEM
+
+* Do NOT modify game engine
+* Do NOT change API
+* Only modify:
+
+  * AudioManager
+  * useVoiceInput hook
+  * voice-related state
+
+---
+
+9. LOGGING (FOR DEBUGGING)
+
+Add console logs:
+
+* "TTS started"
+* "TTS ended"
+* "Listening started"
+* "Listening stopped"
+
+---
+
+## OUTPUT FORMAT
+
+1. Updated AudioManager.ts (with speak-lock logic)
+2. Updated useVoiceInput.ts (with protections)
+3. State flow diagram (text)
+4. Explanation of how feedback loop is prevented
+
+---
+
+## END GOAL
+
+The system must behave like:
+
+User speaks → Game processes → Game speaks → Mic pauses → Mic resumes
+
+NO feedback loop, NO duplicate commands.
+
+---
+
+## BEGIN NOW
