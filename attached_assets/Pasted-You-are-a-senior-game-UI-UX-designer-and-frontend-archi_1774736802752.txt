@@ -1,0 +1,280 @@
+You are a senior game UI/UX designer and frontend architect.
+
+You are redesigning the frontend of an existing audio-first RPG called "Dora Dungeons".
+
+The current system works correctly (game engine, API, voice, audio), but the UI looks like a developer tool. Your task is to transform it into a PROFESSIONAL, IMMERSIVE, GAME-QUALITY INTERFACE without breaking any logic.
+
+---
+
+## CORE RULE (CRITICAL)
+
+* DO NOT change or break any game logic
+* DO NOT modify the game engine
+* ONLY refactor UI, layout, styling, and presentation layer
+* All existing functionality must still work
+
+---
+
+## GOAL
+
+Create a cinematic, immersive, audio-first interface inspired by:
+
+* Dark Souls (minimal HUD)
+* Diablo IV (dark fantasy aesthetic)
+* Shades of Doom (audio-first interaction)
+
+The UI must feel like a GAME, not a dashboard.
+
+---
+
+## PART 1 — CINEMATIC INTRO SYSTEM
+
+Create a new IntroScene component:
+
+Features:
+
+1. Fullscreen cinematic intro screen
+
+   * Dark background
+   * Centered logo (DORA DUNGEONS)
+   * Subtle animated glow or fog effect
+
+2. Video support:
+
+   * Auto-play intro video (local or placeholder)
+   * Muted by default
+   * Optional subtitles overlay
+
+3. Controls:
+
+   * "Skip Intro" button
+   * Voice command support: "skip intro"
+
+4. Transition:
+
+   * Fade to black (1–2s)
+   * Then fade into game UI
+
+5. Optional narration (TTS):
+
+   * "You descend into darkness..."
+   * Must integrate with AudioManager
+
+6. Must be isolated:
+
+   * IntroScene.tsx
+   * Controlled by App state (intro → game)
+
+---
+
+## PART 2 — COMPLETE UI LAYOUT REFACTOR
+
+Replace current layout with a GAME HUD structure:
+
+NEW LAYOUT:
+
+TOP BAR:
+
+* Minimal info: game state (Exploring / Combat), audio status, session ID
+* Subtle styling (not dominant)
+
+MAIN AREA (FOCUS):
+
+* Large narration panel (centered, dominant)
+* This is the primary focus of the screen
+
+BOTTOM SECTION:
+
+* LEFT: Player HUD (HP, MP, Level, XP)
+* RIGHT: Controls (voice + quick actions)
+
+REMOVE:
+
+* Heavy borders
+* "Terminal" look
+* Overly boxy layout
+
+---
+
+## PART 3 — NARRATION PANEL (CORE EXPERIENCE)
+
+Transform "Terminal Output" into:
+
+"Narrative Feed"
+
+Requirements:
+
+* Large readable text
+* Smooth fade-in for new messages
+* Line spacing optimized for readability
+* Optional typewriter effect (subtle)
+
+Each message:
+
+* Styled by type:
+
+  * narration
+  * combat
+  * system
+  * warning
+
+---
+
+## PART 4 — VISUAL DESIGN SYSTEM
+
+Implement a unified design system:
+
+COLORS:
+
+* Background: near-black (#0b0b0f)
+* Primary text: soft white (#e6e6e6)
+* Accent: crimson (#b3122f) and gold (#d4af37)
+* Combat: red highlights
+* Exploration: cool neutral tones
+
+TYPOGRAPHY:
+
+* Titles: serif cinematic font (Cinzel or similar)
+* Body: readable serif
+
+EFFECTS:
+
+* Soft glow (not neon)
+* Subtle gradients
+* Ambient vignette
+
+---
+
+## PART 5 — PLAYER HUD REDESIGN
+
+Replace current stats panel with:
+
+Compact HUD:
+
+* HP bar (red)
+* MP bar (blue)
+* XP bar (gold)
+* Level indicator
+
+Design:
+
+* Horizontal bars
+* Smooth animations on change
+* Minimal text, more visual
+
+---
+
+## PART 6 — CONTROL SYSTEM REDESIGN
+
+Controls must feel like a game, not a form.
+
+Add:
+
+VOICE CONTROL:
+
+* Large microphone button (center-right)
+* Animated when listening (pulse effect)
+* Clear states:
+
+  * Idle
+  * Listening
+  * Processing
+  * Speaking
+
+QUICK ACTIONS:
+
+* Styled buttons (not plain)
+* Icons + labels:
+
+  * Attack
+  * Cast
+  * Defend
+  * Move
+  * Repeat
+
+COMMAND INPUT:
+
+* Keep input box but style minimally
+* Add glow on focus
+
+---
+
+## PART 7 — AUDIO UI FEEDBACK
+
+Integrate subtle UI sounds:
+
+* Button click → soft tick
+* Action confirm → deeper tone
+* Error → sharp tone
+
+Use AudioManager:
+
+* Do NOT create new audio system
+* Reuse existing structure
+
+---
+
+## PART 8 — STATE-BASED VISUAL FEEDBACK
+
+Change UI based on game state:
+
+EXPLORATION:
+
+* calm tones
+* subtle ambient glow
+
+COMBAT:
+
+* slight red tint overlay
+* subtle screen pulse
+* more intense UI accents
+
+---
+
+## PART 9 — ACCESSIBILITY (CRITICAL)
+
+Ensure:
+
+* High contrast text
+* Large readable fonts
+* No reliance on visuals only
+
+Add:
+
+* Voice feedback for UI states:
+
+  * "Listening started"
+  * "Command received"
+
+---
+
+## PART 10 — ANIMATIONS (IMPORTANT)
+
+Add subtle animations:
+
+* Fade transitions between states
+* Button hover glow
+* Narration fade-in
+* Intro → game transition
+
+DO NOT overuse animations.
+
+---
+
+## OUTPUT FORMAT
+
+1. New component structure
+2. IntroScene.tsx implementation
+3. Updated GameScreen.tsx layout
+4. CSS / styling system
+5. Explanation of design system
+
+---
+
+## END GOAL
+
+The application should feel like a professional audio RPG interface, not a developer dashboard.
+
+---
+
+## BEGIN NOW

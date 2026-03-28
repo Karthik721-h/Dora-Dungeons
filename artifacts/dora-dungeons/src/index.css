@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Fira+Code:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Fira+Code:wght@300;400;500&family=Crimson+Text:ital,wght@0,400;0,600;1,400;1,600&display=swap');
 @import "tailwindcss";
 
 @custom-variant dark (&:is(.dark *));
@@ -9,27 +9,21 @@
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
-
   --color-card: hsl(var(--card));
   --color-card-foreground: hsl(var(--card-foreground));
-  
   --color-primary: hsl(var(--primary));
   --color-primary-foreground: hsl(var(--primary-foreground));
-
   --color-secondary: hsl(var(--secondary));
   --color-secondary-foreground: hsl(var(--secondary-foreground));
-
   --color-muted: hsl(var(--muted));
   --color-muted-foreground: hsl(var(--muted-foreground));
-
   --color-accent: hsl(var(--accent));
   --color-accent-foreground: hsl(var(--accent-foreground));
-
   --color-destructive: hsl(var(--destructive));
   --color-destructive-foreground: hsl(var(--destructive-foreground));
 
-  --font-sans: 'Fira Code', monospace;
-  --font-serif: 'Cinzel', serif;
+  --font-sans: 'Crimson Text', Georgia, serif;
+  --font-serif: 'Crimson Text', Georgia, serif;
   --font-mono: 'Fira Code', monospace;
   --font-display: 'Cinzel', serif;
 
@@ -37,139 +31,245 @@
   --radius-md: 0.25rem;
   --radius-lg: 0.5rem;
   --radius-xl: 0.75rem;
-
-  --animate-scanline: scanline 8s linear infinite;
-  --animate-flicker: text-flicker 0.15s infinite;
-  --animate-pulse-slow: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
 :root {
-  /* Gothic Terminal Aesthetic - Bone & Blood on Abyss */
-  --background: 240 11% 4%;
-  --foreground: 60 20% 85%;
-  
+  /* Cinematic dark — near-black with warm undertone */
+  --background: 240 15% 4%;
+  --foreground: 38 18% 88%;
+
   --card: 240 13% 6%;
-  --card-foreground: 60 20% 85%;
-  
-  --popover: 240 13% 6%;
-  --popover-foreground: 60 20% 85%;
-  
-  /* Blood Red */
-  --primary: 350 80% 45%;
+  --card-foreground: 38 18% 88%;
+
+  --popover: 240 13% 7%;
+  --popover-foreground: 38 18% 88%;
+
+  /* Crimson */
+  --primary: 350 82% 42%;
   --primary-foreground: 0 0% 100%;
-  
-  /* Deep Charcoal */
-  --secondary: 240 10% 12%;
-  --secondary-foreground: 60 20% 85%;
-  
-  --muted: 240 10% 15%;
-  --muted-foreground: 240 5% 55%;
-  
-  /* Sickly Green / Magic */
-  --accent: 120 40% 40%;
+
+  /* Charcoal panel */
+  --secondary: 240 10% 10%;
+  --secondary-foreground: 38 18% 88%;
+
+  --muted: 240 10% 13%;
+  --muted-foreground: 240 6% 48%;
+
+  /* Gold */
+  --accent: 42 65% 52%;
   --accent-foreground: 0 0% 0%;
-  
-  --destructive: 0 100% 40%;
+
+  --destructive: 2 90% 42%;
   --destructive-foreground: 0 0% 100%;
 
-  --border: 240 15% 15%;
-  --input: 240 15% 10%;
-  --ring: 350 80% 45%;
+  --border: 240 12% 14%;
+  --input: 240 12% 9%;
+  --ring: 350 82% 42%;
 
   --radius: 0.25rem;
 }
 
+/* ─── Base ─────────────────────────────────────────────── */
 @layer base {
-  * {
-    @apply border-border;
+  * { @apply border-border; box-sizing: border-box; }
+
+  html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
   }
 
   body {
-    @apply font-mono antialiased bg-background text-foreground overflow-x-hidden;
-    /* Subtle CRT curve effect fallback */
-    background-image: radial-gradient(circle, rgba(0,0,0,0) 60%, rgba(0,0,0,0.4) 100%);
+    @apply antialiased bg-background text-foreground overflow-x-hidden;
+    font-family: 'Crimson Text', Georgia, serif;
+    font-size: 18px;
+    background-image:
+      radial-gradient(ellipse at 50% 0%, rgba(179,18,47,0.04) 0%, transparent 60%),
+      radial-gradient(ellipse at 50% 100%, rgba(0,0,0,0.5) 0%, transparent 70%);
   }
 
-  h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-display);
-    @apply font-bold tracking-wider;
+  h1, h2, h3, h4 {
+    font-family: 'Cinzel', serif;
+    @apply tracking-wider;
     text-transform: uppercase;
   }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: hsl(var(--primary) / 0.4); }
 }
 
-@keyframes scanline {
-  0% {
-    transform: translateY(-100%);
-  }
-  100% {
-    transform: translateY(100vh);
-  }
+/* ─── Atmospheric overlays ──────────────────────────────── */
+.vignette {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.65) 100%);
+  pointer-events: none;
+  z-index: 1;
 }
 
-@keyframes text-flicker {
-  0% { opacity: 0.95; }
-  5% { opacity: 0.85; }
-  10% { opacity: 0.95; }
-  15% { opacity: 1; }
-  100% { opacity: 1; }
+.combat-overlay {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(139,12,24,0.22) 100%);
+  pointer-events: none;
+  z-index: 1;
+  animation: combat-breathe 2.5s ease-in-out infinite;
+}
+
+@keyframes combat-breathe {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+/* ─── Typography ────────────────────────────────────────── */
+.font-display { font-family: 'Cinzel', serif; }
+.font-narration { font-family: 'Crimson Text', Georgia, serif; }
+.font-code { font-family: 'Fira Code', monospace; }
+
+.logo-glow {
+  text-shadow:
+    0 0 20px rgba(179, 18, 47, 0.5),
+    0 0 60px rgba(179, 18, 47, 0.2),
+    0 0 100px rgba(179, 18, 47, 0.1);
+}
+
+.gold-glow {
+  text-shadow:
+    0 0 10px rgba(212, 175, 55, 0.4),
+    0 0 30px rgba(212, 175, 55, 0.15);
+}
+
+/* ─── Narration message animations ─────────────────────── */
+@keyframes message-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.message-in {
+  animation: message-in 0.4s ease-out both;
+}
+
+/* Typewriter for new narration messages */
+@keyframes type-reveal {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ─── Mic button states ─────────────────────────────────── */
+@keyframes mic-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(179, 18, 47, 0.7); }
+  50%       { box-shadow: 0 0 0 16px rgba(179, 18, 47, 0); }
+}
+
+@keyframes speaking-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.6); }
+  50%       { box-shadow: 0 0 0 12px rgba(59, 130, 246, 0); }
+}
+
+.mic-listening {
+  animation: mic-pulse 1.2s ease-in-out infinite;
+}
+
+.mic-speaking {
+  animation: speaking-pulse 1.8s ease-in-out infinite;
+}
+
+/* ─── HP/MP/XP bar animations ──────────────────────────── */
+@keyframes bar-fill {
+  from { width: 0%; }
+}
+
+.stat-bar-fill {
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ─── Intro scene ──────────────────────────────────────── */
+@keyframes fog-drift {
+  0%   { transform: translateX(-5%) scale(1.05); opacity: 0.4; }
+  50%  { transform: translateX(5%) scale(1.1);  opacity: 0.6; }
+  100% { transform: translateX(-5%) scale(1.05); opacity: 0.4; }
+}
+
+.fog-layer {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 80%, rgba(40,10,10,0.8) 0%, transparent 70%);
+  animation: fog-drift 12s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes ember-float {
+  0%   { transform: translateY(0) translateX(0); opacity: 0; }
+  20%  { opacity: 0.6; }
+  80%  { opacity: 0.3; }
+  100% { transform: translateY(-120px) translateX(30px); opacity: 0; }
+}
+
+/* ─── Separator divider ─────────────────────────────────── */
+.rune-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: hsl(var(--primary) / 0.4);
+  font-family: 'Cinzel', serif;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+.rune-divider::before,
+.rune-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to right, transparent, hsl(var(--primary) / 0.25), transparent);
+}
+
+/* ─── Button effects ────────────────────────────────────── */
+.action-btn {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+.action-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(255,255,255,0.08) 0%, transparent 70%);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.action-btn:hover::after { opacity: 1; }
+.action-btn:active { transform: scale(0.96); }
+
+/* ─── Panel glass effect ────────────────────────────────── */
+.glass-panel {
+  background: linear-gradient(135deg, rgba(255,255,255,0.02) 0%, transparent 100%);
+  border: 1px solid hsl(var(--border));
+  backdrop-filter: blur(2px);
+}
+
+/* ─── Input focus glow ──────────────────────────────────── */
+.command-input:focus {
+  box-shadow: 0 0 0 1px hsl(var(--primary) / 0.4), 0 0 20px rgba(179, 18, 47, 0.1);
+  border-color: hsl(var(--primary) / 0.6);
+  outline: none;
+}
+
+/* ─── Scanning line (very subtle) ──────────────────────── */
+@keyframes scanline-move {
+  0%   { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
 }
 
 .scanline-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 10vh;
-  background: linear-gradient(
-    to bottom,
-    rgba(255, 255, 255, 0),
-    rgba(255, 255, 255, 0.02) 50%,
-    rgba(0, 0, 0, 0.05) 51%,
-    rgba(0, 0, 0, 0)
-  );
-  opacity: 0.3;
+  top: 0; left: 0;
+  width: 100vw; height: 6vh;
+  background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.015) 50%, transparent);
   pointer-events: none;
   z-index: 50;
-  animation: scanline 10s linear infinite;
-}
-
-.crt-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-  background-size: 100% 2px, 3px 100%;
-  pointer-events: none;
-  z-index: 49;
-  opacity: 0.15;
-}
-
-.terminal-text {
-  text-shadow: 0 0 4px rgba(230, 230, 210, 0.3);
-}
-
-.terminal-text-primary {
-  text-shadow: 0 0 6px rgba(206, 23, 34, 0.6);
-}
-
-/* Custom Scrollbar for Terminal */
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-::-webkit-scrollbar-track {
-  background: hsl(var(--background));
-  border-left: 1px solid hsl(var(--border));
-}
-
-::-webkit-scrollbar-thumb {
-  background: hsl(var(--border));
-  border: 1px solid hsl(var(--background));
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--primary) / 0.5);
+  opacity: 0.5;
+  animation: scanline-move 14s linear infinite;
 }
