@@ -9,4 +9,5 @@ export * from "./entities/Enemy.js";
 export * from "./systems/AbilitySystem.js";
 export * from "./systems/ItemSystem.js";
 export * from "./systems/EventSystem.js";
+export * from "./narration/NarrationRegistry.js";
 export * from "./narration/NarrationEngine.js";

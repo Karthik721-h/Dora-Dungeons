@@ -50,11 +50,11 @@ export enum AbilityTargetType {
   SELF = "SELF",
 }
 
-export enum AbilityEffectType {
-  ATTACK = "attack",
-  BUFF = "buff",
-  DEBUFF = "debuff",
-  HEAL = "heal",
+export enum AbilityEffectKind {
+  DAMAGE = "DAMAGE",
+  HEAL_SELF = "HEAL_SELF",
+  APPLY_STATUS_TARGET = "APPLY_STATUS_TARGET",
+  APPLY_STATUS_SELF = "APPLY_STATUS_SELF",
 }
 
 export enum ItemType {
@@ -72,13 +72,16 @@ export enum EventType {
   EMPTY = "EMPTY",
 }
 
-export interface StatusEffect {
+export interface StatusEffectDefinition {
   type: StatusEffectType;
   name: string;
   duration: number;
   damagePerTurn?: number;
   defenseModifier?: number;
   skipsTurn?: boolean;
+}
+
+export interface StatusEffect extends StatusEffectDefinition {
   narration: string;
 }
 
@@ -106,19 +109,22 @@ export interface Item {
   equipped?: boolean;
 }
 
+export interface AbilityEffect {
+  kind: AbilityEffectKind;
+  value: number;
+  statusDef?: StatusEffectDefinition;
+}
+
 export interface Ability {
   id: string;
   name: string;
   description: string;
   mpCost: number;
   targetType: AbilityTargetType;
-  effectType: AbilityEffectType;
-  baseDamage?: number;
-  healAmount?: number;
-  statusEffect?: Omit<StatusEffect, "narration">;
+  effects: AbilityEffect[];
+  narrationKey: string;
   cooldown?: number;
   currentCooldown?: number;
-  narrationTemplate: string;
 }
 
 export interface Player extends StatBlock {
