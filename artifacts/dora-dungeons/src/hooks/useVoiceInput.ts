@@ -12,15 +12,16 @@
  *
  *   listening  ──(final transcript)──▶  processing  ──(400ms)──▶  listening
  *
- * FEEDBACK LOOP PREVENTION
- * ────────────────────────
- * 1. AudioManager fires `onSpeakLock(cb)` when TTS starts/ends.
- * 2. On TTS start: isSpeakingRef = true, recognition.stop() (so mic never
- *    hears TTS output).
- * 3. On TTS end: isSpeakingRef = false, recognition restarts automatically
- *    if the user still wants to listen (wantListeningRef = true).
- * 4. Every final transcript is guarded: if isSpeakingRef is true, discard.
- * 5. 1000ms command deduplication prevents double-firing the same phrase.
+ * DESIGN RULES
+ * ────────────
+ * • All caller-supplied callbacks (onFinalTranscript, etc.) are stored in refs
+ *   so recognition handlers always call the latest version without recreating.
+ * • _startRecognition has NO changing dependencies — it reads everything
+ *   through stable refs.
+ * • onend always delegates to a stable restartRef instead of calling
+ *   recognition.start() directly, preventing ghost sessions.
+ * • The speak-lock (AudioManager.onSpeakLock) stops recognition when TTS
+ *   starts and restarts when TTS ends, preventing the feedback loop.
  */
 
 import { useState, useRef, useCallback, useEffect } from "react";
@@ -45,10 +46,8 @@ interface UseVoiceInputResult {
   toggleListening: () => void;
 }
 
-// How long the same transcript is ignored to prevent duplicate commands (ms)
-const DEBOUNCE_MS = 1000;
-// How long "processing" state is shown before returning to "listening" (ms)
-const PROCESSING_FLASH_MS = 400;
+const DEBOUNCE_MS = 1000;       // ignore same command within this window
+const PROCESSING_FLASH_MS = 400; // how long "processing" badge shows
 
 export function useVoiceInput({
   onFinalTranscript,
@@ -57,29 +56,161 @@ export function useVoiceInput({
   language = "en-US",
 }: UseVoiceInputOptions): UseVoiceInputResult {
 
+  // ── Stable callback refs — always fresh, never stale in recognition handlers ──
+  const onFinalRef   = useRef(onFinalTranscript);
+  const onInterimRef = useRef(onInterimTranscript);
+  const onErrorRef   = useRef(onError);
+  // Keep refs in sync every render (no hooks-order change)
+  onFinalRef.current   = onFinalTranscript;
+  onInterimRef.current = onInterimTranscript;
+  onErrorRef.current   = onError;
+
+  // ── UI state ───────────────────────────────────────────────────────────────
   const [voiceState, setVoiceState] = useState<VoiceState>("idle");
   const [interimTranscript, setInterimTranscript] = useState("");
 
-  // Refs — used inside event handlers so they always see the latest value
-  /** User's intent: did they click the mic on? */
-  const wantListeningRef = useRef(false);
-  /** Is recognition currently running? */
-  const isListeningRef = useRef(false);
-  /** Is TTS currently speaking? (updated by AudioManager speak-lock) */
-  const isSpeakingRef = useRef(false);
-  /** Last accepted command text + timestamp — for deduplication */
-  const lastCommandRef = useRef({ text: "", time: 0 });
-
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const micStreamRef = useRef<MediaStream | null>(null);
-  const processingTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // ── Stable refs (read by event handlers — never cause re-renders on their own) ─
+  const wantListeningRef  = useRef(false); // user's intent (clicked mic on)
+  const isListeningRef    = useRef(false); // recognition currently running
+  const isSpeakingRef     = useRef(false); // TTS currently active
+  const lastCommandRef    = useRef({ text: "", time: 0 });
+  const recognitionRef    = useRef<SpeechRecognition | null>(null);
+  const micStreamRef      = useRef<MediaStream | null>(null);
+  const processingTimerRef= useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const languageRef       = useRef(language);
+  languageRef.current = language;
 
   const isSupported =
     typeof window !== "undefined" &&
     !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 
-  // ── Speak-lock subscription (prevents feedback loop) ──────────────────────
+  // ── Stable restart ref — onend calls this instead of recognition.start() ──
+  // Using a ref so onend closures always have the latest version without deps.
+  const restartRef = useRef<() => void>(() => {});
 
+  // ── Core: create and start a fresh recognition session ────────────────────
+  // No changing deps — reads everything through refs.
+  const _startRecognition = useCallback(() => {
+    if (!isSupported) return;
+    if (isListeningRef.current) return; // already running, do nothing
+    if (isSpeakingRef.current)  return; // TTS active — speak-lock will restart us
+
+    const RecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!RecognitionCtor) return;
+
+    // Abort any existing instance to avoid ghost sessions
+    if (recognitionRef.current) {
+      try { recognitionRef.current.onend = null; recognitionRef.current.stop(); } catch { /* ok */ }
+    }
+
+    const recognition = new RecognitionCtor();
+    recognition.continuous      = true;
+    recognition.interimResults  = true;
+    recognition.maxAlternatives = 1;
+    recognition.lang            = languageRef.current;
+
+    recognition.onstart = () => {
+      console.log("[useVoiceInput] Listening started");
+      isListeningRef.current = true;
+      setVoiceState("listening");
+    };
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      // PRIMARY GUARD — drop anything captured while TTS is playing
+      if (isSpeakingRef.current) {
+        console.log("[useVoiceInput] Transcript discarded (TTS active)");
+        return;
+      }
+
+      let interim = "";
+      let finalText = "";
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const r = event.results[i];
+        if (!r) continue;
+        const text = r[0]?.transcript ?? "";
+        if (r.isFinal) finalText += text;
+        else           interim   += text;
+      }
+
+      if (interim) {
+        setInterimTranscript(interim);
+        onInterimRef.current?.(interim);
+      }
+
+      if (finalText.trim()) {
+        setInterimTranscript("");
+        const trimmed = finalText.trim();
+
+        // DEDUPLICATION
+        const now = Date.now();
+        if (
+          trimmed === lastCommandRef.current.text &&
+          now - lastCommandRef.current.time < DEBOUNCE_MS
+        ) {
+          console.log("[useVoiceInput] Duplicate command suppressed:", trimmed);
+          return;
+        }
+        lastCommandRef.current = { text: trimmed, time: now };
+
+        // Flash "processing" badge
+        setVoiceState("processing");
+        clearTimeout(processingTimerRef.current);
+        processingTimerRef.current = setTimeout(() => {
+          if (wantListeningRef.current && !isSpeakingRef.current) {
+            setVoiceState("listening");
+          }
+        }, PROCESSING_FLASH_MS);
+
+        // Call the latest version of the callback through the ref
+        onFinalRef.current(trimmed);
+      }
+    };
+
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      if (event.error === "no-speech") return; // normal silence timeout
+      if (event.error === "aborted")   return; // expected when we call .stop()
+      console.warn("[useVoiceInput] Error:", event.error);
+      onErrorRef.current?.(`Voice error: ${event.error}`);
+      isListeningRef.current = false;
+    };
+
+    recognition.onend = () => {
+      console.log("[useVoiceInput] Recognition ended");
+      isListeningRef.current = false;
+      // Delegate restart to the stable ref
+      restartRef.current();
+    };
+
+    recognitionRef.current = recognition;
+
+    try {
+      recognition.start();
+    } catch (e) {
+      console.warn("[useVoiceInput] start() failed:", e);
+      onErrorRef.current?.("Failed to start voice recognition.");
+      wantListeningRef.current = false;
+      setVoiceState("idle");
+    }
+  // isSupported is a constant after mount — safe to omit from deps array
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Keep the restartRef up to date so onend always calls the latest logic
+  // (without this, the closure in recognition.onend would be forever stale)
+  useEffect(() => {
+    restartRef.current = () => {
+      if (wantListeningRef.current && !isSpeakingRef.current) {
+        // Small delay so Chrome can cleanly close the previous session
+        setTimeout(_startRecognition, 80);
+      } else if (!wantListeningRef.current) {
+        setVoiceState("idle");
+      }
+      // If isSpeakingRef is true: speak-lock onend handler will call _startRecognition
+    };
+  }, [_startRecognition]);
+
+  // ── Speak-lock: stops mic during TTS, restarts after ─────────────────────
   useEffect(() => {
     if (!isSupported) return;
 
@@ -87,23 +218,17 @@ export function useVoiceInput({
       isSpeakingRef.current = speaking;
 
       if (speaking) {
-        // TTS started — immediately suspend recognition so mic doesn't hear it
-        console.log("[useVoiceInput] Listening stopped (TTS started)");
+        console.log("[useVoiceInput] Listening paused (TTS started)");
         setVoiceState("speaking");
         setInterimTranscript("");
-        if (recognitionRef.current && isListeningRef.current) {
-          try {
-            recognitionRef.current.stop();
-            // isListeningRef stays as-is; onend will check isSpeakingRef
-          } catch {
-            // already stopped
-          }
+        // Stop recognition — onend will NOT restart because isSpeakingRef=true
+        if (recognitionRef.current) {
+          try { recognitionRef.current.stop(); } catch { /* ok */ }
         }
       } else {
-        // TTS ended — restart recognition if the user still wants to listen
-        console.log("[useVoiceInput] TTS ended — checking restart");
+        console.log("[useVoiceInput] TTS ended — attempting mic restart");
         if (wantListeningRef.current) {
-          // Small delay so the last TTS audio fully drains from the mic
+          // Drain buffer: wait 300ms after TTS ends before listening again
           setTimeout(() => {
             if (wantListeningRef.current && !isSpeakingRef.current) {
               _startRecognition();
@@ -114,14 +239,14 @@ export function useVoiceInput({
         }
       }
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // _startRecognition is stable (no deps)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSupported]);
 
-  // ── Mic initialisation (echo cancellation) ────────────────────────────────
-
+  // ── Mic warm-up with echo cancellation (best-effort, non-blocking) ────────
   const _initMic = useCallback(async () => {
-    if (micStreamRef.current) return; // already acquired
-    if (!navigator.mediaDevices?.getUserMedia) return;
+    if (micStreamRef.current) return;
+    if (!navigator?.mediaDevices?.getUserMedia) return;
     try {
       micStreamRef.current = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -131,180 +256,66 @@ export function useVoiceInput({
         },
       });
     } catch {
-      // Permission denied or unavailable — recognition still works, just
-      // without explicit echo cancellation constraints.
+      // Denied or unavailable — recognition still works without explicit constraints
     }
   }, []);
-
-  // ── Recognition lifecycle ─────────────────────────────────────────────────
-
-  const _startRecognition = useCallback(() => {
-    if (!isSupported) return;
-    if (isListeningRef.current) return; // already running
-    if (isSpeakingRef.current) return;  // TTS active — do not start
-
-    const RecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!RecognitionCtor) return;
-
-    const recognition = new RecognitionCtor();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.maxAlternatives = 1;
-    recognition.lang = language;
-
-    recognition.onstart = () => {
-      console.log("[useVoiceInput] Listening started");
-      isListeningRef.current = true;
-      setVoiceState("listening");
-    };
-
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
-      // PRIMARY GUARD — discard anything heard while TTS is active
-      if (isSpeakingRef.current) {
-        console.log("[useVoiceInput] Transcript discarded (TTS speaking)");
-        return;
-      }
-
-      let interim = "";
-      let finalText = "";
-
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        if (!result) continue;
-        const text = result[0]?.transcript ?? "";
-        if (result.isFinal) {
-          finalText += text;
-        } else {
-          interim += text;
-        }
-      }
-
-      if (interim) {
-        setInterimTranscript(interim);
-        onInterimTranscript?.(interim);
-      }
-
-      if (finalText.trim()) {
-        setInterimTranscript("");
-        const trimmed = finalText.trim();
-
-        // DEDUPLICATION — ignore same command within the debounce window
-        const now = Date.now();
-        if (
-          trimmed === lastCommandRef.current.text &&
-          now - lastCommandRef.current.time < DEBOUNCE_MS
-        ) {
-          console.log("[useVoiceInput] Duplicate command ignored:", trimmed);
-          return;
-        }
-        lastCommandRef.current = { text: trimmed, time: now };
-
-        // Brief "processing" flash
-        setVoiceState("processing");
-        clearTimeout(processingTimerRef.current);
-        processingTimerRef.current = setTimeout(() => {
-          if (wantListeningRef.current && !isSpeakingRef.current) {
-            setVoiceState("listening");
-          }
-        }, PROCESSING_FLASH_MS);
-
-        onFinalTranscript(trimmed);
-      }
-    };
-
-    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      if (event.error === "no-speech") return;
-      if (event.error === "aborted") return; // expected when we call .stop()
-      onError?.(`Voice error: ${event.error}`);
-      isListeningRef.current = false;
-      setVoiceState(wantListeningRef.current ? "idle" : "idle");
-    };
-
-    recognition.onend = () => {
-      console.log("[useVoiceInput] Recognition ended");
-      isListeningRef.current = false;
-
-      // Auto-restart only if:
-      //   • user still wants to listen
-      //   • TTS is NOT currently speaking (restart is handled by speak-lock instead)
-      if (wantListeningRef.current && !isSpeakingRef.current) {
-        try {
-          recognition.start();
-        } catch {
-          wantListeningRef.current = false;
-          setVoiceState("idle");
-        }
-      }
-    };
-
-    recognitionRef.current = recognition;
-
-    try {
-      recognition.start();
-    } catch {
-      onError?.("Failed to start voice recognition.");
-      wantListeningRef.current = false;
-      setVoiceState("idle");
-    }
-  }, [isSupported, language, onFinalTranscript, onInterimTranscript, onError]);
 
   // ── Public API ────────────────────────────────────────────────────────────
 
   const startListening = useCallback(() => {
     if (!isSupported) {
-      onError?.("Voice input is not supported in this browser.");
+      onErrorRef.current?.("Voice input is not supported in this browser.");
       return;
     }
     if (wantListeningRef.current) return; // already on
 
     wantListeningRef.current = true;
 
-    // Init mic with echo cancellation constraints, then start recognition
+    // Warm up mic, then start recognition
     _initMic().then(() => {
       if (wantListeningRef.current && !isSpeakingRef.current) {
         _startRecognition();
       }
     });
-  }, [isSupported, onError, _initMic, _startRecognition]);
+  }, [_initMic, _startRecognition]);
 
   const stopListening = useCallback(() => {
+    console.log("[useVoiceInput] Listening stopped (user request)");
     wantListeningRef.current = false;
-    isListeningRef.current = false;
+    isListeningRef.current   = false;
     setVoiceState("idle");
     setInterimTranscript("");
     clearTimeout(processingTimerRef.current);
     if (recognitionRef.current) {
       try {
+        // Null out onend before stopping so the auto-restart doesn't fire
+        recognitionRef.current.onend = null;
         recognitionRef.current.stop();
-      } catch {
-        // already stopped
-      }
+      } catch { /* ok */ }
     }
-    console.log("[useVoiceInput] Listening stopped (user request)");
   }, []);
 
   const toggleListening = useCallback(() => {
-    if (wantListeningRef.current) {
-      stopListening();
-    } else {
-      startListening();
-    }
+    if (wantListeningRef.current) stopListening();
+    else                          startListening();
   }, [startListening, stopListening]);
 
-  // ── Cleanup ───────────────────────────────────────────────────────────────
-
+  // ── Cleanup on unmount ────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
       wantListeningRef.current = false;
-      isListeningRef.current = false;
+      isListeningRef.current   = false;
       clearTimeout(processingTimerRef.current);
-      try { recognitionRef.current?.stop(); } catch { /* */ }
+      if (recognitionRef.current) {
+        try { recognitionRef.current.onend = null; recognitionRef.current.stop(); } catch { /* ok */ }
+      }
       micStreamRef.current?.getTracks().forEach(t => t.stop());
     };
   }, []);
 
   return {
     isSupported,
+    // isListening is true during active recognition AND brief processing flash
     isListening: voiceState === "listening" || voiceState === "processing",
     voiceState,
     interimTranscript,

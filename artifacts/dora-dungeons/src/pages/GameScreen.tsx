@@ -42,6 +42,23 @@ export function GameScreen({ gameState }: { gameState: GameStateResponse }) {
     AudioManager.onStateChange(setAudioSpeaking);
   }, []);
 
+  // Speak the initial room description once on first mount (after a short delay
+  // so voices have time to load and the user has interacted with the intro).
+  const hasSpokenInitialRef = useRef(false);
+  useEffect(() => {
+    if (hasSpokenInitialRef.current || isMuted) return;
+    if (!gameState.logs.length) return;
+    hasSpokenInitialRef.current = true;
+    // Give AudioManager 600ms to finish loading voices before speaking
+    const t = setTimeout(() => {
+      // Speak just the last 2–3 lines so it's not overwhelming
+      const lines = gameState.logs.slice(-3);
+      AudioManager.speakLines(lines);
+    }, 600);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── Mutation ────────────────────────────────────────────────────────────────
   const { mutate: sendAction, isPending } = useProcessAction({
     mutation: {
