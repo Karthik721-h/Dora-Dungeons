@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Dora Dungeons"
+version = "1.0.0"
+id = "artifacts/dora-dungeons"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22758
+
+[services.development]
+run = "pnpm --filter @workspace/dora-dungeons run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/dora-dungeons", "run", "build" ]
+publicDir = "artifacts/dora-dungeons/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22758"
+BASE_PATH = "/"

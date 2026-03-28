@@ -1,8 +1,8 @@
-# Workspace
+# Dora Dungeons — Audio-First RPG Foundation
 
 ## Overview
 
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+A scalable foundation for an audio-first dungeon RPG called Dora Dungeons, inspired by Shades of Doom (audio-based gameplay for visually impaired users). The core game loop is: Listen → Decide → Act → Audio Feedback → Reward → Repeat.
 
 ## Stack
 
@@ -14,83 +14,124 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **Database**: PostgreSQL + Drizzle ORM
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
-- **Build**: esbuild (CJS bundle)
+- **Build**: esbuild (ESM bundle)
+- **Frontend**: React + Vite (dark terminal RPG UI)
 
 ## Structure
 
 ```text
 artifacts-monorepo/
-├── artifacts/              # Deployable applications
-│   └── api-server/         # Express API server
-├── lib/                    # Shared libraries
+├── artifacts/
+│   ├── api-server/         # Express API server (game routes + health)
+│   └── dora-dungeons/      # React + Vite frontend (terminal-style RPG UI)
+├── lib/
+│   ├── game-engine/        # CORE: Framework-independent game logic
+│   │   ├── src/types/      # TypeScript interfaces & enums
+│   │   ├── src/engine/     # GameEngine class (startGame, processCommand)
+│   │   ├── src/combat/     # CombatSystem (attack, defend, cast_spell)
+│   │   ├── src/dungeon/    # DungeonManager (room navigation, encounters)
+│   │   └── src/ai/         # CommandParser (voice → parsed command)
 │   ├── api-spec/           # OpenAPI spec + Orval codegen config
 │   ├── api-client-react/   # Generated React Query hooks
 │   ├── api-zod/            # Generated Zod schemas from OpenAPI
 │   └── db/                 # Drizzle ORM schema + DB connection
-├── scripts/                # Utility scripts (single workspace package)
-│   └── src/                # Individual .ts scripts, run via `pnpm --filter @workspace/scripts run <script>`
-├── pnpm-workspace.yaml     # pnpm workspace (artifacts/*, lib/*, lib/integrations/*, scripts)
-├── tsconfig.base.json      # Shared TS options (composite, bundler resolution, es2022)
-├── tsconfig.json           # Root TS project references
-└── package.json            # Root package with hoisted devDeps
+├── scripts/                # Utility scripts
+├── pnpm-workspace.yaml
+├── tsconfig.base.json
+├── tsconfig.json
+└── package.json
 ```
+
+## Game Engine Architecture
+
+The `@workspace/game-engine` lib is completely framework-independent:
+
+### Core Entities (TypeScript interfaces)
+- `Player` — HP, MP, level, XP, attack, defense, abilities, inventory
+- `Enemy` — HP, attack, defense, XP reward, defeated state
+- `Room` — name, description, exits (node-based), enemies, items
+- `Dungeon` — Map of rooms with startRoomId and bossRoomId
+- `Ability` — name, MP cost, damage/heal, type (offensive/defensive)
+- `Item` — name, type, effect
+
+### Enums/Constants
+- `GameStatus`: IDLE, IN_COMBAT, EXPLORING, GAME_OVER, VICTORY
+- `ActionType`: ATTACK, DEFEND, MOVE, CAST_SPELL, LOOK, STATUS, TAKE, USE
+- `Direction`: north, south, east, west, up, down
+
+### GameEngine class
+- `startGame(playerName?)` — Initializes session, dungeon, player
+- `processCommand(input: string)` — Parses and executes a voice command
+- `updateState()` — Recalculates game status
+- `getState()` — Returns current GameState
+
+### CombatSystem
+- Turn-based player vs enemy
+- `attack(player, enemy)` — Player attacks with counterattack
+- `defend(player, enemies)` — Defensive stance reduces damage by 50%
+- `castSpell(player, spell, enemy, enemies)` — Uses MP for offensive/healing spells
+
+### DungeonManager
+- 5 rooms: Entrance → Main Hall → {Armory, Storage Room} → Throne Room
+- Node-based graph (no graphics, purely logical)
+- Boss room: Throne Room (Orc Warlord)
+
+### CommandParser (Voice AI layer)
+- Input: `"attack goblin"` → Output: `{ action: "ATTACK", target: "GOBLIN", raw: "attack goblin" }`
+- Supports all action types and directions
+- Extensible keyword mapping
+
+## API Routes
+
+- `POST /api/game/start` — Start new session (`{ playerName?: string }`)
+- `POST /api/game/action` — Process command (`{ command: string }`)
+- `GET /api/game/state` — Get current state
+
+Routes are thin delegators — all logic lives in `@workspace/game-engine`.
+
+## Frontend
+
+Dark terminal-style RPG debug interface:
+- Game log panel (scrollable, auto-scroll to latest)
+- Player status panel (HP/MP bars, level, XP)
+- Current room panel (exits, active enemies with HP)
+- Command input + EXECUTE button
+- Quick macro buttons (movement + combat + examine)
 
 ## TypeScript & Composite Projects
 
-Every package extends `tsconfig.base.json` which sets `composite: true`. The root `tsconfig.json` lists all packages as project references. This means:
-
-- **Always typecheck from the root** — run `pnpm run typecheck` (which runs `tsc --build --emitDeclarationOnly`). This builds the full dependency graph so that cross-package imports resolve correctly. Running `tsc` inside a single package will fail if its dependencies haven't been built yet.
-- **`emitDeclarationOnly`** — we only emit `.d.ts` files during typecheck; actual JS bundling is handled by esbuild/tsx/vite...etc, not `tsc`.
-- **Project references** — when package A depends on package B, A's `tsconfig.json` must list B in its `references` array. `tsc --build` uses this to determine build order and skip up-to-date packages.
+- `lib/*` packages are composite and emit declarations via `tsc --build`
+- Root `tsconfig.json` lists all lib packages as project references
+- `artifacts/*` are leaf packages checked with `tsc --noEmit`
 
 ## Root Scripts
 
-- `pnpm run build` — runs `typecheck` first, then recursively runs `build` in all packages that define it
-- `pnpm run typecheck` — runs `tsc --build --emitDeclarationOnly` using project references
+- `pnpm run build` — typecheck + build all
+- `pnpm run typecheck` — full type check
+- `pnpm --filter @workspace/api-spec run codegen` — regenerate client/zod from OpenAPI
 
 ## Packages
 
 ### `artifacts/api-server` (`@workspace/api-server`)
+Express 5 API. Game routes in `src/routes/game.ts`, delegates to `@workspace/game-engine`.
+- `pnpm --filter @workspace/api-server run dev` — dev server
+- `pnpm --filter @workspace/api-server run build` — production bundle
 
-Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` for request and response validation and `@workspace/db` for persistence.
+### `artifacts/dora-dungeons` (`@workspace/dora-dungeons`)
+React + Vite frontend. Dark RPG terminal UI.
+- `pnpm --filter @workspace/dora-dungeons run dev` — dev server
 
-- Entry: `src/index.ts` — reads `PORT`, starts Express
-- App setup: `src/app.ts` — mounts CORS, JSON/urlencoded parsing, routes at `/api`
-- Routes: `src/routes/index.ts` mounts sub-routers; `src/routes/health.ts` exposes `GET /health` (full path: `/api/health`)
-- Depends on: `@workspace/db`, `@workspace/api-zod`
-- `pnpm --filter @workspace/api-server run dev` — run the dev server
-- `pnpm --filter @workspace/api-server run build` — production esbuild bundle (`dist/index.cjs`)
-- Build bundles an allowlist of deps (express, cors, pg, drizzle-orm, zod, etc.) and externalizes the rest
+### `lib/game-engine` (`@workspace/game-engine`)
+Core game logic — fully framework independent. No external runtime dependencies.
 
 ### `lib/db` (`@workspace/db`)
-
-Database layer using Drizzle ORM with PostgreSQL. Exports a Drizzle client instance and schema models.
-
-- `src/index.ts` — creates a `Pool` + Drizzle instance, exports schema
-- `src/schema/index.ts` — barrel re-export of all models
-- `src/schema/<modelname>.ts` — table definitions with `drizzle-zod` insert schemas (no models definitions exist right now)
-- `drizzle.config.ts` — Drizzle Kit config (requires `DATABASE_URL`, automatically provided by Replit)
-- Exports: `.` (pool, db, schema), `./schema` (schema only)
-
-Production migrations are handled by Replit when publishing. In development, we just use `pnpm --filter @workspace/db run push`, and we fallback to `pnpm --filter @workspace/db run push-force`.
+Database layer using Drizzle ORM with PostgreSQL. No game schema yet (game state is in-memory).
 
 ### `lib/api-spec` (`@workspace/api-spec`)
-
-Owns the OpenAPI 3.1 spec (`openapi.yaml`) and the Orval config (`orval.config.ts`). Running codegen produces output into two sibling packages:
-
-1. `lib/api-client-react/src/generated/` — React Query hooks + fetch client
-2. `lib/api-zod/src/generated/` — Zod schemas
-
-Run codegen: `pnpm --filter @workspace/api-spec run codegen`
+OpenAPI 3.1 spec for all game + health endpoints.
 
 ### `lib/api-zod` (`@workspace/api-zod`)
-
-Generated Zod schemas from the OpenAPI spec (e.g. `HealthCheckResponse`). Used by `api-server` for response validation.
+Generated Zod schemas: `StartGameBody`, `StartGameResponse`, `ProcessActionBody`, `ProcessActionResponse`, `GetGameStateResponse`.
 
 ### `lib/api-client-react` (`@workspace/api-client-react`)
-
-Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHealthCheck`, `healthCheck`).
-
-### `scripts` (`@workspace/scripts`)
-
-Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.
+Generated React Query hooks: `useStartGame`, `useProcessAction`, `useGetGameState`.

@@ -3,13 +3,15 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Dora Dungeons API specification
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: game
+    description: Game operations
 paths:
   /healthz:
     get:
@@ -24,6 +26,81 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /game/start:
+    post:
+      operationId: startGame
+      tags: [game]
+      summary: Start a new game session
+      description: Initializes a new game session and returns the initial game state
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartGameRequest"
+      responses:
+        "200":
+          description: Game started successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameStateResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /game/action:
+    post:
+      operationId: processAction
+      tags: [game]
+      summary: Process a game action
+      description: Processes a voice command or action string and returns the updated game state
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActionRequest"
+      responses:
+        "200":
+          description: Action processed successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameStateResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: No active game session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /game/state:
+    get:
+      operationId: getGameState
+      tags: [game]
+      summary: Get current game state
+      description: Returns the current game state for the active session
+      responses:
+        "200":
+          description: Current game state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameStateResponse"
+        "404":
+          description: No active game session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +110,180 @@ components:
           type: string
       required:
         - status
-
+    StartGameRequest:
+      type: object
+      properties:
+        playerName:
+          type: string
+          description: Optional player name
+    ActionRequest:
+      type: object
+      properties:
+        command:
+          type: string
+          description: The voice command or action string (e.g. "attack goblin", "move north")
+      required:
+        - command
+    ParsedCommand:
+      type: object
+      properties:
+        action:
+          type: string
+          description: The parsed action type (e.g. ATTACK, MOVE, DEFEND, CAST_SPELL, LOOK)
+        target:
+          type: string
+          description: The parsed target if any
+        direction:
+          type: string
+          description: Direction for movement commands
+        raw:
+          type: string
+          description: The original raw command string
+      required:
+        - action
+        - raw
+    PlayerState:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        hp:
+          type: integer
+        maxHp:
+          type: integer
+        mp:
+          type: integer
+        maxMp:
+          type: integer
+        level:
+          type: integer
+        xp:
+          type: integer
+        xpToNextLevel:
+          type: integer
+        attack:
+          type: integer
+        defense:
+          type: integer
+        abilities:
+          type: array
+          items:
+            type: string
+        inventory:
+          type: array
+          items:
+            type: string
+      required:
+        - id
+        - name
+        - hp
+        - maxHp
+        - mp
+        - maxMp
+        - level
+        - xp
+        - xpToNextLevel
+        - attack
+        - defense
+        - abilities
+        - inventory
+    EnemyState:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        hp:
+          type: integer
+        maxHp:
+          type: integer
+        attack:
+          type: integer
+        defense:
+          type: integer
+        xpReward:
+          type: integer
+        isDefeated:
+          type: boolean
+      required:
+        - id
+        - name
+        - hp
+        - maxHp
+        - attack
+        - defense
+        - xpReward
+        - isDefeated
+    RoomState:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        exits:
+          type: object
+          additionalProperties:
+            type: string
+        enemies:
+          type: array
+          items:
+            $ref: "#/components/schemas/EnemyState"
+        items:
+          type: array
+          items:
+            type: string
+        isExplored:
+          type: boolean
+      required:
+        - id
+        - name
+        - description
+        - exits
+        - enemies
+        - items
+        - isExplored
+    GameStateResponse:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        gameStatus:
+          type: string
+          description: IDLE, IN_COMBAT, EXPLORING, GAME_OVER, VICTORY
+        player:
+          $ref: "#/components/schemas/PlayerState"
+        currentRoom:
+          $ref: "#/components/schemas/RoomState"
+        logs:
+          type: array
+          items:
+            type: string
+          description: Narrative messages describing what happened
+        parsedCommand:
+          $ref: "#/components/schemas/ParsedCommand"
+          description: The command that was parsed (only present on action responses)
+        turnCount:
+          type: integer
+      required:
+        - sessionId
+        - gameStatus
+        - player
+        - currentRoom
+        - logs
+        - turnCount
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+      required:
+        - error
+        - message

@@ -1,0 +1,168 @@
+You are a senior full stack developer and senior game developer.
+
+Your task is to design and generate the foundation for an audio-first RPG game called "Dora Dungeons", inspired by Shades of Doom (audio-based gameplay for visually impaired users).
+
+---
+
+## PROJECT GOAL
+
+Build a scalable foundation for a voice-controlled dungeon RPG where:
+
+* The player interacts entirely through voice (input + audio feedback)
+* The game is accessible for visually impaired users
+* The core gameplay loop is: Listen → Decide → Act → Audio Feedback → Reward → Repeat
+
+This is NOT a full game yet. This is the foundation (MVP architecture + core systems).
+
+---
+
+## PHASE 0 — DEFINE CORE SYSTEMS
+
+1. Define the core game loop in code-friendly structure
+
+2. Define core entities as TypeScript interfaces:
+
+   * Player
+   * Enemy
+   * Ability
+   * Item
+   * Room (Dungeon Node)
+
+3. Define enums/constants for:
+
+   * Actions (ATTACK, DEFEND, MOVE, CAST_SPELL)
+   * Game states (IDLE, IN_COMBAT, EXPLORING)
+
+4. Define a simple dungeon structure:
+
+   * Node-based (Room connections)
+   * No graphics, purely logical
+
+---
+
+## PHASE 1 — ARCHITECTURE SETUP
+
+Create a clean, scalable monorepo structure:
+
+/app
+/client        (React frontend - Vite)
+/server        (Node.js backend - Express or Fastify)
+/game-engine   (CORE LOGIC - must be framework independent)
+/ai            (voice processing + command parsing)
+/audio         (audio management layer)
+
+---
+
+## BACKEND REQUIREMENTS
+
+* Use Node.js with TypeScript
+
+* Use Express or Fastify
+
+* Create basic API routes:
+
+  * POST /game/start
+  * POST /game/action
+  * GET /game/state
+
+* DO NOT mix game logic inside routes
+
+* Routes must call the game-engine module
+
+---
+
+## GAME ENGINE REQUIREMENTS (CRITICAL)
+
+This must be completely independent of the backend.
+
+Implement:
+
+1. GameEngine class:
+
+   * startGame()
+   * processCommand(input: string)
+   * updateState()
+
+2. Combat system:
+
+   * Turn-based
+   * Player vs Enemy
+   * Basic attack logic
+
+3. Player progression:
+
+   * XP gain
+   * Level up logic
+
+4. Dungeon navigation:
+
+   * Move between rooms
+   * Trigger encounters
+
+---
+
+## VOICE COMMAND SYSTEM (BASIC)
+
+Create a simple parser:
+
+Input:
+"attack goblin"
+
+Output:
+{
+action: "ATTACK",
+target: "GOBLIN"
+}
+
+Keep it simple and extensible.
+
+---
+
+## FRONTEND REQUIREMENTS
+
+* React + Vite
+* Minimal UI (debug interface only)
+* Button to simulate voice input
+* Display game logs (text output)
+
+---
+
+## CODE QUALITY RULES
+
+* Use TypeScript everywhere
+* Use clean architecture principles
+* Keep modules decoupled
+* No hardcoding logic inside UI
+* Write readable, well-structured code
+
+---
+
+## OUTPUT FORMAT
+
+1. Folder structure
+2. All core files with code
+3. Explanation of how modules interact
+4. Instructions to run the project
+
+---
+
+## IMPORTANT CONSTRAINTS
+
+* Do NOT implement advanced features yet (no multiplayer, no payments, no mini-games)
+* Focus ONLY on foundation and scalability
+* Code must be production-ready in structure (not prototype-level)
+
+---
+
+## GOAL
+
+By the end, I should have a working foundation where:
+
+* I can start a game
+* Send a command (e.g., "attack")
+* Get a response from the engine
+* See the game state update
+
+---
+
+## BEGIN NOW

@@ -1,0 +1,17 @@
+packages:
+  "framer-motion": "For terminal text reveal and atmospheric fade animations"
+  "clsx": "Utility for constructing className strings conditionally"
+  "tailwind-merge": "Utility to merge tailwind classes safely"
+  "lucide-react": "For UI icons in the game interface"
+
+images:
+  - path: "artifacts/dora-dungeons/public/images/dungeon-bg.png"
+    description: "Dark atmospheric gothic dungeon background, extremely subtle, mostly shadows, terminal aesthetic"
+    aspect_ratio: "16:9"
+  - path: "artifacts/dora-dungeons/public/images/hero-art.png"
+    description: "Abstract pixel art or ASCII art style skull or gothic archway, monochromatic amber or bone color"
+    aspect_ratio: "1:1"
+
+notes:
+  - Expects @workspace/api-client-react generated hooks to be available
+  - React Query retry disabled for initial state fetch to immediately show Start Game screen on 404
