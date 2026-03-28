@@ -1,14 +1,10 @@
 import crypto from "crypto";
 import { Player } from "../types/index.js";
-import { PLAYER_STARTING_ABILITIES } from "../systems/AbilitySystem.js";
-
-function uuid(): string {
-  return crypto.randomUUID();
-}
+import { getPlayerStartingAbilities } from "../systems/AbilitySystem.js";
 
 export function createPlayer(name: string): Player {
   return {
-    id: uuid(),
+    id: crypto.randomUUID(),
     name,
     hp: 100,
     maxHp: 100,
@@ -20,7 +16,7 @@ export function createPlayer(name: string): Player {
     level: 1,
     xp: 0,
     xpToNextLevel: 100,
-    abilities: PLAYER_STARTING_ABILITIES.map((a) => ({ ...a })),
+    abilities: getPlayerStartingAbilities(),
     inventory: [],
     statusEffects: [],
     isDefending: false,

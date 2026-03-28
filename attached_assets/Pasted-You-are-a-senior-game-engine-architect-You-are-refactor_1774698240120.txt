@@ -1,0 +1,176 @@
+You are a senior game engine architect.
+
+You are refactoring an existing TypeScript RPG engine to enforce FULL data-driven architecture and eliminate all hardcoded branching logic.
+
+The current problems:
+
+* Adding a new ability requires modifying CombatSystem logic
+* Adding a new event requires editing a switch statement
+* Expanding the dungeon requires rewriting logic instead of using generation or configuration
+
+Your goal is to FIX these issues permanently.
+
+---
+
+1. ABILITY SYSTEM — FULL DATA-DRIVEN DESIGN
+
+---
+
+Refactor abilities so that:
+
+* Each Ability has:
+  id
+  name
+  effects: AbilityEffect[]
+
+* AbilityEffect structure:
+  {
+  type: string (e.g., DAMAGE, HEAL, APPLY_STATUS, MODIFY_STAT)
+  target: "SELF" | "ENEMY" | "ALL_ENEMIES"
+  value?: number
+  status?: string
+  stat?: string
+  }
+
+* CombatSystem MUST:
+
+  * Iterate through effects[]
+  * Process each effect generically
+  * NEVER use if/else or switch based on ability name or type
+
+* Adding a new ability must require:
+
+  * ONLY defining data (no code changes)
+
+---
+
+2. EVENT SYSTEM — PLUGGABLE REGISTRY
+
+---
+
+Replace ALL switch(event.type) logic with a registry system:
+
+EventRegistry:
+
+* register(eventType: string, handler: Function)
+* trigger(eventType: string, context)
+
+Each event type must:
+
+* Register itself independently
+* Contain its own handler logic
+
+Example:
+EventRegistry.register("TRAP", trapHandler)
+
+Adding a new event must NOT require editing existing code.
+
+---
+
+3. DUNGEON SYSTEM — CONFIG + GENERATION
+
+---
+
+Refactor dungeon system to:
+
+* Use Room definitions as pure data:
+  {
+  id
+  description
+  connections
+  eventType
+  }
+
+* Create a DungeonGenerator:
+
+  * generateDungeon(seed?: string)
+  * returns a full dungeon map
+
+* Support:
+
+  * random layouts
+  * reusable room templates
+
+* GameEngine must NOT hardcode room flows
+
+---
+
+4. REMOVE ALL HARDCODED BRANCHING
+
+---
+
+Audit the entire codebase and eliminate:
+
+* switch (ability.type)
+* switch (event.type)
+* hardcoded room flows
+* logic tied to specific names like "Fireball" or "Goblin"
+
+Replace with:
+
+* registries
+* maps
+* configuration-driven execution
+
+---
+
+5. VALIDATION TESTS (IMPORTANT)
+
+---
+
+After refactoring, demonstrate:
+
+1. Add a new ability:
+
+   * Define it in data only
+   * Show it works without modifying CombatSystem
+
+2. Add a new event:
+
+   * Register it only
+   * Show it works without editing existing event logic
+
+3. Generate a new dungeon:
+
+   * Different layout from previous run
+   * No code changes required
+
+---
+
+6. CODE QUALITY RULES
+
+---
+
+* Strict TypeScript typing
+
+* Modular separation:
+  /systems
+  /registries
+  /data
+  /generators
+
+* No business logic in API routes
+
+* Engine must remain framework-independent
+
+---
+
+## OUTPUT FORMAT
+
+1. Updated architecture
+2. Refactored core systems
+3. Before vs After explanation
+4. Proof that new ability/event/dungeon works without code changes
+
+---
+
+## GOAL
+
+After this refactor:
+
+* The engine behaves like a configurable system, not a hardcoded game
+* New content is added through data, not logic edits
+
+---
+
+## BEGIN NOW

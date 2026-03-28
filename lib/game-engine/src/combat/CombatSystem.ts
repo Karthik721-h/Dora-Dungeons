@@ -1,16 +1,14 @@
 import {
   Player,
   Enemy,
-  Ability,
   CombatState,
   AbilityTargetType,
-  AbilityEffectKind,
   StatusEffectType,
-  StatusEffect,
 } from "../types/index.js";
 import { NarrationEngine } from "../narration/NarrationEngine.js";
-import { tickStatusEffects, applyStatusEffect, getDefenseBonus, isStunned } from "./StatusEffects.js";
+import { tickStatusEffects, getDefenseBonus, isStunned } from "./StatusEffects.js";
 import { findAbilityByName } from "../systems/AbilitySystem.js";
+import { AbilityEffectRegistry } from "../registries/AbilityEffectRegistry.js";
 
 export interface CombatActionResult {
   messages: string[];
@@ -36,7 +34,7 @@ function calcDamage(attackerAtk: number, defenderDef: number, defenderBonus = 0)
 }
 
 function buildTurnOrder(player: Player, enemies: Enemy[]): string[] {
-  const combatants: Array<{ id: string; speed: number }> = [
+  const combatants = [
     { id: "player", speed: player.speed },
     ...enemies.filter((e) => !e.isDefeated).map((e) => ({ id: e.id, speed: e.speed })),
   ];
@@ -62,8 +60,7 @@ export function refreshTurnOrder(combat: CombatState, player: Player): void {
 
 function enemyAttackPlayer(enemy: Enemy, player: Player): string[] {
   const msgs: string[] = [];
-  const stunned = isStunned(enemy.statusEffects);
-  if (stunned) {
+  if (isStunned(enemy.statusEffects)) {
     msgs.push(NarrationEngine.statusEffectTick(enemy.name, StatusEffectType.STUN, 0));
     return msgs;
   }
@@ -81,102 +78,11 @@ function enemyAttackPlayer(enemy: Enemy, player: Player): string[] {
 
   const defBonus = getDefenseBonus(player.statusEffects);
   const defenseMult = player.isDefending ? 0.5 : 1.0;
-  const raw = calcDamage(enemy.attack, player.defense, defBonus);
-  const dmg = Math.floor(raw * defenseMult);
+  const dmg = Math.floor(calcDamage(enemy.attack, player.defense, defBonus) * defenseMult);
   player.hp = clamp(player.hp - dmg, 0, player.maxHp);
   msgs.push(NarrationEngine.enemyTurn(enemy, dmg));
   if (player.hp <= 0) msgs.push(NarrationEngine.playerDefeated(player));
   return msgs;
-}
-
-function resolveTargets(ability: Ability, targetEnemy: Enemy | null, activeEnemies: Enemy[]): Enemy[] {
-  if (ability.targetType === AbilityTargetType.ALL_ENEMIES) return activeEnemies;
-  if (ability.targetType === AbilityTargetType.SELF) return [];
-  if (targetEnemy) return [targetEnemy];
-  return activeEnemies.slice(0, 1);
-}
-
-function applyAbilityEffects(
-  ability: Ability,
-  player: Player,
-  targets: Enemy[],
-  messages: string[]
-): { xpGained: number; goldGained: number } {
-  let xpGained = 0;
-  let goldGained = 0;
-
-  let firstDamageDone = false;
-
-  for (const effect of ability.effects) {
-    switch (effect.kind) {
-      case AbilityEffectKind.HEAL_SELF: {
-        const healed = Math.min(effect.value, player.maxHp - player.hp);
-        player.hp = clamp(player.hp + healed, 0, player.maxHp);
-        messages.push(NarrationEngine.spellHeal(player.name, ability.name, healed));
-        break;
-      }
-
-      case AbilityEffectKind.APPLY_STATUS_SELF: {
-        if (effect.statusDef) {
-          const statusEffect: StatusEffect = { ...effect.statusDef, narration: "" };
-          applyStatusEffect(player.statusEffects, statusEffect);
-          messages.push(NarrationEngine.statusEffectApplied(player.name, effect.statusDef.type));
-        }
-        break;
-      }
-
-      case AbilityEffectKind.DAMAGE: {
-        if (targets.length === 0) break;
-
-        if (!firstDamageDone) {
-          const primary = targets[0]!;
-          const primaryDmg = clamp(
-            Math.floor(rollDamage(effect.value) - getDefenseBonus(primary.statusEffects) * 0.3),
-            1,
-            9999
-          );
-          messages.push(
-            ability.targetType === AbilityTargetType.ALL_ENEMIES
-              ? NarrationEngine.spellCast(player.name, ability.name, "all enemies", primaryDmg)
-              : NarrationEngine.spellCast(player.name, ability.name, primary.name, primaryDmg)
-          );
-          firstDamageDone = true;
-        }
-
-        for (const target of targets) {
-          const defBonus = getDefenseBonus(target.statusEffects);
-          const dmg = clamp(Math.floor(rollDamage(effect.value) - defBonus * 0.3), 1, 9999);
-          target.hp = clamp(target.hp - dmg, 0, target.maxHp);
-
-          if (targets.length > 1) {
-            messages.push(`${target.name} takes ${dmg} damage.`);
-          }
-
-          if (target.hp <= 0) {
-            target.isDefeated = true;
-            xpGained += target.xpReward;
-            goldGained += target.goldReward;
-            messages.push(NarrationEngine.enemyDefeated(target));
-            messages.push(NarrationEngine.xpGained(target.xpReward));
-            if (target.goldReward > 0) messages.push(NarrationEngine.goldGained(target.goldReward));
-          }
-        }
-        break;
-      }
-
-      case AbilityEffectKind.APPLY_STATUS_TARGET: {
-        if (!effect.statusDef) break;
-        for (const target of targets.filter((t) => !t.isDefeated)) {
-          const statusEffect: StatusEffect = { ...effect.statusDef, narration: "" };
-          applyStatusEffect(target.statusEffects, statusEffect);
-          messages.push(NarrationEngine.statusEffectApplied(target.name, effect.statusDef.type));
-        }
-        break;
-      }
-    }
-  }
-
-  return { xpGained, goldGained };
 }
 
 export class CombatSystem {
@@ -202,10 +108,13 @@ export class CombatSystem {
     player.isDefending = false;
     messages.push(...this.runEnemyTurns(player, combat, enemy));
 
-    const allDefeated = combat.enemies.every((e) => e.isDefeated);
-    const playerDefeated = player.hp <= 0;
-
-    return { messages, xpGained, goldGained, allEnemiesDefeated: allDefeated, playerDefeated };
+    return {
+      messages,
+      xpGained,
+      goldGained,
+      allEnemiesDefeated: combat.enemies.every((e) => e.isDefeated),
+      playerDefeated: player.hp <= 0,
+    };
   }
 
   playerDefend(player: Player, combat: CombatState): CombatActionResult {
@@ -214,11 +123,27 @@ export class CombatSystem {
     messages.push(NarrationEngine.playerDefend(player));
     messages.push(...this.runEnemyTurns(player, combat));
     const allDefeated = combat.enemies.every((e) => e.isDefeated);
-    const playerDefeated = player.hp <= 0;
     player.isDefending = false;
-    return { messages, xpGained: 0, goldGained: 0, allEnemiesDefeated: allDefeated, playerDefeated };
+    return {
+      messages,
+      xpGained: 0,
+      goldGained: 0,
+      allEnemiesDefeated: allDefeated,
+      playerDefeated: player.hp <= 0,
+    };
   }
 
+  /**
+   * Spell casting — fully data-driven.
+   *
+   * This method:
+   *  1. Looks up the ability by name
+   *  2. Resolves targets based on ability.targetType
+   *  3. Iterates ability.effects[] and delegates each to AbilityEffectRegistry
+   *
+   * It NEVER branches on ability name, effect type, or specific values.
+   * Adding a new ability or effect type requires zero changes here.
+   */
   playerCastSpell(
     player: Player,
     abilityName: string,
@@ -230,7 +155,7 @@ export class CombatSystem {
     const ability = findAbilityByName(player.abilities, abilityName);
     if (!ability) {
       messages.push(
-        `You don't know the spell "${abilityName}". Your known spells: ${player.abilities.map((a) => a.name).join(", ")}`
+        `You don't know "${abilityName}". Known spells: ${player.abilities.map((a) => a.name).join(", ")}`
       );
       return { messages, xpGained: 0, goldGained: 0, allEnemiesDefeated: false, playerDefeated: false };
     }
@@ -242,26 +167,44 @@ export class CombatSystem {
 
     player.mp = clamp(player.mp - ability.mpCost, 0, player.maxMp);
     const activeEnemies = combat.enemies.filter((e) => !e.isDefeated);
-    const targets = resolveTargets(ability, targetEnemy, activeEnemies);
 
-    if (
-      ability.targetType !== AbilityTargetType.SELF &&
-      ability.effects.some((e) => e.kind === AbilityEffectKind.DAMAGE || e.kind === AbilityEffectKind.APPLY_STATUS_TARGET) &&
-      targets.length === 0
-    ) {
+    const targets: Enemy[] =
+      ability.targetType === AbilityTargetType.ALL_ENEMIES
+        ? activeEnemies
+        : ability.targetType === AbilityTargetType.SELF
+        ? []
+        : targetEnemy
+        ? [targetEnemy]
+        : activeEnemies.slice(0, 1);
+
+    const needsEnemyTarget =
+      ability.targetType !== AbilityTargetType.SELF && activeEnemies.length > 0;
+
+    if (needsEnemyTarget && targets.length === 0) {
       messages.push(NarrationEngine.noTarget(ability.name));
       player.mp = clamp(player.mp + ability.mpCost, 0, player.maxMp);
       return { messages, xpGained: 0, goldGained: 0, allEnemiesDefeated: false, playerDefeated: false };
     }
 
-    const { xpGained, goldGained } = applyAbilityEffects(ability, player, targets, messages);
+    let xpGained = 0;
+    let goldGained = 0;
+
+    for (const effect of ability.effects) {
+      const result = AbilityEffectRegistry.process(effect, player, targets, messages);
+      xpGained += result.xpGained;
+      goldGained += result.goldGained;
+    }
 
     player.isDefending = false;
     messages.push(...this.runEnemyTurns(player, combat));
 
-    const allDefeated = combat.enemies.every((e) => e.isDefeated);
-    const playerDefeated = player.hp <= 0;
-    return { messages, xpGained, goldGained, allEnemiesDefeated: allDefeated, playerDefeated };
+    return {
+      messages,
+      xpGained,
+      goldGained,
+      allEnemiesDefeated: combat.enemies.every((e) => e.isDefeated),
+      playerDefeated: player.hp <= 0,
+    };
   }
 
   private runEnemyTurns(player: Player, combat: CombatState, justKilled?: Enemy): string[] {
@@ -270,16 +213,15 @@ export class CombatSystem {
 
     for (const enemy of combat.enemies) {
       if (enemy.isDefeated) continue;
-      if (justKilled && enemy.id === justKilled.id) continue;
-
+      if (justKilled?.id === enemy.id) continue;
       messages.push(...enemyAttackPlayer(enemy, player));
       if (player.hp <= 0) break;
     }
 
-    const playerStatusTick = tickStatusEffects(player.name, player.statusEffects);
-    messages.push(...playerStatusTick.messages);
-    if (playerStatusTick.damage > 0) {
-      player.hp = clamp(player.hp - playerStatusTick.damage, 0, player.maxHp);
+    const tick = tickStatusEffects(player.name, player.statusEffects);
+    messages.push(...tick.messages);
+    if (tick.damage > 0) {
+      player.hp = clamp(player.hp - tick.damage, 0, player.maxHp);
       if (player.hp <= 0) messages.push(NarrationEngine.playerDefeated(player));
     }
 

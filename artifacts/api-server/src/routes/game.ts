@@ -85,8 +85,11 @@ function serializeGameState(state: GameState) {
 
 router.post("/start", (req: Request, res: Response) => {
   const body = StartGameBody.parse(req.body ?? {});
+  const dungeonSeed: string | undefined = typeof req.body?.dungeonSeed === "string"
+    ? req.body.dungeonSeed
+    : undefined;
   engine = new GameEngine();
-  currentState = engine.startGame(body.playerName ?? "Hero");
+  currentState = engine.startGame(body.playerName ?? "Hero", dungeonSeed);
   const response = StartGameResponse.parse(serializeGameState(currentState));
   res.json(response);
 });

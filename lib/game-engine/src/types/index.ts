@@ -50,13 +50,6 @@ export enum AbilityTargetType {
   SELF = "SELF",
 }
 
-export enum AbilityEffectKind {
-  DAMAGE = "DAMAGE",
-  HEAL_SELF = "HEAL_SELF",
-  APPLY_STATUS_TARGET = "APPLY_STATUS_TARGET",
-  APPLY_STATUS_SELF = "APPLY_STATUS_SELF",
-}
-
 export enum ItemType {
   CONSUMABLE = "CONSUMABLE",
   WEAPON = "WEAPON",
@@ -69,6 +62,7 @@ export enum EventType {
   TREASURE = "TREASURE",
   TRAP = "TRAP",
   STORY = "STORY",
+  SHRINE = "SHRINE",
   EMPTY = "EMPTY",
 }
 
@@ -109,10 +103,31 @@ export interface Item {
   equipped?: boolean;
 }
 
+/**
+ * Data-driven ability effect. Each effect is processed generically by
+ * AbilityEffectRegistry — no switch statements, no hardcoded type checks.
+ *
+ * type: string key registered in AbilityEffectRegistry
+ *       Built-ins: "DAMAGE" | "HEAL" | "APPLY_STATUS" | "MODIFY_STAT"
+ *       Custom: register any new type without changing engine code.
+ *
+ * target: which combatants are affected
+ *         "SELF"        — the player
+ *         "ENEMY"       — single targeted enemy (or first if none specified)
+ *         "ALL_ENEMIES" — every living enemy
+ *
+ * value:    numeric magnitude (damage amount, heal amount, stat delta)
+ * statusId: key into StatusDefinitionRegistry for APPLY_STATUS effects
+ * stat:     Player/StatBlock key for MODIFY_STAT effects
+ */
 export interface AbilityEffect {
-  kind: AbilityEffectKind;
-  value: number;
-  statusDef?: StatusEffectDefinition;
+  type: string;
+  target: "SELF" | "ENEMY" | "ALL_ENEMIES";
+  value?: number;
+  statusId?: string;
+  stat?: string;
+  /** Narration template key (from NarrationRegistry) used by DAMAGE effects. */
+  narrationKey?: string;
 }
 
 export interface Ability {
@@ -163,6 +178,7 @@ export interface RoomEvent {
   goldReward?: number;
   trapDamage?: number;
   storyText?: string;
+  shrineType?: string;
 }
 
 export interface Room {
@@ -180,6 +196,7 @@ export interface Dungeon {
   rooms: Map<string, Room>;
   startRoomId: string;
   bossRoomId: string;
+  seed: string;
 }
 
 export interface ParsedCommand {

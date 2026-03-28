@@ -54,6 +54,11 @@ NarrationRegistry.register("ability.shield", [
   "A translucent shield materializes around {player}, deflecting future blows.",
 ]);
 
+NarrationRegistry.register("ability.meteor_strike", [
+  "{player} raises their arms to the heavens — a blazing meteor tears through the dungeon ceiling and detonates among the enemies! ({damage} damage each!)",
+  "The sky itself answers {player}'s call. A meteor screams down and erupts in an inferno, scorching everything! ({damage} each)",
+]);
+
 NarrationRegistry.register("ability.poison_dart", [
   "{player} flings a venomous dart at {target}! It buries itself deep — {damage} damage and the venom seeps in.",
   "{player} draws a dart dipped in poison and hurls it at {target} for {damage} damage!",

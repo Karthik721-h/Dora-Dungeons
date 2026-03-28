@@ -4,18 +4,18 @@ import {
   GameStatus,
   ActionType,
   Direction,
-  CombatState,
   ParsedCommand,
   Enemy,
+  ItemType,
 } from "../types/index.js";
 import { CommandParser } from "../ai/CommandParser.js";
-import { DungeonManager, createDefaultDungeon } from "../dungeon/DungeonManager.js";
+import { DungeonManager } from "../dungeon/DungeonManager.js";
+import { generateDungeon } from "../generators/DungeonGenerator.js";
 import { CombatSystem, initCombatState, refreshTurnOrder } from "../combat/CombatSystem.js";
 import { NarrationEngine } from "../narration/NarrationEngine.js";
 import { triggerRoomEvent } from "../systems/EventSystem.js";
 import { findItemByName, useConsumable, applyEquipment } from "../systems/ItemSystem.js";
 import { createPlayer, calculateXpToNextLevel } from "../entities/Player.js";
-import { ItemType } from "../types/index.js";
 
 function uuid(): string {
   return crypto.randomUUID();
@@ -35,23 +35,29 @@ export class GameEngine {
     this.combat = new CombatSystem();
   }
 
-  startGame(playerName = "Hero"): GameState {
-    const dungeon = createDefaultDungeon();
-    const startRoomId = dungeon.startRoomId;
+  /**
+   * Start a new game.
+   * @param playerName   Display name for the player character.
+   * @param dungeonSeed  Optional seed for reproducible dungeon generation.
+   *                     Omit for a random dungeon each run.
+   */
+  startGame(playerName = "Hero", dungeonSeed?: string): GameState {
+    const dungeon = generateDungeon(dungeonSeed);
     const player = createPlayer(playerName);
 
     this.state = {
       sessionId: uuid(),
       gameStatus: GameStatus.EXPLORING,
       player,
-      currentRoomId: startRoomId,
+      currentRoomId: dungeon.startRoomId,
       dungeon,
       logs: [
         "══════════════════════════════",
         "   DORA DUNGEONS — BEGIN",
         "══════════════════════════════",
         `You are ${playerName}, a lone adventurer descending into an ancient dungeon.`,
-        "Your quest: reach the Dark Throne Room and slay the Orc Warlord.",
+        "Your quest: reach the final chamber and slay the boss.",
+        `Dungeon seed: ${dungeon.seed}`,
         "Commands: attack [enemy] | defend | move [direction] | cast [spell] [target] | use [item] | look | status | flee",
         "——————————————————————————————",
       ],
@@ -62,8 +68,10 @@ export class GameEngine {
     };
 
     const mgr = new DungeonManager(dungeon);
-    mgr.markExplored(startRoomId);
-    const eventResult = triggerRoomEvent(this.state.dungeon.rooms.get(startRoomId)!.event, player);
+    mgr.markExplored(dungeon.startRoomId);
+
+    const startRoom = dungeon.rooms.get(dungeon.startRoomId)!;
+    const eventResult = triggerRoomEvent(startRoom.event, player);
     if (eventResult.narration.length > 0) this.state.logs.push(...eventResult.narration);
     this.state.logs.push(...this.describeCurrentRoom(false));
 
@@ -122,7 +130,7 @@ export class GameEngine {
       default:
         logs.push(
           `Unknown command: "${input}".`,
-          "Try: attack [enemy], defend, move [direction], cast [spell], use [item], look, status, flee"
+          "Try: attack [enemy] | defend | move [direction] | cast [spell] | use [item] | look | status | flee"
         );
     }
 
@@ -132,20 +140,12 @@ export class GameEngine {
     return this.state;
   }
 
-  updateState(): GameState {
-    if (!this.state) throw new Error("No active game session.");
-    this.syncGameStatus();
-    return this.state;
-  }
-
   private handleAttack(parsed: ParsedCommand): string[] {
     const state = this.state!;
     const mgr = new DungeonManager(state.dungeon);
     const activeEnemies = mgr.getActiveEnemies(state.currentRoomId);
 
-    if (activeEnemies.length === 0) {
-      return ["There are no enemies here to attack. Explore the dungeon."];
-    }
+    if (activeEnemies.length === 0) return ["There are no enemies here to attack."];
 
     this.ensureCombatStarted(activeEnemies);
 
@@ -241,13 +241,11 @@ export class GameEngine {
 
     const direction = parsed.direction;
     if (!direction) {
-      return ["Which direction? Try: move north, move south, move east, move west, move up, move down"];
+      return ["Which direction? Try: move north, move south, move east, move west."];
     }
 
     const nextRoomId = mgr.canMove(state.currentRoomId, direction);
-    if (!nextRoomId) {
-      return [NarrationEngine.noExit(direction)];
-    }
+    if (!nextRoomId) return [NarrationEngine.noExit(direction)];
 
     state.currentRoomId = nextRoomId;
     state.combat.active = false;
@@ -257,25 +255,22 @@ export class GameEngine {
     const wasExplored = nextRoom.isExplored;
     mgr.markExplored(nextRoomId);
 
-    const msgs: string[] = [];
-    msgs.push(`You move ${direction}...`);
+    const msgs: string[] = [`You move ${direction}...`];
 
     if (wasExplored) {
       msgs.push(NarrationEngine.roomAlreadyExplored(nextRoom.name));
     } else {
       msgs.push(NarrationEngine.roomEntry(nextRoom.name, nextRoom.description));
-    }
-
-    if (nextRoom.ambientDescription && !wasExplored) {
-      msgs.push(nextRoom.ambientDescription);
+      if (nextRoom.ambientDescription) msgs.push(nextRoom.ambientDescription);
     }
 
     if (!wasExplored) {
       const eventResult = triggerRoomEvent(nextRoom.event, state.player);
       msgs.push(...eventResult.narration);
 
-      if (eventResult.goldGained > 0) {
-        state.gold += eventResult.goldGained;
+      if (eventResult.goldGained > 0) state.gold += eventResult.goldGained;
+      if ((eventResult as { mpRestored?: number }).mpRestored) {
+        state.player.mp = Math.min(state.player.mp + ((eventResult as { mpRestored?: number }).mpRestored ?? 0), state.player.maxMp);
       }
       if (eventResult.itemFound) {
         state.player.inventory.push(eventResult.itemFound);
@@ -306,12 +301,13 @@ export class GameEngine {
   private handleUseItem(parsed: ParsedCommand): string[] {
     const state = this.state!;
     const searchName = parsed.item ?? parsed.target ?? "";
-
     const item = findItemByName(state.player.inventory, searchName);
+
     if (!item) {
       const names = state.player.inventory.map((i) => i.name);
-      if (names.length === 0) return ["Your pack is empty. Nothing to use."];
-      return [`You don't have "${searchName}". Inventory: ${names.join(", ")}.`];
+      return names.length === 0
+        ? ["Your pack is empty."]
+        : [`You don't have "${searchName}". Inventory: ${names.join(", ")}.`];
     }
 
     if (item.type === ItemType.CONSUMABLE) {
@@ -319,9 +315,12 @@ export class GameEngine {
       return [NarrationEngine.itemUsed(state.player.name, item.name, result.message)];
     }
 
-    if (item.type === ItemType.WEAPON || item.type === ItemType.ARMOR || item.type === ItemType.MISC) {
-      const equipMsg = applyEquipment(state.player, item);
-      return [equipMsg];
+    if (
+      item.type === ItemType.WEAPON ||
+      item.type === ItemType.ARMOR ||
+      item.type === ItemType.MISC
+    ) {
+      return [applyEquipment(state.player, item)];
     }
 
     return [`You aren't sure how to use the ${item.name}.`];
@@ -364,9 +363,10 @@ export class GameEngine {
       state.player.isDefending = false;
       state.gameStatus = GameStatus.EXPLORING;
       mgr.markExplored(roomId);
-      const msgs = [NarrationEngine.fleeSuccess(dir as Direction)];
-      msgs.push(...this.describeCurrentRoom(false));
-      return msgs;
+      return [
+        NarrationEngine.fleeSuccess(dir as Direction),
+        ...this.describeCurrentRoom(false),
+      ];
     }
 
     return [NarrationEngine.fleeFailed(), "The enemies retaliate for your attempt!"];
@@ -389,7 +389,6 @@ export class GameEngine {
 
     const msgs: string[] = [];
     if (includeHeader) msgs.push(`── ${room.name} ──`);
-
     if (!includeHeader) msgs.push(`── ${room.name} ──`);
     msgs.push(room.description);
 
@@ -398,13 +397,13 @@ export class GameEngine {
 
     const activeEnemies = (room.event.enemies ?? []).filter((e) => !e.isDefeated);
     if (activeEnemies.length > 0) {
-      msgs.push(`Enemies present: ${activeEnemies.map((e) => `${e.name} (${e.hp}/${e.maxHp} HP)`).join(", ")}`);
+      msgs.push(`Enemies: ${activeEnemies.map((e) => `${e.name} (${e.hp}/${e.maxHp} HP)`).join(", ")}`);
     } else {
-      msgs.push("The room is clear of enemies.");
+      msgs.push("The room is clear.");
     }
 
     if (room.items.length > 0) {
-      msgs.push(`Items on the ground: ${room.items.map((i) => i.name).join(", ")}`);
+      msgs.push(`Items on the floor: ${room.items.map((i) => i.name).join(", ")}`);
     }
 
     return msgs;
@@ -459,8 +458,6 @@ export class GameEngine {
 
   private syncGameStatus(): void {
     const state = this.state!;
-    if (!state) return;
-
     if (state.player.hp <= 0) {
       state.gameStatus = GameStatus.GAME_OVER;
       state.combat.active = false;
@@ -475,7 +472,7 @@ export class GameEngine {
         "══════════════════════════════",
         "   VICTORY! THE DUNGEON FALLS",
         "══════════════════════════════",
-        `The Orc Warlord is slain. ${state.player.name} stands victorious in the silence.`,
+        `The boss is slain. ${state.player.name} stands victorious in the silence.`,
         `Final Level: ${state.player.level} | Gold: ${state.gold} | Turns: ${state.turnCount}`
       );
       return;
