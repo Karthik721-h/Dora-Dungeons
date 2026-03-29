@@ -3,7 +3,7 @@ import { useProcessAction, GameStateResponse } from "@workspace/api-client-react
 import { useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { getGetGameStateQueryKey } from "@workspace/api-client-react";
-import { Map, Skull, TerminalSquare, Volume2, VolumeX, Plus, Minus, Eye, Info } from "lucide-react";
+import { Map, Skull, TerminalSquare, Volume2, VolumeX, Plus, Minus, Eye, Info, LogOut } from "lucide-react";
 
 import { AudioManager } from "@/audio/AudioManager";
 import { processIntent, directionToPan } from "@/audio/IntentProcessor";
@@ -26,7 +26,7 @@ function extractDirection(cmd: string): string | null {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function GameScreen({ gameState }: { gameState: GameStateResponse }) {
+export function GameScreen({ gameState, onLogout }: { gameState: GameStateResponse; onLogout?: () => void }) {
   const [command, setCommand] = useState("");
   const [speechRate, setSpeechRateState] = useState(1.0);
   const [isMuted, setIsMuted] = useState(false);
@@ -303,6 +303,24 @@ export function GameScreen({ gameState }: { gameState: GameStateResponse }) {
             <TerminalSquare size={10} />
             {gameState.sessionId.slice(0, 8)}
           </div>
+
+          {/* Log out */}
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              className="flex items-center gap-1.5 transition-colors"
+              style={{ color: "rgba(200,190,180,0.3)" }}
+              onMouseEnter={e => (e.currentTarget.style.color = "rgba(200,190,180,0.7)")}
+              onMouseLeave={e => (e.currentTarget.style.color = "rgba(200,190,180,0.3)")}
+              aria-label="Log out"
+              title="Log out"
+            >
+              <LogOut size={13} />
+              <span className="font-code hidden sm:inline" style={{ fontSize: "10px", letterSpacing: "0.15em" }}>
+                LOG OUT
+              </span>
+            </button>
+          )}
         </div>
       </header>
 

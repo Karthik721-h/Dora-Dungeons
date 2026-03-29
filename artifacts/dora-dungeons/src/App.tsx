@@ -27,7 +27,7 @@ const queryClient = new QueryClient({
 
 const INTRO_SEEN_KEY = "dd_intro_seen";
 
-function GameOrchestrator({ skipIntro }: { skipIntro: boolean }) {
+function GameOrchestrator({ skipIntro, onLogout }: { skipIntro: boolean; onLogout: () => void }) {
   const { data: gameState, isLoading, isError } = useGetGameState({
     query: {
       queryKey: getGetGameStateQueryKey(),
@@ -81,7 +81,7 @@ function GameOrchestrator({ skipIntro }: { skipIntro: boolean }) {
         transition={{ duration: 0.7 }}
         className="h-screen"
       >
-        <GameScreen gameState={gameState} />
+        <GameScreen gameState={gameState} onLogout={onLogout} />
       </motion.div>
     </AnimatePresence>
   );
@@ -149,8 +149,8 @@ function App() {
             >
               <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
                 <Switch>
-                  <Route path="/" component={() => <GameOrchestrator skipIntro={!showIntro} />} />
-                  <Route component={() => <GameOrchestrator skipIntro />} />
+                  <Route path="/" component={() => <GameOrchestrator skipIntro={!showIntro} onLogout={auth.logout} />} />
+                  <Route component={() => <GameOrchestrator skipIntro onLogout={auth.logout} />} />
                 </Switch>
               </WouterRouter>
             </motion.div>
