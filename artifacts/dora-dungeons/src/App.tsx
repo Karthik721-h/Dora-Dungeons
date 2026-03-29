@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -95,6 +95,20 @@ function App() {
   useEffect(() => {
     AudioManager.initializeVoices();
   }, []);
+
+  // Wipe the React Query cache whenever the logged-in user changes so a
+  // newly-signed-up or switched user never sees a stale game session from
+  // the previous user.  Without this, useGetGameState can return the old
+  // user's cached data, causing the game action buttons to hit the server
+  // with a JWT that has no matching session → 404.
+  const prevUserIdRef = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    const currentId = auth.user?.id ?? null;
+    if (prevUserIdRef.current !== undefined && prevUserIdRef.current !== currentId) {
+      queryClient.clear();
+    }
+    prevUserIdRef.current = currentId;
+  }, [auth.user?.id]);
 
   useEffect(() => {
     if (auth.isLoading || !auth.isAuthenticated) return;
