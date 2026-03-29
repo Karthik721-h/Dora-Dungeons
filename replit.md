@@ -111,8 +111,65 @@ NarrationRegistry.get("ability.fireball", { player, target, damage });
 - Game state is in-memory (module-level) — single session per server process
 - Room events reference enemies via `room.event.enemies`; DungeonManager looks up live enemy state
 
+## Auth System (`/auth` module)
+
+Clean layered architecture: controller → service → db (Drizzle ORM).
+
+### Database
+
+- **Table**: `users` (PostgreSQL, managed by Drizzle ORM in `lib/db`)
+  - `id` uuid PK (defaultRandom)
+  - `email` text, unique, lowercased on write
+  - `password` text (bcrypt, 12 rounds)
+  - `subscriptionStatus` enum `FREE | PRO`, default `FREE`
+  - `createdAt` timestamp
+
+### Endpoints
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/api/auth/signup` | — | Create account; 409 if email exists |
+| `POST` | `/api/auth/login` | — | Return JWT; 401 on bad creds |
+| `GET` | `/api/auth/me` | Bearer JWT | Return public user (no password) |
+
+### Response shape
+
+Signup & login:
+```json
+{ "user": { "id", "email", "subscriptionStatus", "createdAt" }, "token": "<JWT>" }
+```
+
+`GET /me`:
+```json
+{ "user": { "id", "email", "subscriptionStatus", "createdAt" } }
+```
+
+### Error codes
+
+- `400 VALIDATION_ERROR` — bad email / password too short
+- `401 UNAUTHORIZED` — wrong password or missing/invalid JWT
+- `409 CONFLICT` — email already registered
+
+### Environment
+
+- `JWT_SECRET` — generated automatically on first run, stored in shared env vars
+- `DATABASE_URL` — Replit-provisioned PostgreSQL
+
+### Files
+
+```
+artifacts/api-server/src/auth/
+├── auth.controller.ts   # Input validation (Zod), HTTP responses
+├── auth.service.ts      # Business logic (bcrypt, JWT, DB queries)
+├── auth.middleware.ts   # requireAuth — verifies Bearer JWT, attaches req.user
+└── auth.routes.ts       # POST /signup, POST /login, GET /me
+lib/db/src/schema/
+└── users.ts             # Drizzle table, insert/select schemas, PublicUser type
+```
+
 ## API Routes
 
+### Game routes
 - `POST /api/game/start` — `{ playerName?: string, dungeonSeed?: string }`
 - `POST /api/game/action` — `{ command: string }`
 - `GET /api/game/state` — returns current `GameState`
