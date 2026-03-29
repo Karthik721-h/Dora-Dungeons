@@ -7,6 +7,7 @@ import { StartScreen } from "@/pages/StartScreen";
 import { GameScreen } from "@/pages/GameScreen";
 import { IntroScene } from "@/components/IntroScene";
 import { useGetGameState, getGetGameStateQueryKey } from "@workspace/api-client-react";
+import { useAuth } from "@workspace/replit-auth-web";
 import { Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AudioManager } from "@/audio/AudioManager";
@@ -85,29 +86,121 @@ function GameOrchestrator({ skipIntro }: { skipIntro: boolean }) {
   );
 }
 
+function LoginGate({ onAuthenticated }: { onAuthenticated: () => void }) {
+  const { isLoading, isAuthenticated, login } = useAuth();
+
+  useEffect(() => {
+    if (isAuthenticated) onAuthenticated();
+  }, [isAuthenticated, onAuthenticated]);
+
+  if (isLoading) {
+    return (
+      <div
+        className="min-h-screen w-full flex items-center justify-center"
+        style={{ background: "#09080c" }}
+      >
+        <Loader2 className="w-10 h-10 animate-spin" style={{ color: "rgba(179,18,47,0.6)" }} />
+      </div>
+    );
+  }
+
+  if (isAuthenticated) return null;
+
+  return (
+    <div
+      className="min-h-screen w-full flex flex-col items-center justify-center gap-8 px-4"
+      style={{ background: "#09080c" }}
+    >
+      <div className="text-center">
+        <h1
+          className="font-display text-4xl md:text-6xl font-bold mb-3"
+          style={{ color: "#c8beb4", letterSpacing: "0.05em" }}
+        >
+          Dora Dungeons
+        </h1>
+        <p
+          className="font-body text-sm md:text-base"
+          style={{ color: "rgba(200,190,180,0.5)" }}
+        >
+          An audio-first dungeon adventure
+        </p>
+      </div>
+
+      <button
+        onClick={login}
+        className="px-8 py-4 font-display text-sm tracking-widest uppercase transition-all duration-200 border"
+        style={{
+          background: "rgba(179,18,47,0.15)",
+          borderColor: "rgba(179,18,47,0.5)",
+          color: "#c8beb4",
+        }}
+        onMouseEnter={e => {
+          (e.currentTarget as HTMLButtonElement).style.background = "rgba(179,18,47,0.3)";
+        }}
+        onMouseLeave={e => {
+          (e.currentTarget as HTMLButtonElement).style.background = "rgba(179,18,47,0.15)";
+        }}
+      >
+        Log in to play
+      </button>
+    </div>
+  );
+}
+
 function App() {
   const [showIntro, setShowIntro] = useState(false);
   const [introComplete, setIntroComplete] = useState(false);
+  const [isAuthReady, setIsAuthReady] = useState(false);
+
+  const { isLoading: authLoading, isAuthenticated } = useAuth();
 
   useEffect(() => {
     // Initialize TTS voice selection as early as possible.
     // Chrome/Edge load voices asynchronously so this must fire before any speak() call.
     AudioManager.initializeVoices();
+  }, []);
 
-    // Show intro on first visit per session
+  useEffect(() => {
+    if (authLoading) return;
+    if (!isAuthenticated) {
+      // Auth check done — show login gate (handled by LoginGate)
+      setIsAuthReady(true);
+      return;
+    }
+    // User is authenticated — proceed with intro
+    setIsAuthReady(true);
     const seen = sessionStorage.getItem(INTRO_SEEN_KEY);
     if (!seen) {
       setShowIntro(true);
     } else {
       setIntroComplete(true);
     }
-  }, []);
+  }, [authLoading, isAuthenticated]);
 
   const handleIntroComplete = () => {
     sessionStorage.setItem(INTRO_SEEN_KEY, "1");
     setShowIntro(false);
     setIntroComplete(true);
   };
+
+  if (!isAuthReady || authLoading) {
+    return (
+      <div
+        className="min-h-screen w-full flex items-center justify-center"
+        style={{ background: "#09080c" }}
+      >
+        <Loader2 className="w-10 h-10 animate-spin" style={{ color: "rgba(179,18,47,0.6)" }} />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <LoginGate onAuthenticated={() => {}} />
+      </QueryClientProvider>
+    );
+  }
 
   return (
     <QueryClientProvider client={queryClient}>
