@@ -7,7 +7,6 @@ import {
   Enemy,
   Item,
   Ability,
-  StatusEffect,
 } from "@workspace/game-engine";
 import {
   StartGameBody,
@@ -16,11 +15,11 @@ import {
   ProcessActionResponse,
   GetGameStateResponse,
 } from "@workspace/api-zod";
+import { loadSession, saveSession, deleteSession } from "../lib/gameSession.js";
 
 const router: IRouter = Router();
 
-let engine: GameEngine | null = null;
-let currentState: GameState | null = null;
+// ── Serializers (read-only view sent to the client) ──────────────────────────
 
 function serializePlayer(p: Player) {
   return {
@@ -83,47 +82,98 @@ function serializeGameState(state: GameState) {
   };
 }
 
-router.post("/start", (req: Request, res: Response) => {
-  const body = StartGameBody.parse(req.body ?? {});
-  const dungeonSeed: string | undefined = typeof req.body?.dungeonSeed === "string"
-    ? req.body.dungeonSeed
-    : undefined;
-  engine = new GameEngine();
-  currentState = engine.startGame(body.playerName ?? "Hero", dungeonSeed);
-  const response = StartGameResponse.parse(serializeGameState(currentState));
-  res.json(response);
-});
+// ── Routes ───────────────────────────────────────────────────────────────────
 
-router.post("/action", (req: Request, res: Response) => {
-  if (!engine || !currentState) {
-    res.status(404).json({ error: "NOT_FOUND", message: "No active game session. Call /game/start first." });
+/**
+ * POST /game/start
+ * Resume an existing session or create a new one.
+ * Pass ?new=true to force-start a fresh game (deletes old session).
+ */
+router.post("/start", async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  const forceNew = req.query.new === "true";
+
+  if (forceNew) {
+    await deleteSession(userId);
+  }
+
+  // Try to resume an existing session first
+  const existing = await loadSession(userId);
+  if (existing) {
+    const response = StartGameResponse.parse(serializeGameState(existing.state));
+    res.json(response);
     return;
   }
 
+  // No session found — start a new game
+  const body = StartGameBody.parse(req.body ?? {});
+  const dungeonSeed: string | undefined =
+    typeof req.body?.dungeonSeed === "string" ? req.body.dungeonSeed : undefined;
+
+  const engine = new GameEngine();
+  const state = engine.startGame(body.playerName ?? "Hero", dungeonSeed);
+
+  await saveSession(userId, state);
+
+  const response = StartGameResponse.parse(serializeGameState(state));
+  res.json(response);
+});
+
+/**
+ * POST /game/action
+ * Load the user's session, process a command, save updated state.
+ */
+router.post("/action", async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+
+  const session = await loadSession(userId);
+  if (!session) {
+    res.status(404).json({
+      error: "NOT_FOUND",
+      message: "No active game session. Call /game/start first.",
+    });
+    return;
+  }
+
+  const { engine, state } = session;
+
   if (
-    currentState.gameStatus === GameStatus.GAME_OVER ||
-    currentState.gameStatus === GameStatus.VICTORY
+    state.gameStatus === GameStatus.GAME_OVER ||
+    state.gameStatus === GameStatus.VICTORY
   ) {
     res.status(400).json({
       error: "GAME_ENDED",
-      message: `Game is over (${currentState.gameStatus}). Start a new game.`,
+      message: `Game is over (${state.gameStatus}). Start a new game with POST /game/start?new=true`,
     });
     return;
   }
 
   const body = ProcessActionBody.parse(req.body);
-  currentState = engine.processCommand(body.command);
-  const response = ProcessActionResponse.parse(serializeGameState(currentState));
+  const updatedState = engine.processCommand(body.command);
+
+  await saveSession(userId, updatedState);
+
+  const response = ProcessActionResponse.parse(serializeGameState(updatedState));
   res.json(response);
 });
 
-router.get("/state", (_req: Request, res: Response) => {
-  if (!engine || !currentState) {
-    res.status(404).json({ error: "NOT_FOUND", message: "No active game session. Call /game/start first." });
+/**
+ * GET /game/state
+ * Return the current saved state for the authenticated user.
+ */
+router.get("/state", async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+
+  const session = await loadSession(userId);
+  if (!session) {
+    res.status(404).json({
+      error: "NOT_FOUND",
+      message: "No active game session. Call /game/start first.",
+    });
     return;
   }
 
-  const response = GetGameStateResponse.parse(serializeGameState(currentState));
+  const response = GetGameStateResponse.parse(serializeGameState(session.state));
   res.json(response);
 });
 
