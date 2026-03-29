@@ -184,6 +184,7 @@ export function useVoiceInput({
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       if (event.error === "no-speech") return; // normal silence
       if (event.error === "aborted")   return; // expected from .stop()
+      if (isSpeakingRef.current)       return; // TTS stopped recognition — not a real error
 
       console.warn("[useVoiceInput] Error:", event.error);
       isListeningRef.current = false;
