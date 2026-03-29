@@ -1,0 +1,156 @@
+Analyze, define, and audit the Demo Mode system in this application.
+
+Context:
+This is a role-based platform with:
+- Student
+- Coach
+- Head Coach
+- Admin
+
+The system includes:
+- Profiles and roles
+- Workspaces and relationships
+- Chat system
+- Submissions and approvals
+- Notifications
+- Team members
+- Billing (Stripe)
+
+A Demo Mode has already been implemented and is used to showcase the platform with mock/sample data.
+
+---
+
+Goal:
+
+1. Understand the CURRENT Demo Mode implementation
+2. Define the IDEAL Demo Mode architecture (best practice)
+3. Compare both and identify all issues, risks, and inconsistencies
+
+---
+
+Tasks:
+
+1. ANALYZE CURRENT DEMO MODE
+
+- Identify how demo users and data are currently handled:
+  - Are demo users stored in the same tables as real users?
+  - Is there a flag (e.g., is_demo) or separate workspace?
+- Determine:
+  - How demo users are created
+  - How demo data is stored
+  - How demo mode is triggered
+
+---
+
+2. DEFINE IDEAL DEMO ARCHITECTURE
+
+Design a clean and safe Demo Mode system:
+
+- Choose best approach:
+  - Isolated demo workspace(s)
+  - OR is_demo flag strategy
+
+Define:
+- Demo user structure (student, coach, head)
+- Data isolation rules
+- Permission boundaries
+- Billing behavior (must not trigger real payments)
+- Chat, submissions, and notifications behavior in demo
+
+---
+
+3. DATA ISOLATION VALIDATION
+
+Check if:
+
+- Demo users can access real user data ❌
+- Real users can access demo data ❌
+- Queries properly filter demo vs real data
+
+Flag any mixing of data as a critical issue.
+
+---
+
+4. PERMISSION & SECURITY CHECK
+
+Verify:
+
+- Demo users follow the same role rules (student/coach/head)
+- Demo users cannot:
+  - Escalate privileges
+  - Interact with non-demo users
+
+- Demo account creation is restricted to system/service role only
+
+---
+
+5. ABUSE & EXPLOIT RISKS
+
+Check for:
+
+- Users bypassing demo restrictions
+- Creating demo accounts manually
+- Using demo mode to access restricted features
+
+---
+
+6. BILLING & EXTERNAL SERVICES
+
+Ensure:
+
+- Demo users cannot trigger real Stripe payments
+- Billing is:
+  - Disabled
+  - Mocked
+  - Or safely simulated
+
+Flag any real payment risk as critical.
+
+---
+
+7. RESET & DATA LIFECYCLE
+
+Check:
+
+- Is there a reset mechanism?
+- Does demo data persist indefinitely?
+- Can demo state become inconsistent over time?
+
+---
+
+8. MODULE CONSISTENCY
+
+Verify Demo Mode works correctly across:
+
+- Chat system
+- Submissions
+- Notifications
+- Team system
+- Dashboards
+
+Flag any module that:
+- Uses real data in demo
+- Ignores demo isolation
+
+---
+
+9. OUTPUT FORMAT
+
+Provide:
+
+- Current Demo Mode summary (how it works today)
+- Ideal architecture (recommended structure)
+- List of critical issues (security/data risks)
+- List of structural issues
+- List of inconsistencies across modules
+- Clear recommendations:
+  - What must be fixed immediately
+  - What should be improved
+  - What can remain as-is
+
+---
+
+Important:
+- Do NOT add new features
+- Focus ONLY on Demo Mode architecture, isolation, and safety
+- Prioritize preventing data leaks and system abuse
