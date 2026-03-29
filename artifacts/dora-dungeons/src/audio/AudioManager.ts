@@ -219,11 +219,16 @@ class AudioManagerClass {
     }
   }
 
-  /** Stop all narration immediately. */
+  /**
+   * Stop all narration immediately and reset all audio state.
+   * Call on logout so no TTS bleeds into the auth screen.
+   */
   stop() {
     if ("speechSynthesis" in window) window.speechSynthesis.cancel();
-    this.narrationQueue = [];
-    this.isSpeaking = false;
+    this.narrationQueue     = [];
+    this.isSpeaking         = false;
+    this.queueDrainedCallback = undefined; // prevent stale one-shot callbacks
+    this.speakLockCallback?.(false);       // tell useVoiceInput speak-lock is released
     this.onSpeakingChange?.(false);
   }
 

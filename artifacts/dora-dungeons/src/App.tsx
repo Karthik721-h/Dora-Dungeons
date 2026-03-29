@@ -105,7 +105,11 @@ function App() {
   useEffect(() => {
     const currentId = auth.user?.id ?? null;
     if (prevUserIdRef.current !== undefined && prevUserIdRef.current !== currentId) {
+      // User changed (logout or account switch) — wipe stale game cache and
+      // silence any TTS that may still be playing.  Voice recognition stops
+      // automatically when GameScreen unmounts.
       queryClient.clear();
+      AudioManager.stop();
     }
     prevUserIdRef.current = currentId;
   }, [auth.user?.id]);
