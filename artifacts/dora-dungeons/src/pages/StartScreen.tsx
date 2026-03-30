@@ -49,18 +49,15 @@ export function StartScreen() {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.3, duration: 1 }}
-              className="mb-6 relative"
+              className="mb-4 relative"
             >
-              <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full" />
+              <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full scale-75" />
               <img 
-                src={`${import.meta.env.BASE_URL}images/hero-art.png`}
-                alt="Dora Dungeons Insignia"
-                className="w-32 h-32 object-contain relative z-10 opacity-80 mix-blend-screen drop-shadow-[0_0_15px_rgba(200,0,0,0.5)]"
+                src={`${import.meta.env.BASE_URL}images/logo.png`}
+                alt="Dora Dungeons"
+                className="w-44 h-44 object-contain relative z-10 drop-shadow-[0_0_20px_rgba(180,120,0,0.5)]"
               />
             </motion.div>
-            <h1 className="font-display text-4xl md:text-5xl font-bold text-center mb-2 terminal-text text-foreground">
-              Dora <span className="text-primary terminal-text-primary">Dungeons</span>
-            </h1>
             <p className="text-muted-foreground text-sm font-mono text-center flex items-center gap-2">
               <Volume2 className="w-4 h-4" /> Audio-First Roleplaying
             </p>

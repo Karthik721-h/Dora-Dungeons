@@ -64,13 +64,12 @@ export function AuthScreen({ auth }: AuthScreenProps) {
       className="min-h-screen w-full flex flex-col items-center justify-center gap-8 px-4"
       style={{ background: "#09080c" }}
     >
-      <div className="text-center">
-        <h1
-          className="font-display text-4xl md:text-6xl font-bold mb-3"
-          style={{ color: "#c8beb4", letterSpacing: "0.05em" }}
-        >
-          Dora Dungeons
-        </h1>
+      <div className="flex flex-col items-center gap-3">
+        <img
+          src={`${import.meta.env.BASE_URL}images/logo.png`}
+          alt="Dora Dungeons"
+          className="w-40 h-40 object-contain drop-shadow-[0_0_24px_rgba(180,120,0,0.45)]"
+        />
         <p
           className="font-body text-sm"
           style={{ color: "rgba(200,190,180,0.4)" }}
