@@ -181,19 +181,11 @@ export function GameScreen({
       if (/^help$/i.test(trimmed)) {
         AudioManager.speakLines(
           [
-            "Here are your voice commands.",
-            "Say north, south, east, or west — to move through the dungeon.",
-            "Say look — to hear your current room description and available exits.",
-            "Say attack — to strike an enemy in your room.",
-            "Say defend — to take a defensive stance and reduce incoming damage.",
-            "Say cast fireball — to use a magic spell on an enemy.",
-            "Say flee — to escape from combat and retreat.",
-            "Say status — to hear your current health, mana, and level.",
-            "Say repeat — to hear the last message again.",
-            "Say change voice — to switch between female and male narrator.",
-            "Say log out — to exit the game and return to the login screen.",
-            "Say help — to hear these commands again at any time.",
-            "Exits are always announced after every action, so you always know where you can go.",
+            "Commands: move with north, south, east, or west.",
+            "Combat: attack, defend, cast fireball, or flee.",
+            "Info: look for your room. Status for your stats. Repeat to replay.",
+            "Other: change voice, log out, or help.",
+            "Exits are always announced after each action.",
           ],
           { interrupt: true }
         );
