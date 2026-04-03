@@ -64,6 +64,8 @@ export function GameScreen({
 
   const prevLogsRef = useRef<string[]>(gameState.logs);
   const queryClient = useQueryClient();
+  const stopListeningRef = useRef<() => void>(() => {});
+  const onLogoutRef = useRef(onLogout);
 
   useEffect(() => {
     AudioManager.onStateChange(setAudioSpeaking);
@@ -144,6 +146,18 @@ export function GameScreen({
         return;
       }
 
+      if (trimmed === "logout") {
+        stopListeningRef.current();
+        AudioManager.speak(
+          "You have been logged out successfully. Please log in again to continue your adventure.",
+          { interrupt: true }
+        );
+        AudioManager.onQueueDrained(() => {
+          onLogoutRef.current?.();
+        });
+        return;
+      }
+
       if (/^help$/i.test(trimmed)) {
         AudioManager.speakLines(
           [
@@ -156,6 +170,7 @@ export function GameScreen({
             "Say flee — to escape from combat and retreat.",
             "Say status — to hear your current health, mana, and level.",
             "Say repeat — to hear the last message again.",
+            "Say log out — to exit the game and return to the login screen.",
             "Say help — to hear these commands again at any time.",
             "Exits are always announced after every action, so you always know where you can go.",
           ],
@@ -186,6 +201,7 @@ export function GameScreen({
     voiceState,
     interimTranscript,
     startListening,
+    stopListening,
     toggleListening,
   } = useVoiceInput({
     onFinalTranscript: (raw) => {
@@ -201,6 +217,10 @@ export function GameScreen({
       AudioManager.speak(err, { interrupt: false });
     },
   });
+
+  // Keep refs fresh so submitCommand (a useCallback) always has current values
+  stopListeningRef.current = stopListening;
+  onLogoutRef.current = onLogout;
 
   // ── Rate / mute ─────────────────────────────────────────────────────────────
   const adjustRate = (delta: number) => {

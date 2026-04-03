@@ -45,6 +45,12 @@ function stripFillers(input: string): string {
 }
 
 const PHRASE_PATTERNS: PhrasePair[] = [
+  // --- Logout ---
+  {
+    pattern: /^(?:log\s*out|logout|sign\s*out|exit\s*account|log\s*me\s*out|sign\s*me\s*out|quit\s*game|leave\s*game)$/,
+    canonical: () => "logout",
+  },
+
   // --- Repeat last message ---
   {
     pattern: /^(repeat|say (that |it )?again|what did you say|again|huh|what\??)/,

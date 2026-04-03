@@ -102,17 +102,21 @@ export function AuthScreen({ auth }: AuthScreenProps) {
 
       case "signup_email": {
         const email = normalizeEmailSpeech(raw);
-        if (isValidEmail(email)) {
-          setCapturedEmail(email);
-          capturedEmailRef.current = email;
-          setStep("signup_confirm");
-          const namePart = capturedNameRef.current
-            ? ` Your character name is ${capturedNameRef.current}.`
-            : "";
-          s(`Your email is ${email}.${namePart} Shall I create your account? Say yes to confirm, or no to start over.`);
-        } else {
-          s("That email doesn't look right. Please say your email address again — for example: name dot surname at gmail dot com.");
+        if (!isValidEmail(email)) {
+          s("That email doesn't look right. Please say your email address again — for example: name at gmail dot com.");
+          break;
         }
+        if (!email.endsWith("@gmail.com")) {
+          s("That email address is not supported. Please provide a valid Gmail address ending with at gmail dot com.");
+          break;
+        }
+        setCapturedEmail(email);
+        capturedEmailRef.current = email;
+        setStep("signup_confirm");
+        const namePart = capturedNameRef.current
+          ? ` Your character name is ${capturedNameRef.current}.`
+          : "";
+        s(`Your email is ${email}.${namePart} Shall I create your account? Say yes to confirm, or no to start over.`);
         break;
       }
 
@@ -130,14 +134,18 @@ export function AuthScreen({ auth }: AuthScreenProps) {
 
       case "login_email": {
         const email = normalizeEmailSpeech(raw);
-        if (isValidEmail(email)) {
-          setCapturedEmail(email);
-          capturedEmailRef.current = email;
-          setStep("login_confirm");
-          s(`Your email is ${email}. Shall I proceed to enter the dungeon? Say yes or no.`);
-        } else {
+        if (!isValidEmail(email)) {
           s("That email doesn't look right. Please say your email address again — for example: name at gmail dot com.");
+          break;
         }
+        if (!email.endsWith("@gmail.com")) {
+          s("That email address is not supported. Please provide a valid Gmail address ending with at gmail dot com.");
+          break;
+        }
+        setCapturedEmail(email);
+        capturedEmailRef.current = email;
+        setStep("login_confirm");
+        s(`Your email is ${email}. Shall I proceed to enter the dungeon? Say yes or no.`);
         break;
       }
 
@@ -184,10 +192,17 @@ export function AuthScreen({ auth }: AuthScreenProps) {
       await auth.signup(email, name || undefined);
       AudioManager.speak("Your account has been created. Entering the dungeon now.", { interrupt: true });
     } catch (err: any) {
-      if (err?.data?.error === "EMAIL_TAKEN") {
+      const code = err?.data?.error;
+      if (code === "EMAIL_TAKEN") {
         setStep("login_confirm");
         speakThenListenRef.current(
-          "An account with that email already exists. Say yes to log in instead, or no to try a different email."
+          "An account with this email already exists. Please log in or use a different Gmail address. Say yes to log in with this email, or no to try a different one."
+        );
+      } else if (code === "INVALID_DOMAIN") {
+        setCapturedEmail("");
+        setStep("signup_email");
+        speakThenListenRef.current(
+          "That email address is not supported. Please provide a valid Gmail address."
         );
       } else {
         setVoiceError(err.message ?? "Something went wrong.");
@@ -211,11 +226,18 @@ export function AuthScreen({ auth }: AuthScreenProps) {
       await auth.login(email);
       AudioManager.speak("Welcome back. Restoring your journey.", { interrupt: true });
     } catch (err: any) {
-      if (err?.data?.error === "NOT_FOUND") {
+      const code = err?.data?.error;
+      if (code === "NOT_FOUND") {
         setStep("signup_confirm");
         setCapturedName("");
         speakThenListenRef.current(
-          "No account was found with that email. Say yes to create a new account with it, or no to try a different email."
+          "No account was found with that email. Please try again or create a new account. Say yes to create one, or no to try a different email."
+        );
+      } else if (code === "INVALID_DOMAIN") {
+        setCapturedEmail("");
+        setStep("login_email");
+        speakThenListenRef.current(
+          "That email address is not supported. Please provide a valid Gmail address."
         );
       } else {
         setVoiceError(err.message ?? "Something went wrong.");

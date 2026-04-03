@@ -1,0 +1,130 @@
+You are a senior backend + frontend engineer building a secure, voice-first authentication system.
+
+Enhance the authentication flow and add a fully voice-controlled logout system for "Dora Dungeons".
+
+---
+
+## GOAL
+
+1. Enforce strict email rules
+2. Prevent duplicate accounts
+3. Enable voice-only logout inside the game
+4. Provide clear, immersive TTS feedback
+
+---
+
+## AUTHENTICATION RULES
+
+1. EMAIL VALIDATION
+
+* Only allow emails ending with "@gmail.com"
+* Reject all other domains
+
+If invalid:
+Speak:
+"That email address is not supported. Please provide a valid Gmail address."
+
+---
+
+2. DUPLICATE ACCOUNT PREVENTION
+
+* During SIGNUP:
+
+  * Check if email already exists in database
+  * If it exists → reject signup
+
+Speak:
+"An account with this email already exists. Please log in or use a different Gmail address."
+
+---
+
+3. LOGIN VALIDATION
+
+* During LOGIN:
+
+  * If email does not exist
+
+Speak:
+"No account was found with that email. Please try again or create a new account."
+
+---
+
+## VOICE LOGOUT SYSTEM (CRITICAL)
+
+1. INTENT DETECTION
+
+Update IntentProcessor:
+
+Map phrases:
+
+* "log out"
+* "logout"
+* "exit account"
+* "sign out"
+
+→ LOGOUT intent
+
+---
+
+2. LOGOUT EXECUTION
+
+When LOGOUT is detected:
+
+* Clear JWT token (localStorage/session)
+* Reset app state
+* Redirect user to login screen
+
+---
+
+3. TTS FEEDBACK AFTER LOGOUT
+
+Speak (clear, calm voice):
+
+"You have been logged out successfully. Please log in again to continue your adventure."
+
+---
+
+4. Log Out Should be announced to the users also when the user say the "help" command
+
+Example: Say "Log Out" to exit the game.
+
+---
+
+## VOICE UX RULES
+
+* No logout button required (optional fallback only)
+* Voice command must always work
+* TTS must confirm every critical action
+
+---
+
+## ERROR HANDLING
+
+If logout fails (edge case):
+
+Speak:
+"Something went wrong while logging out. Please try again."
+
+---
+
+## SECURITY NOTES
+
+* Always verify email uniqueness at database level
+* Do NOT rely only on frontend validation
+* Normalize emails before saving (lowercase)
+
+---
+
+## OUTPUT
+
+* Updated signup validation logic
+* Updated login validation logic
+* IntentProcessor with logout intent
+* Voice-triggered logout flow
+* TTS narration updates
+
+---
+
+## STOP AFTER THIS STEP
+
+Do NOT implement voice switching yet

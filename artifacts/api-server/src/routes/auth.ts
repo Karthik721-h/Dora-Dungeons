@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { signJwt } from "../lib/auth.js";
 import { requireAuth } from "../middlewares/authMiddleware.js";
 
@@ -11,6 +11,11 @@ router.post("/auth/signup", async (req: Request, res: Response) => {
 
   if (typeof email !== "string" || !email.includes("@")) {
     res.status(400).json({ error: "INVALID_EMAIL", message: "A valid email is required." });
+    return;
+  }
+
+  if (!email.toLowerCase().endsWith("@gmail.com")) {
+    res.status(400).json({ error: "INVALID_DOMAIN", message: "Only Gmail addresses are supported." });
     return;
   }
 
@@ -29,6 +34,7 @@ router.post("/auth/signup", async (req: Request, res: Response) => {
     .insert(usersTable)
     .values({
       email: email.toLowerCase(),
+      passwordHash: sql`null`,
       firstName: typeof firstName === "string" ? firstName : null,
       lastName: typeof lastName === "string" ? lastName : null,
     })
@@ -46,6 +52,11 @@ router.post("/auth/login", async (req: Request, res: Response) => {
 
   if (typeof email !== "string" || !email.includes("@")) {
     res.status(400).json({ error: "INVALID_EMAIL", message: "A valid email is required." });
+    return;
+  }
+
+  if (!email.toLowerCase().endsWith("@gmail.com")) {
+    res.status(400).json({ error: "INVALID_DOMAIN", message: "Only Gmail addresses are supported." });
     return;
   }
 
