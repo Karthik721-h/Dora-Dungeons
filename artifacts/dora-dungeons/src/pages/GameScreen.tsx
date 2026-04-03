@@ -78,7 +78,7 @@ export function GameScreen({
 
     const t = setTimeout(() => {
       AudioManager.speak(
-        "Welcome to Dora Dungeons. Voice control is active. Speak your command when ready."
+        "Welcome to Dora Dungeons. Voice control is active. Say help at any time to hear the list of commands. Speak when you are ready."
       );
       // Speak the last few log lines so the player hears the starting room
       const lines = gameState.logs.slice(-5);
@@ -145,14 +145,20 @@ export function GameScreen({
       }
 
       if (/^help$/i.test(trimmed)) {
-        AudioManager.speak(
-          "Basic commands: " +
-          "Say north, south, east, or west to move between rooms. " +
-          "Exits are always announced after every action so you always know where you can go. " +
-          "Say look to re-hear the room description and exits. " +
-          "Say attack to fight an enemy. Say cast fireball to use magic. " +
-          "Say status to check your health and stats. " +
-          "Say repeat to hear the last message again.",
+        AudioManager.speakLines(
+          [
+            "Here are your voice commands.",
+            "Say north, south, east, or west — to move through the dungeon.",
+            "Say look — to hear your current room description and available exits.",
+            "Say attack — to strike an enemy in your room.",
+            "Say defend — to take a defensive stance and reduce incoming damage.",
+            "Say cast fireball — to use a magic spell on an enemy.",
+            "Say flee — to escape from combat and retreat.",
+            "Say status — to hear your current health, mana, and level.",
+            "Say repeat — to hear the last message again.",
+            "Say help — to hear these commands again at any time.",
+            "Exits are always announced after every action, so you always know where you can go.",
+          ],
           { interrupt: true }
         );
         return;
