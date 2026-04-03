@@ -6,27 +6,34 @@ interface IntroSceneProps {
   onComplete: () => void;
 }
 
+const HEADPHONE_NOTICE = "For the best experience, please use headphones.";
 const INTRO_NARRATION = "You descend into darkness. Ancient stones surround you. The air reeks of blood and old magic. Enter... if you dare.";
 
 export function IntroScene({ onComplete }: IntroSceneProps) {
   const [phase, setPhase] = useState<"rising" | "held" | "exiting">("rising");
+  const [showHeadphoneNotice, setShowHeadphoneNotice] = useState(true);
   const hasSpoken = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
-    // Start TTS narration immediately
+    // Speak headphone notice first, then queue intro narration
     const narrationTimer = setTimeout(() => {
       if (!hasSpoken.current) {
         hasSpoken.current = true;
-        AudioManager.speak(INTRO_NARRATION, { interrupt: true });
+        AudioManager.speak(HEADPHONE_NOTICE, { interrupt: true });
+        AudioManager.speak(INTRO_NARRATION, { interrupt: false });
       }
     }, 600);
 
-    // Auto-advance after 4s (down from 7s)
-    const autoTimer = setTimeout(() => handleSkip(), 4000);
+    // Fade out the headphone notice after ~3s
+    const noticeTimer = setTimeout(() => setShowHeadphoneNotice(false), 3200);
+
+    // Auto-advance after 6s to give room for both announcements
+    const autoTimer = setTimeout(() => handleSkip(), 6000);
 
     return () => {
       clearTimeout(narrationTimer);
+      clearTimeout(noticeTimer);
       clearTimeout(autoTimer);
     };
   }, []);
@@ -77,6 +84,49 @@ export function IntroScene({ onComplete }: IntroSceneProps) {
               opacity: 0.06,
             }}
           />
+
+          {/* Headphone notice — top of screen, fades out */}
+          <AnimatePresence>
+            {showHeadphoneNotice && (
+              <motion.div
+                key="headphone-notice"
+                initial={{ opacity: 0, y: -12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.5 }}
+                className="absolute top-8 left-0 right-0 z-20 flex justify-center pointer-events-none"
+                role="status"
+                aria-live="polite"
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    padding: "0.5rem 1.25rem",
+                    background: "rgba(12,15,22,0.88)",
+                    border: "1px solid rgba(200,155,60,0.3)",
+                    borderRadius: "999px",
+                    backdropFilter: "blur(12px)",
+                    boxShadow: "0 0 18px rgba(200,155,60,0.12), 0 4px 16px rgba(0,0,0,0.5)",
+                  }}
+                >
+                  <span style={{ fontSize: "1.1rem" }}>🎧</span>
+                  <span
+                    style={{
+                      fontFamily: "'Cinzel', serif",
+                      fontSize: "0.7rem",
+                      letterSpacing: "0.18em",
+                      textTransform: "uppercase",
+                      color: "rgba(200,155,60,0.85)",
+                    }}
+                  >
+                    Use Headphones For Best Experience
+                  </span>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Main content */}
           <div className="relative z-10 flex flex-col items-center gap-8 px-8 text-center max-w-lg">
