@@ -3,7 +3,10 @@ import { useProcessAction, GameStateResponse } from "@workspace/api-client-react
 import { useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { getGetGameStateQueryKey } from "@workspace/api-client-react";
-import { Map, Skull, TerminalSquare, Volume2, VolumeX, Plus, Minus, Eye, Info, LogOut } from "lucide-react";
+import {
+  Map, Skull, TerminalSquare, Volume2, VolumeX, Plus, Minus,
+  Eye, Info, LogOut, Swords,
+} from "lucide-react";
 
 import { AudioManager } from "@/audio/AudioManager";
 import { processIntent, directionToPan } from "@/audio/IntentProcessor";
@@ -12,7 +15,7 @@ import { NarrationFeed } from "@/components/NarrationFeed";
 import { PlayerHUD } from "@/components/PlayerHUD";
 import { VoiceControl } from "@/components/VoiceControl";
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Helpers ────────────────────────────────────────────────────────────────
 
 function getNewLogs(prev: string[], next: string[]): string[] {
   if (next.length <= prev.length) return [];
@@ -24,9 +27,15 @@ function extractDirection(cmd: string): string | null {
   return m ? m[1]! : null;
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
+// ─── Component ──────────────────────────────────────────────────────────────
 
-export function GameScreen({ gameState, onLogout }: { gameState: GameStateResponse; onLogout?: () => void }) {
+export function GameScreen({
+  gameState,
+  onLogout,
+}: {
+  gameState: GameStateResponse;
+  onLogout?: () => void;
+}) {
   const [command, setCommand] = useState("");
   const [speechRate, setSpeechRateState] = useState(1.0);
   const [isMuted, setIsMuted] = useState(false);
@@ -37,16 +46,11 @@ export function GameScreen({ gameState, onLogout }: { gameState: GameStateRespon
   const prevLogsRef = useRef<string[]>(gameState.logs);
   const queryClient = useQueryClient();
 
-  // Hook up AudioManager state listener
   useEffect(() => {
     AudioManager.onStateChange(setAudioSpeaking);
   }, []);
 
-  // ── Accessibility auto-start ─────────────────────────────────────────────────
-  // On first mount: speak a welcome announcement + initial room description,
-  // then automatically start voice recognition so blind users never need to
-  // click anything.  Guard with a ref so this fires exactly once even if the
-  // component re-renders before the timeout resolves.
+  // ── Auto-start voice ───────────────────────────────────────────────────────
   const hasAutoStartedRef = useRef(false);
   useEffect(() => {
     if (hasAutoStartedRef.current || isMuted || !voiceSupported) return;
@@ -54,21 +58,16 @@ export function GameScreen({ gameState, onLogout }: { gameState: GameStateRespon
     hasAutoStartedRef.current = true;
 
     const t = setTimeout(() => {
-      // 1. System welcome — brief, clearly spoken before gameplay begins
       AudioManager.speak(
         "Welcome to Dora Dungeons. Voice control is active. Speak your command when ready."
       );
-
-      // 2. Initial room description (last 3 log lines — avoids overwhelming the player)
       const lines = gameState.logs.slice(-3);
       AudioManager.speakLines(lines);
-
-      // 3. After the full queue drains, auto-start listening — no click required
       AudioManager.onQueueDrained(() => {
-        if (!hasAutoStartedRef.current) return; // safety check
+        if (!hasAutoStartedRef.current) return;
         startListening();
       });
-    }, 700); // 700ms gives voice engine time to load before first utterance
+    }, 700);
 
     return () => clearTimeout(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -102,40 +101,43 @@ export function GameScreen({ gameState, onLogout }: { gameState: GameStateRespon
     },
   });
 
-  // ── Submit command ──────────────────────────────────────────────────────────
-  const submitCommand = useCallback((cmd: string) => {
-    const trimmed = cmd.trim();
-    if (!trimmed || isPending) return;
+  // ── Submit ──────────────────────────────────────────────────────────────────
+  const submitCommand = useCallback(
+    (cmd: string) => {
+      const trimmed = cmd.trim();
+      if (!trimmed || isPending) return;
 
-    if (trimmed === "repeat") {
-      AudioManager.repeatLast();
-      return;
-    }
+      if (trimmed === "repeat") {
+        AudioManager.repeatLast();
+        return;
+      }
 
-    if (/^help$/i.test(trimmed)) {
-      AudioManager.speak(
-        "Basic commands: say north, south, east, or west to move. " +
-        "Say attack to fight. Say cast fireball to use magic. " +
-        "Say look to examine your surroundings. " +
-        "Say status to check your health and stats. " +
-        "Say repeat to hear the last message again.",
-        { interrupt: true }
-      );
-      return;
-    }
+      if (/^help$/i.test(trimmed)) {
+        AudioManager.speak(
+          "Basic commands: say north, south, east, or west to move. " +
+          "Say attack to fight. Say cast fireball to use magic. " +
+          "Say look to examine your surroundings. " +
+          "Say status to check your health and stats. " +
+          "Say repeat to hear the last message again.",
+          { interrupt: true }
+        );
+        return;
+      }
 
-    if (trimmed === "look" || trimmed === "status") {
+      if (trimmed === "look" || trimmed === "status") {
+        sendAction({ data: { command: trimmed } });
+        return;
+      }
+
+      const dir = extractDirection(trimmed);
+      if (dir && !isMuted) {
+        AudioManager.playDirectionalTone(directionToPan(dir), { frequency: 520, duration: 0.14 });
+      }
+
       sendAction({ data: { command: trimmed } });
-      return;
-    }
-
-    const dir = extractDirection(trimmed);
-    if (dir && !isMuted) {
-      AudioManager.playDirectionalTone(directionToPan(dir), { frequency: 520, duration: 0.14 });
-    }
-
-    sendAction({ data: { command: trimmed } });
-  }, [isPending, isMuted, sendAction]);
+    },
+    [isPending, isMuted, sendAction]
+  );
 
   // ── Voice ───────────────────────────────────────────────────────────────────
   const {
@@ -147,7 +149,6 @@ export function GameScreen({ gameState, onLogout }: { gameState: GameStateRespon
     toggleListening,
   } = useVoiceInput({
     onFinalTranscript: (raw) => {
-      // Swallow navigation phrases that belong to the intro
       if (/^(skip intro|skip|enter)$/i.test(raw.trim())) return;
       const { canonical, wasNormalized } = processIntent(raw);
       setCommand(canonical);
@@ -157,12 +158,11 @@ export function GameScreen({ gameState, onLogout }: { gameState: GameStateRespon
     },
     onInterimTranscript: (interim) => setCommand(interim),
     onError: (err) => {
-      // Speak mic errors so a blind user is informed without any visual check
       AudioManager.speak(err, { interrupt: false });
     },
   });
 
-  // ── Speech rate ─────────────────────────────────────────────────────────────
+  // ── Rate / mute ─────────────────────────────────────────────────────────────
   const adjustRate = (delta: number) => {
     const next = Math.max(0.5, Math.min(2.0, +(speechRate + delta).toFixed(1)));
     setSpeechRateState(next);
@@ -179,304 +179,335 @@ export function GameScreen({ gameState, onLogout }: { gameState: GameStateRespon
     }
   };
 
+  // ── Derived state ──────────────────────────────────────────────────────────
   const { player, currentRoom, logs, gameStatus, parsedCommand } = gameState;
   const isCombat = gameStatus === "IN_COMBAT";
   const isGameOver = gameStatus === "GAME_OVER";
 
-  // Derive display audio state from the hook's voiceState (which reflects the speak-lock)
-  // "processing" shows briefly after a command fires, "speaking" when TTS is active.
   const audioState: "idle" | "listening" | "speaking" | "processing" =
     voiceState === "speaking" || audioSpeaking ? "speaking"
     : voiceState === "processing" ? "processing"
     : voiceState === "listening" ? "listening"
     : "idle";
 
-  const statusColor = isCombat
-    ? { border: "rgba(179,18,47,0.5)", color: "#f87171", bg: "rgba(179,18,47,0.08)" }
+  // Status badge colors
+  const statusStyle = isCombat
+    ? { border: "rgba(139,30,30,0.7)", color: "#f87171", bg: "rgba(139,30,30,0.18)" }
     : isGameOver
-    ? { border: "rgba(239,68,68,0.5)", color: "#ef4444", bg: "rgba(239,68,68,0.08)" }
-    : { border: "rgba(212,175,55,0.35)", color: "rgba(212,175,55,0.8)", bg: "rgba(212,175,55,0.05)" };
+    ? { border: "rgba(239,68,68,0.6)", color: "#ef4444", bg: "rgba(239,68,68,0.12)" }
+    : { border: "rgba(200,155,60,0.4)", color: "#c89b3c", bg: "rgba(200,155,60,0.08)" };
+
+  const activeEnemies = currentRoom.enemies.filter(e => !e.isDefeated);
 
   return (
-    <div
-      className="relative flex flex-col min-h-screen w-full"
-      style={{ background: "#09080c", overflow: "hidden" }}
-    >
-      {/* ── Vignette ── */}
+    <div className="relative flex flex-col h-screen w-full overflow-hidden" style={{ background: "#0b0f14" }}>
+
+      {/* ── Background ── */}
+      <div className="dungeon-bg" />
+
+      {/* ── Atmospheric ── */}
       <div className="vignette" />
-
-      {/* ── Combat red overlay ── */}
       {isCombat && <div className="combat-overlay" />}
-
-      {/* ── Scanline ── */}
       <div className="scanline-overlay" />
 
-      {/* ═══════════ TOP BAR ═══════════ */}
-      <header
-        className="relative z-10 flex items-center justify-between px-5 py-2"
-        style={{ borderBottom: "1px solid rgba(255,255,255,0.04)", background: "rgba(0,0,0,0.3)" }}
-      >
-        {/* Left: title + status */}
-        <div className="flex items-center gap-3">
-          <h1
-            className="font-display text-sm tracking-widest"
-            style={{ color: "rgba(232,224,208,0.6)", letterSpacing: "0.3em" }}
-          >
-            DORA DUNGEONS
-          </h1>
-          <div
-            className="font-code text-xs px-2 py-0.5 uppercase tracking-widest"
+      {/* ══════════════ NAVBAR ══════════════ */}
+      <header className="dd-navbar">
+        {/* Left: logo + title */}
+        <div className="dd-navbar-brand">
+          <img
+            src={`${import.meta.env.BASE_URL}images/logo.png`}
+            alt="Dora Dungeons"
+            style={{ width: 36, height: 36, objectFit: "contain", flexShrink: 0 }}
+          />
+          <span className="dd-navbar-title hidden sm:block">Dora Dungeons</span>
+        </div>
+
+        {/* Center: game status */}
+        <div className="dd-navbar-center">
+          <span
+            className="status-badge"
             style={{
-              border: `1px solid ${statusColor.border}`,
-              color: statusColor.color,
-              background: statusColor.bg,
-              letterSpacing: "0.2em",
-              fontSize: "10px",
+              borderColor: statusStyle.border,
+              color: statusStyle.color,
+              background: statusStyle.bg,
               animation: isCombat ? "combat-breathe 2s infinite" : undefined,
             }}
           >
-            {gameStatus.replace("_", " ")}
-          </div>
+            {isCombat ? "⚔ In Combat" : isGameOver ? "☠ Fallen" : "◉ " + gameStatus.replace("_", " ")}
+          </span>
         </div>
 
-        {/* Right: audio controls */}
-        <div className="flex items-center gap-3">
-          {/* Audio indicator */}
-          <div
-            className="font-code text-xs uppercase tracking-widest"
+        {/* Right: controls */}
+        <div className="dd-navbar-controls">
+          {/* Audio state indicator */}
+          <span
+            className="font-code hidden md:block"
             style={{
-              color: audioState === "listening"
-                ? "rgba(248,113,113,0.6)"
-                : audioState === "speaking"
-                ? "rgba(96,165,250,0.6)"
-                : audioState === "processing"
-                ? "rgba(212,175,55,0.7)"
-                : "rgba(200,190,180,0.2)",
               fontSize: "10px",
-              letterSpacing: "0.2em",
+              letterSpacing: "0.18em",
+              textTransform: "uppercase",
+              color:
+                audioState === "listening" ? "rgba(248,113,113,0.7)"
+                : audioState === "speaking" ? "rgba(58,134,255,0.7)"
+                : audioState === "processing" ? "rgba(200,155,60,0.7)"
+                : "rgba(200,190,180,0.2)",
             }}
           >
-            {audioState === "listening" ? "● LISTENING"
-              : audioState === "speaking" ? "● SPEAKING"
-              : audioState === "processing" ? "● PROCESSING"
-              : "○ IDLE"}
-          </div>
+            {audioState === "listening" ? "● MIC"
+              : audioState === "speaking" ? "● TTS"
+              : audioState === "processing" ? "● …"
+              : "○ idle"}
+          </span>
 
-          {/* Rate */}
-          <div className="flex items-center gap-1" style={{ color: "rgba(200,190,180,0.35)" }}>
+          {/* Rate control */}
+          <div className="flex items-center gap-0.5" style={{ color: "rgba(200,190,180,0.35)" }}>
             <button
               onClick={() => adjustRate(-0.1)}
-              className="p-0.5 hover:text-white transition-colors"
+              className="p-1 hover:text-white transition-colors rounded"
               aria-label="Speak slower"
-              style={{ fontSize: "12px" }}
             >
-              <Minus size={10} />
+              <Minus size={11} />
             </button>
-            <span className="font-code text-xs w-6 text-center" style={{ color: "rgba(200,190,180,0.45)", fontSize: "11px" }}>
+            <span
+              className="font-code w-7 text-center"
+              style={{ fontSize: "11px", color: "rgba(200,190,180,0.5)" }}
+            >
               {speechRate.toFixed(1)}
             </span>
             <button
               onClick={() => adjustRate(0.1)}
-              className="p-0.5 hover:text-white transition-colors"
+              className="p-1 hover:text-white transition-colors rounded"
               aria-label="Speak faster"
-              style={{ fontSize: "12px" }}
             >
-              <Plus size={10} />
+              <Plus size={11} />
             </button>
           </div>
 
           {/* Mute */}
           <button
             onClick={toggleMute}
-            className="transition-colors"
-            style={{ color: isMuted ? "rgba(200,190,180,0.2)" : "rgba(200,190,180,0.45)" }}
+            className="p-1 transition-colors rounded hover:text-white"
+            style={{ color: isMuted ? "rgba(200,190,180,0.2)" : "rgba(200,190,180,0.5)" }}
             aria-label={isMuted ? "Unmute" : "Mute audio"}
           >
-            {isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+            {isMuted ? <VolumeX size={15} /> : <Volume2 size={15} />}
           </button>
 
-          {/* Session */}
+          {/* Session ID */}
           <div
-            className="font-code hidden md:flex items-center gap-1"
+            className="font-code hidden lg:flex items-center gap-1"
             style={{ color: "rgba(200,190,180,0.2)", fontSize: "10px" }}
           >
             <TerminalSquare size={10} />
             {gameState.sessionId.slice(0, 8)}
           </div>
 
-          {/* Log out */}
+          {/* Logout */}
           {onLogout && (
             <button
               onClick={onLogout}
-              className="flex items-center gap-1.5 transition-colors"
+              className="flex items-center gap-1.5 transition-colors p-1 rounded group"
               style={{ color: "rgba(200,190,180,0.3)" }}
-              onMouseEnter={e => (e.currentTarget.style.color = "rgba(200,190,180,0.7)")}
+              onMouseEnter={e => (e.currentTarget.style.color = "rgba(248,113,113,0.7)")}
               onMouseLeave={e => (e.currentTarget.style.color = "rgba(200,190,180,0.3)")}
               aria-label="Log out"
               title="Log out"
             >
-              <LogOut size={13} />
-              <span className="font-code hidden sm:inline" style={{ fontSize: "10px", letterSpacing: "0.15em" }}>
-                LOG OUT
+              <LogOut size={14} />
+              <span className="font-code hidden sm:inline" style={{ fontSize: "10px", letterSpacing: "0.14em" }}>
+                EXIT
               </span>
             </button>
           )}
         </div>
       </header>
 
-      {/* ═══════════ MAIN AREA ═══════════ */}
-      <div className="relative z-10 flex flex-col flex-1 overflow-hidden" style={{ minHeight: 0 }}>
-
-        {/* ── Location strip (thin) ── */}
-        <div
-          className="px-5 py-2 flex items-center gap-3"
-          style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}
+      {/* ══════════════ LOCATION STRIP ══════════════ */}
+      <div className="location-strip">
+        <Map size={12} style={{ color: "rgba(200,155,60,0.55)", flexShrink: 0 }} />
+        <span
+          className="font-display text-xs uppercase tracking-widest"
+          style={{ color: "rgba(200,155,60,0.75)", letterSpacing: "0.2em", fontSize: "11px" }}
         >
-          <Map size={12} style={{ color: "rgba(212,175,55,0.5)" }} />
-          <span
-            className="font-display text-xs tracking-widest uppercase"
-            style={{ color: "rgba(212,175,55,0.65)", letterSpacing: "0.2em", fontSize: "11px" }}
-          >
-            {currentRoom.name}
-          </span>
-          {currentRoom.enemies.filter(e => !e.isDefeated).length > 0 && (
-            <>
-              <span style={{ color: "rgba(255,255,255,0.1)" }}>·</span>
-              <Skull size={11} style={{ color: "rgba(248,113,113,0.5)" }} />
-              <span
-                className="font-code text-xs"
-                style={{ color: "rgba(248,113,113,0.5)", fontSize: "11px" }}
-              >
-                {currentRoom.enemies.filter(e => !e.isDefeated).map(e => `${e.name} ${e.hp}HP`).join(", ")}
-              </span>
-            </>
+          {currentRoom.name}
+        </span>
+
+        {activeEnemies.length > 0 && (
+          <>
+            <span style={{ color: "rgba(255,255,255,0.12)" }}>·</span>
+            <Skull size={11} style={{ color: "rgba(248,113,113,0.55)", flexShrink: 0 }} />
+            <span className="font-code text-xs" style={{ color: "rgba(248,113,113,0.55)", fontSize: "11px" }}>
+              {activeEnemies.map(e => `${e.name} ${e.hp}HP`).join(", ")}
+            </span>
+          </>
+        )}
+
+        {/* Exit buttons + quick actions */}
+        <div className="ml-auto flex gap-1.5 flex-wrap justify-end">
+          {Object.keys(currentRoom.exits).map(dir => (
+            <motion.button
+              key={dir}
+              whileHover={{ scale: 1.06 }}
+              whileTap={{ scale: 0.94 }}
+              onClick={() => submitCommand(`move ${dir}`)}
+              disabled={isPending || isGameOver}
+              className="action-btn font-code text-xs uppercase px-2.5 py-1 transition-all"
+              style={{
+                border: "1px solid rgba(200,155,60,0.25)",
+                color: "rgba(200,155,60,0.65)",
+                background: "rgba(200,155,60,0.05)",
+                fontSize: "10px",
+                letterSpacing: "0.15em",
+                opacity: isPending || isGameOver ? 0.4 : 1,
+                cursor: isPending || isGameOver ? "not-allowed" : "pointer",
+              }}
+              aria-label={`Move ${dir}`}
+            >
+              {dir}
+            </motion.button>
+          ))}
+
+          {isCombat && (
+            <motion.button
+              whileHover={{ scale: 1.06 }}
+              whileTap={{ scale: 0.94 }}
+              onClick={() => submitCommand("attack")}
+              disabled={isPending || isGameOver}
+              className="action-btn font-code text-xs uppercase px-2.5 py-1 transition-all"
+              style={{
+                border: "1px solid rgba(139,30,30,0.5)",
+                color: "rgba(248,113,113,0.75)",
+                background: "rgba(139,30,30,0.1)",
+                fontSize: "10px",
+                letterSpacing: "0.15em",
+                opacity: isPending || isGameOver ? 0.4 : 1,
+                cursor: isPending || isGameOver ? "not-allowed" : "pointer",
+              }}
+              aria-label="Attack"
+            >
+              <Swords size={10} className="inline mr-1" />atk
+            </motion.button>
           )}
-          <div className="ml-auto flex gap-1.5">
-            {Object.keys(currentRoom.exits).map(dir => (
-              <button
-                key={dir}
-                onClick={() => submitCommand(`move ${dir}`)}
-                disabled={isPending || isGameOver}
-                className="font-code text-xs uppercase px-2 py-0.5 transition-all hover:scale-105"
-                style={{
-                  border: "1px solid rgba(255,255,255,0.1)",
-                  color: "rgba(200,190,180,0.5)",
-                  background: "rgba(255,255,255,0.02)",
-                  fontSize: "10px",
-                  letterSpacing: "0.15em",
-                }}
-                aria-label={`Move ${dir}`}
+
+          <button
+            onClick={() => submitCommand("look")}
+            disabled={isPending || isGameOver}
+            className="p-1 transition-colors rounded hover:text-white"
+            style={{ color: "rgba(200,190,180,0.3)" }}
+            aria-label="Look around"
+            title="Look around"
+          >
+            <Eye size={12} />
+          </button>
+          <button
+            onClick={() => submitCommand("status")}
+            disabled={isPending || isGameOver}
+            className="p-1 transition-colors rounded hover:text-white"
+            style={{ color: "rgba(200,190,180,0.3)" }}
+            aria-label="Show status"
+            title="Show status"
+          >
+            <Info size={12} />
+          </button>
+        </div>
+      </div>
+
+      {/* ══════════════ MAIN CONTENT ══════════════ */}
+      <div className="relative z-10 flex flex-col flex-1 overflow-hidden px-3 pt-3 pb-0 gap-3" style={{ minHeight: 0 }}>
+
+        {/* Terminal / Narration feed */}
+        <div className="terminal-panel flex flex-col" style={{ height: "clamp(200px, 45vh, 480px)", flexShrink: 0 }}>
+          {/* Terminal chrome bar */}
+          <div className="terminal-header">
+            <div className="terminal-dot" style={{ background: "#8b1e1e", opacity: 0.8 }} />
+            <div className="terminal-dot" style={{ background: "rgba(200,155,60,0.5)" }} />
+            <div className="terminal-dot" style={{ background: "rgba(58,134,255,0.4)" }} />
+            <span
+              className="font-code ml-2"
+              style={{ color: "rgba(200,155,60,0.4)", fontSize: "10px", letterSpacing: "0.18em" }}
+            >
+              DUNGEON LOG
+            </span>
+            {parsedCommand && (
+              <span
+                className="font-code ml-auto"
+                style={{ color: "rgba(200,190,180,0.25)", fontSize: "10px", letterSpacing: "0.14em" }}
               >
-                {dir}
-              </button>
-            ))}
-            <button
-              onClick={() => submitCommand("look")}
-              disabled={isPending || isGameOver}
-              className="ml-1 transition-colors"
-              style={{ color: "rgba(200,190,180,0.25)" }}
-              aria-label="Look around"
-              title="Look around"
-            >
-              <Eye size={12} />
-            </button>
-            <button
-              onClick={() => submitCommand("status")}
-              disabled={isPending || isGameOver}
-              className="transition-colors"
-              style={{ color: "rgba(200,190,180,0.25)" }}
-              aria-label="Show status"
-              title="Show status"
-            >
-              <Info size={12} />
-            </button>
+                {parsedCommand.action}
+                {parsedCommand.direction ? ` · ${parsedCommand.direction}` : ""}
+                {parsedCommand.target ? ` · ${parsedCommand.target}` : ""}
+              </span>
+            )}
+          </div>
+
+          {/* Scrollable log area */}
+          <div className="flex-1 overflow-hidden">
+            <NarrationFeed logs={logs} newFromIndex={newFromIndex} />
           </div>
         </div>
 
-        {/* ── Narration Feed ── */}
-        <NarrationFeed logs={logs} newFromIndex={newFromIndex} />
+        {/* Bottom HUD: 2-col on desktop, stacked on mobile */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 flex-1 min-h-0 pb-3">
+          <PlayerHUD
+            name={player.name}
+            level={player.level}
+            hp={player.hp}
+            maxHp={player.maxHp}
+            mp={player.mp}
+            maxMp={player.maxMp}
+            xp={player.xp}
+            xpToNextLevel={player.xpToNextLevel}
+            attack={player.attack}
+            defense={player.defense}
+            isCombat={isCombat}
+          />
 
-        {/* ── Parsed command debug (hidden when clean) ── */}
-        {parsedCommand && (
-          <div
-            className="px-5 py-1 flex items-center gap-3"
-            style={{ borderTop: "1px solid rgba(255,255,255,0.03)" }}
-          >
-            <span className="font-code text-xs" style={{ color: "rgba(200,190,180,0.2)", fontSize: "10px", letterSpacing: "0.15em" }}>
-              {parsedCommand.action}
-              {parsedCommand.direction ? ` · ${parsedCommand.direction}` : ""}
-              {parsedCommand.target ? ` · ${parsedCommand.target}` : ""}
-            </span>
-          </div>
-        )}
+          <VoiceControl
+            isSupported={voiceSupported}
+            audioState={audioState}
+            isListening={isListening}
+            interimTranscript={interimTranscript}
+            intentHint={intentHint}
+            isPending={isPending}
+            isGameOver={isGameOver}
+            isCombat={isCombat}
+            command={command}
+            onCommandChange={setCommand}
+            onSubmit={submitCommand}
+            onToggleListen={toggleListening}
+          />
+        </div>
       </div>
 
-      {/* ═══════════ BOTTOM HUD ═══════════ */}
-      <div
-        className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-3 p-3 shrink-0"
-        style={{ borderTop: "1px solid rgba(255,255,255,0.04)", background: "rgba(0,0,0,0.35)" }}
-      >
-        {/* Left: Player HUD */}
-        <PlayerHUD
-          name={player.name}
-          level={player.level}
-          hp={player.hp}
-          maxHp={player.maxHp}
-          mp={player.mp}
-          maxMp={player.maxMp}
-          xp={player.xp}
-          xpToNextLevel={player.xpToNextLevel}
-          attack={player.attack}
-          defense={player.defense}
-          isCombat={isCombat}
-        />
-
-        {/* Right: Voice + Controls */}
-        <VoiceControl
-          isSupported={voiceSupported}
-          audioState={audioState}
-          isListening={isListening}
-          interimTranscript={interimTranscript}
-          intentHint={intentHint}
-          isPending={isPending}
-          isGameOver={isGameOver}
-          isCombat={isCombat}
-          command={command}
-          onCommandChange={setCommand}
-          onSubmit={submitCommand}
-          onToggleListen={toggleListening}
-        />
-      </div>
-
-      {/* ── Game over overlay ── */}
+      {/* ── Game Over overlay ── */}
       <AnimatePresence>
         {isGameOver && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="absolute inset-0 z-20 flex flex-col items-center justify-center"
-            style={{ background: "rgba(5,3,8,0.88)", backdropFilter: "blur(4px)" }}
+            className="absolute inset-0 z-30 flex flex-col items-center justify-center"
+            style={{ background: "rgba(5,3,8,0.92)", backdropFilter: "blur(6px)" }}
           >
             <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
+              initial={{ scale: 0.85, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.2, type: "spring" }}
-              className="text-center space-y-4"
+              className="text-center space-y-5"
             >
-              <div className="rune-divider w-48 mx-auto">✦</div>
+              <div className="rune-divider w-52 mx-auto">✦</div>
               <h2
                 className="font-display text-5xl font-black tracking-widest"
                 style={{
-                  color: "#b3122f",
-                  textShadow: "0 0 40px rgba(179,18,47,0.6), 0 0 80px rgba(179,18,47,0.2)",
+                  color: "#8b1e1e",
+                  textShadow: "0 0 40px rgba(139,30,30,0.7), 0 0 80px rgba(139,30,30,0.25)",
                 }}
               >
                 FALLEN
               </h2>
-              <p className="font-narration italic text-xl" style={{ color: "rgba(212,175,55,0.7)" }}>
+              <p className="font-narration italic text-xl" style={{ color: "rgba(200,155,60,0.7)" }}>
                 The dungeon claims another soul.
               </p>
-              <div className="rune-divider w-48 mx-auto">✦</div>
+              <div className="rune-divider w-52 mx-auto">✦</div>
             </motion.div>
           </motion.div>
         )}

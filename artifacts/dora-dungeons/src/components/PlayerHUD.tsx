@@ -28,27 +28,41 @@ function Bar({
   textColor: string;
 }) {
   const pct = max > 0 ? Math.max(0, Math.min(100, (value / max) * 100)) : 0;
+  const isLow = pct < 25;
 
   return (
     <div className="space-y-1">
       <div className="flex justify-between items-center">
         <span
           className="font-code text-xs uppercase tracking-widest"
-          style={{ color: "rgba(200,190,180,0.45)", letterSpacing: "0.18em" }}
+          style={{ color: "rgba(200,190,180,0.4)", letterSpacing: "0.18em", fontSize: "9px" }}
         >
           {label}
         </span>
-        <span className="font-code text-xs" style={{ color: textColor, opacity: 0.8 }}>
+        <span
+          className="font-code text-xs"
+          style={{
+            color: textColor,
+            opacity: 0.85,
+            fontSize: "11px",
+            animation: isLow ? "combat-breathe 1.5s ease-in-out infinite" : undefined,
+          }}
+        >
           {value} / {max}
         </span>
       </div>
       <div
-        className="relative h-1.5 w-full overflow-hidden rounded-full"
-        style={{ background: "rgba(255,255,255,0.06)" }}
+        className="relative h-2 w-full overflow-hidden"
+        style={{ background: "rgba(255,255,255,0.05)", borderRadius: "999px" }}
       >
         <motion.div
-          className="stat-bar-fill h-full rounded-full"
-          style={{ background: color, width: `${pct}%` }}
+          className="stat-bar-fill h-full"
+          style={{
+            background: color,
+            width: `${pct}%`,
+            borderRadius: "999px",
+            boxShadow: isLow ? `0 0 8px ${textColor}44` : undefined,
+          }}
           initial={{ width: 0 }}
           animate={{ width: `${pct}%` }}
           transition={{ duration: 0.7, ease: "easeOut" }}
@@ -64,36 +78,46 @@ export function PlayerHUD({
   const hpPct = maxHp > 0 ? hp / maxHp : 0;
   const hpColor =
     hpPct > 0.5
-      ? "linear-gradient(to right, #991b1b, #dc2626)"
+      ? "linear-gradient(90deg, #991b1b 0%, #dc2626 100%)"
       : hpPct > 0.25
-      ? "linear-gradient(to right, #b45309, #f59e0b)"
-      : "linear-gradient(to right, #7f1d1d, #ef4444)";
+      ? "linear-gradient(90deg, #b45309 0%, #f59e0b 100%)"
+      : "linear-gradient(90deg, #7f1d1d 0%, #ef4444 100%)";
 
   return (
     <div
-      className="glass-panel p-4 space-y-4"
-      style={{ borderColor: isCombat ? "rgba(179,18,47,0.3)" : undefined }}
+      className="glass-panel p-4 flex flex-col gap-4 overflow-y-auto"
+      style={{
+        borderColor: isCombat ? "rgba(139,30,30,0.4)" : undefined,
+        boxShadow: isCombat
+          ? "0 4px 24px rgba(139,30,30,0.15), inset 0 1px 0 rgba(255,255,255,0.03)"
+          : undefined,
+        minHeight: 0,
+      }}
     >
-      {/* Name + Level */}
-      <div className="flex items-center justify-between">
-        <div>
+      {/* Name + level */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
           <h2
-            className="font-display text-base font-bold tracking-wider"
-            style={{ color: "#e8e0d0" }}
+            className="font-display font-bold tracking-wider truncate"
+            style={{ color: "#e8e0d0", fontSize: "clamp(0.85rem, 2vw, 1rem)" }}
           >
             {name}
           </h2>
-          <p className="font-code text-xs" style={{ color: "rgba(212,175,55,0.6)" }}>
+          <p className="font-code text-xs" style={{ color: "rgba(200,155,60,0.55)", fontSize: "10px" }}>
             adventurer
           </p>
         </div>
         <div
-          className="font-display text-center px-3 py-1"
+          className="font-display text-center flex-shrink-0"
           style={{
-            border: "1px solid rgba(212,175,55,0.3)",
-            color: "rgba(212,175,55,0.9)",
-            fontSize: "11px",
+            border: "1px solid rgba(200,155,60,0.35)",
+            color: "rgba(200,155,60,0.9)",
+            fontSize: "10px",
             letterSpacing: "0.15em",
+            padding: "3px 10px",
+            borderRadius: "999px",
+            background: "rgba(200,155,60,0.07)",
+            whiteSpace: "nowrap",
           }}
         >
           LVL {level}
@@ -102,58 +126,61 @@ export function PlayerHUD({
 
       {/* Bars */}
       <div className="space-y-3">
-        <Bar
-          label="HP"
-          value={hp}
-          max={maxHp}
-          color={hpColor}
-          textColor="#f87171"
-        />
+        <Bar label="HP" value={hp} max={maxHp} color={hpColor} textColor="#f87171" />
         <Bar
           label="MP"
           value={mp}
           max={maxMp}
-          color="linear-gradient(to right, #1e3a8a, #3b82f6)"
+          color="linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%)"
           textColor="#60a5fa"
         />
         <Bar
           label="XP"
           value={xp}
           max={xpToNextLevel}
-          color="linear-gradient(to right, #78350f, #d97706)"
-          textColor="#fbbf24"
+          color="linear-gradient(90deg, #78350f 0%, #d97706 100%)"
+          textColor="#c89b3c"
         />
       </div>
 
-      {/* Combat stats */}
+      {/* Stats row */}
       <div
-        className="flex gap-4 pt-2"
-        style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
+        className="grid grid-cols-2 gap-3 pt-3"
+        style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
       >
-        <div className="text-center flex-1">
-          <div className="font-display text-sm font-bold" style={{ color: "#f87171" }}>
-            {attack}
-          </div>
-          <div
-            className="font-code text-xs uppercase tracking-wider"
-            style={{ color: "rgba(200,190,180,0.35)", fontSize: "10px" }}
-          >
-            ATK
+        {/* Attack */}
+        <div
+          className="flex items-center gap-2 rounded-lg p-2"
+          style={{ background: "rgba(139,30,30,0.08)", border: "1px solid rgba(139,30,30,0.18)" }}
+        >
+          <div>
+            <div className="font-display font-bold" style={{ color: "#f87171", fontSize: "1.1rem", lineHeight: 1 }}>
+              {attack}
+            </div>
+            <div
+              className="font-code uppercase tracking-wider mt-0.5"
+              style={{ color: "rgba(200,190,180,0.35)", fontSize: "9px" }}
+            >
+              ATK
+            </div>
           </div>
         </div>
+
+        {/* Defense */}
         <div
-          className="w-px"
-          style={{ background: "rgba(255,255,255,0.06)" }}
-        />
-        <div className="text-center flex-1">
-          <div className="font-display text-sm font-bold" style={{ color: "#60a5fa" }}>
-            {defense}
-          </div>
-          <div
-            className="font-code text-xs uppercase tracking-wider"
-            style={{ color: "rgba(200,190,180,0.35)", fontSize: "10px" }}
-          >
-            DEF
+          className="flex items-center gap-2 rounded-lg p-2"
+          style={{ background: "rgba(58,134,255,0.07)", border: "1px solid rgba(58,134,255,0.18)" }}
+        >
+          <div>
+            <div className="font-display font-bold" style={{ color: "#60a5fa", fontSize: "1.1rem", lineHeight: 1 }}>
+              {defense}
+            </div>
+            <div
+              className="font-code uppercase tracking-wider mt-0.5"
+              style={{ color: "rgba(200,190,180,0.35)", fontSize: "9px" }}
+            >
+              DEF
+            </div>
           </div>
         </div>
       </div>

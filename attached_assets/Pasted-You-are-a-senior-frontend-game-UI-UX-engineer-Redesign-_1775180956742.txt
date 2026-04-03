@@ -1,0 +1,148 @@
+You are a senior frontend game UI/UX engineer.
+
+Redesign the UI layout and styling of "Dora Dungeons" to look like a professional dark fantasy game interface.
+
+---
+
+## GOAL
+
+Create a clean, immersive, responsive UI with proper layout hierarchy.
+
+---
+
+## LAYOUT STRUCTURE
+
+1. NAVBAR (TOP)
+
+* Left: "DORA DUNGEONS" (bold, large, gold gradient)
+
+* Center: Status (EXPLORING / SPEAKING)
+
+* Right: Controls (rate, sound, settings)
+
+* Use flexbox:
+  justify-content: space-between
+  align-items: center
+
+* Prevent overflow on all screen sizes
+
+* Add padding + max-width container
+
+---
+
+2. TERMINAL (MAIN AREA)
+
+---
+
+* Give terminal its own container:
+
+  * height: 40–50vh
+  * overflow-y: auto
+  * dark glass background (rgba + blur)
+
+* Add:
+
+  * border-radius
+  * subtle glow border
+  * inner padding
+
+* Make it visually distinct from other panels
+
+---
+
+3. BACKGROUND (IMPORTANT)
+
+---
+
+* Replace current background with:
+  "dark dungeon environment" image
+
+* Add overlay:
+  linear-gradient(black 60%, transparent)
+
+* Apply:
+  background-size: cover
+  background-position: center
+  fixed attachment
+
+---
+
+4. COLOR SYSTEM (REALISTIC)
+
+---
+
+Use:
+
+* Primary: #0b0f14 (deep black/blue)
+* Accent: #c89b3c (gold)
+* Secondary: #1a1f29 (dark panel)
+* Danger: #8b1e1e (blood red)
+* Magic: #3a86ff (blue glow)
+
+---
+
+5. BUTTON DESIGN
+
+---
+
+* Use:
+
+  * soft glow on hover
+  * slight scale transform
+  * rounded edges
+
+* Group buttons logically (movement, combat, actions)
+
+---
+
+6. RESPONSIVENESS
+
+---
+
+* Mobile:
+
+  * Stack layout vertically
+  * Collapse navbar items into icons
+  * Reduce font size slightly
+
+* Tablet/Desktop:
+
+  * Use grid layout (2 columns)
+
+---
+
+7. TYPOGRAPHY
+
+---
+
+* Title: fantasy serif (Cinzel or similar)
+* Body: clean readable font
+* Increase spacing for readability
+
+---
+
+8. VISUAL EFFECTS
+
+---
+
+* Add subtle:
+
+  * glow effects (magic feel)
+  * shadow depth
+  * smooth transitions
+
+---
+
+## RULES
+
+* Do NOT break existing functionality
+* Only improve layout and styling
+* Keep accessibility in mind
+
+---
+
+## OUTPUT
+
+* Updated CSS / Tailwind styles
+* Improved layout structure
+* Responsive adjustments

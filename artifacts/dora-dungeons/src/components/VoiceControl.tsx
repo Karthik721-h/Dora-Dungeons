@@ -1,5 +1,8 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic, MicOff, RotateCcw, Swords, Shield, Flame, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Zap } from "lucide-react";
+import {
+  Mic, MicOff, RotateCcw, Swords, Shield, Flame, Zap,
+  ArrowUp, ArrowDown, ArrowLeft, ArrowRight,
+} from "lucide-react";
 import { AudioManager } from "@/audio/AudioManager";
 
 type AudioState = "idle" | "listening" | "speaking" | "processing";
@@ -24,47 +27,43 @@ interface ActionBtnProps {
   label: string;
   onClick: () => void;
   disabled?: boolean;
-  crimson?: boolean;
-  gold?: boolean;
+  variant?: "danger" | "gold" | "magic" | "default";
   small?: boolean;
 }
 
-function ActionBtn({ icon, label, onClick, disabled, crimson, gold, small }: ActionBtnProps) {
-  const bg = crimson
-    ? "rgba(179,18,47,0.12)"
-    : gold
-    ? "rgba(212,175,55,0.08)"
-    : "rgba(255,255,255,0.04)";
-  const borderColor = crimson
-    ? "rgba(179,18,47,0.4)"
-    : gold
-    ? "rgba(212,175,55,0.3)"
-    : "rgba(255,255,255,0.1)";
-  const textColor = crimson ? "#f87171" : gold ? "#fbbf24" : "rgba(220,210,195,0.8)";
+function ActionBtn({ icon, label, onClick, disabled, variant = "default", small }: ActionBtnProps) {
+  const styles = {
+    danger:  { bg: "rgba(139,30,30,0.14)", border: "rgba(139,30,30,0.45)", color: "#f87171" },
+    gold:    { bg: "rgba(200,155,60,0.1)",  border: "rgba(200,155,60,0.35)", color: "#c89b3c" },
+    magic:   { bg: "rgba(58,134,255,0.1)",  border: "rgba(58,134,255,0.35)", color: "#3a86ff" },
+    default: { bg: "rgba(255,255,255,0.04)", border: "rgba(255,255,255,0.12)", color: "rgba(220,210,195,0.8)" },
+  }[variant];
 
   return (
     <motion.button
-      whileHover={{ scale: disabled ? 1 : 1.05 }}
-      whileTap={{ scale: disabled ? 1 : 0.95 }}
+      whileHover={{ scale: disabled ? 1 : 1.06 }}
+      whileTap={{ scale: disabled ? 1 : 0.93 }}
       onClick={onClick}
       disabled={disabled}
-      className="action-btn flex flex-col items-center justify-center gap-1 rounded-sm transition-all"
+      className="action-btn flex flex-col items-center justify-center gap-1 transition-all"
       style={{
-        background: bg,
-        border: `1px solid ${borderColor}`,
-        color: textColor,
-        padding: small ? "6px 8px" : "10px 12px",
+        background: styles.bg,
+        border: `1px solid ${styles.border}`,
+        color: styles.color,
+        borderRadius: "0.5rem",
+        padding: small ? "6px 8px" : "9px 11px",
         opacity: disabled ? 0.3 : 1,
         cursor: disabled ? "not-allowed" : "pointer",
-        minWidth: small ? "44px" : "52px",
+        minWidth: small ? "42px" : "50px",
+        boxShadow: `0 2px 10px ${styles.bg}`,
       }}
       aria-label={label}
       title={label}
     >
-      <span style={{ fontSize: small ? "14px" : "16px" }}>{icon}</span>
+      <span style={{ fontSize: small ? "13px" : "15px" }}>{icon}</span>
       <span
         className="font-code uppercase tracking-widest"
-        style={{ fontSize: "9px", opacity: 0.7 }}
+        style={{ fontSize: "8px", opacity: 0.75 }}
       >
         {label}
       </span>
@@ -83,121 +82,160 @@ export function VoiceControl({
     }
   };
 
-  return (
-    <div className="glass-panel p-4 flex flex-col gap-4">
+  const micColor = isListening
+    ? "#f87171"
+    : audioState === "speaking"
+    ? "#3a86ff"
+    : "rgba(200,190,180,0.45)";
 
-      {/* ── Mic button ── */}
-      <div className="flex flex-col items-center gap-3">
-        {isSupported ? (
+  const micBg = isListening
+    ? "radial-gradient(circle, rgba(139,30,30,0.28) 0%, rgba(139,30,30,0.08) 100%)"
+    : audioState === "speaking"
+    ? "radial-gradient(circle, rgba(58,134,255,0.22) 0%, rgba(58,134,255,0.06) 100%)"
+    : "rgba(255,255,255,0.04)";
+
+  const micBorder = isListening
+    ? "2px solid rgba(139,30,30,0.75)"
+    : audioState === "speaking"
+    ? "2px solid rgba(58,134,255,0.55)"
+    : "2px solid rgba(255,255,255,0.12)";
+
+  const statusLabel = isListening
+    ? "● Listening"
+    : audioState === "speaking"
+    ? "● Speaking"
+    : audioState === "processing"
+    ? "… Processing"
+    : "○ Idle";
+
+  const statusColor = isListening
+    ? "rgba(248,113,113,0.75)"
+    : audioState === "speaking"
+    ? "rgba(58,134,255,0.75)"
+    : audioState === "processing"
+    ? "rgba(200,155,60,0.75)"
+    : "rgba(200,190,180,0.25)";
+
+  return (
+    <div
+      className="glass-panel p-3 flex flex-col gap-3 overflow-y-auto"
+      style={{ minHeight: 0 }}
+    >
+      {/* ── Top row: mic + transcript ── */}
+      <div className="flex items-center gap-3">
+        {isSupported && (
           <motion.button
             onClick={onToggleListen}
             disabled={isGameOver}
-            whileTap={{ scale: 0.92 }}
+            whileTap={{ scale: 0.91 }}
             className={`
-              relative rounded-full flex items-center justify-center transition-all
+              relative rounded-full flex items-center justify-center flex-shrink-0 transition-all
               ${isListening ? "mic-listening" : audioState === "speaking" ? "mic-speaking" : ""}
             `}
             style={{
-              width: 64, height: 64,
-              background: isListening
-                ? "radial-gradient(circle, rgba(179,18,47,0.25) 0%, rgba(179,18,47,0.08) 100%)"
-                : audioState === "speaking"
-                ? "radial-gradient(circle, rgba(59,130,246,0.2) 0%, rgba(59,130,246,0.06) 100%)"
-                : "rgba(255,255,255,0.05)",
-              border: isListening
-                ? "2px solid rgba(179,18,47,0.7)"
-                : audioState === "speaking"
-                ? "2px solid rgba(59,130,246,0.5)"
-                : "2px solid rgba(255,255,255,0.12)",
-              color: isListening ? "#f87171" : audioState === "speaking" ? "#60a5fa" : "rgba(200,190,180,0.5)",
+              width: 54, height: 54,
+              background: micBg,
+              border: micBorder,
+              color: micColor,
               opacity: isGameOver ? 0.3 : 1,
+              cursor: isGameOver ? "not-allowed" : "pointer",
             }}
             aria-label={isListening ? "Stop voice input" : "Start voice input"}
             title={isListening ? "Listening — click to stop" : "Click to speak a command"}
           >
-            {isListening ? <Mic size={26} /> : <MicOff size={26} />}
+            {isListening ? <Mic size={22} /> : <MicOff size={22} />}
           </motion.button>
-        ) : null}
+        )}
 
-        {/* Audio state label */}
-        <div
-          className="font-code text-xs uppercase tracking-widest text-center"
-          style={{
-            color: isListening
-              ? "rgba(248,113,113,0.7)"
-              : audioState === "speaking"
-              ? "rgba(96,165,250,0.7)"
-              : "rgba(200,190,180,0.25)",
-            letterSpacing: "0.2em",
-            fontSize: "10px",
-          }}
-        >
-          {isListening ? "listening" : audioState === "speaking" ? "speaking" : "idle"}
-        </div>
-      </div>
-
-      {/* ── Transcript strip ── */}
-      <AnimatePresence>
-        {(interimTranscript || intentHint) && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="font-narration italic text-sm text-center"
-            style={{ color: "rgba(212,175,55,0.7)", lineHeight: 1.4 }}
+        <div className="flex-1 min-w-0">
+          {/* Status label */}
+          <div
+            className="font-code uppercase tracking-widest mb-1"
+            style={{ fontSize: "10px", letterSpacing: "0.2em", color: statusColor }}
           >
-            {interimTranscript ? `"${interimTranscript}"` : intentHint}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ── Quick actions ── */}
-      <div className="space-y-2">
-        {/* Combat row */}
-        {isCombat && (
-          <div className="flex gap-1.5 justify-center">
-            <ActionBtn icon={<Swords size={15} />} label="Attack" onClick={() => onSubmit("attack")} disabled={isPending || isGameOver} crimson />
-            <ActionBtn icon={<Shield size={15} />} label="Defend" onClick={() => onSubmit("defend")} disabled={isPending || isGameOver} />
-            <ActionBtn icon={<Flame size={15} />} label="Spell" onClick={() => onSubmit("cast fireball")} disabled={isPending || isGameOver} gold />
-            <ActionBtn icon={<Zap size={15} />} label="Flee" onClick={() => onSubmit("flee")} disabled={isPending || isGameOver} small />
+            {statusLabel}
           </div>
-        )}
 
-        {/* Movement row */}
-        <div className="flex items-center justify-center gap-1">
-          <ActionBtn icon={<ArrowLeft size={13} />} label="West" onClick={() => onSubmit("move west")} disabled={isPending || isGameOver} small />
-          <div className="flex flex-col gap-1">
-            <ActionBtn icon={<ArrowUp size={13} />} label="North" onClick={() => onSubmit("move north")} disabled={isPending || isGameOver} small />
-            <ActionBtn icon={<ArrowDown size={13} />} label="South" onClick={() => onSubmit("move south")} disabled={isPending || isGameOver} small />
-          </div>
-          <ActionBtn icon={<ArrowRight size={13} />} label="East" onClick={() => onSubmit("move east")} disabled={isPending || isGameOver} small />
+          {/* Transcript / intent hint */}
+          <AnimatePresence>
+            {(interimTranscript || intentHint) && (
+              <motion.div
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                className="font-narration italic text-sm truncate"
+                style={{ color: "rgba(200,155,60,0.8)" }}
+              >
+                {interimTranscript ? `"${interimTranscript}"` : intentHint}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
+
+        {/* Repeat button */}
+        <motion.button
+          whileHover={{ scale: 1.06 }}
+          whileTap={{ scale: 0.93 }}
+          onClick={() => AudioManager.repeatLast()}
+          className="action-btn flex items-center gap-1 px-2.5 py-2 font-code text-xs uppercase tracking-widest flex-shrink-0"
+          style={{
+            border: "1px solid rgba(255,255,255,0.1)",
+            color: "rgba(200,190,180,0.4)",
+            background: "rgba(255,255,255,0.03)",
+            letterSpacing: "0.14em",
+            fontSize: "10px",
+            borderRadius: "0.5rem",
+          }}
+          aria-label="Repeat last narration"
+          title="Repeat the last spoken line"
+        >
+          <RotateCcw size={11} />
+          <span className="hidden sm:inline">Repeat</span>
+        </motion.button>
       </div>
 
-      {/* ── Repeat button ── */}
-      <motion.button
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.96 }}
-        onClick={() => AudioManager.repeatLast()}
-        className="action-btn flex items-center justify-center gap-2 py-2 font-code text-xs uppercase tracking-widest"
-        style={{
-          border: "1px solid rgba(255,255,255,0.08)",
-          color: "rgba(200,190,180,0.4)",
-          background: "rgba(255,255,255,0.02)",
-          letterSpacing: "0.18em",
-        }}
-        aria-label="Repeat last narration"
-        title="Repeat the last spoken line"
-      >
-        <RotateCcw size={11} /> Repeat
-      </motion.button>
+      {/* ── Combat actions (when in combat) ── */}
+      {isCombat && (
+        <div>
+          <div
+            className="font-code text-xs uppercase tracking-widest mb-2"
+            style={{ color: "rgba(139,30,30,0.6)", fontSize: "9px", letterSpacing: "0.2em" }}
+          >
+            — Combat —
+          </div>
+          <div className="flex gap-1.5 flex-wrap">
+            <ActionBtn icon={<Swords size={14} />} label="Attack"  onClick={() => onSubmit("attack")}       disabled={isPending || isGameOver} variant="danger" />
+            <ActionBtn icon={<Shield size={14} />} label="Defend"  onClick={() => onSubmit("defend")}       disabled={isPending || isGameOver} />
+            <ActionBtn icon={<Flame  size={14} />} label="Spell"   onClick={() => onSubmit("cast fireball")} disabled={isPending || isGameOver} variant="magic" />
+            <ActionBtn icon={<Zap    size={14} />} label="Flee"    onClick={() => onSubmit("flee")}          disabled={isPending || isGameOver} variant="gold" small />
+          </div>
+        </div>
+      )}
+
+      {/* ── Movement pad ── */}
+      <div>
+        <div
+          className="font-code text-xs uppercase tracking-widest mb-2"
+          style={{ color: "rgba(200,155,60,0.4)", fontSize: "9px", letterSpacing: "0.2em" }}
+        >
+          — Movement —
+        </div>
+        <div className="flex items-center justify-start gap-1">
+          <ActionBtn icon={<ArrowLeft  size={12} />} label="W" onClick={() => onSubmit("move west")}  disabled={isPending || isGameOver} small />
+          <div className="flex flex-col gap-1">
+            <ActionBtn icon={<ArrowUp   size={12} />} label="N" onClick={() => onSubmit("move north")} disabled={isPending || isGameOver} small />
+            <ActionBtn icon={<ArrowDown size={12} />} label="S" onClick={() => onSubmit("move south")} disabled={isPending || isGameOver} small />
+          </div>
+          <ActionBtn icon={<ArrowRight size={12} />} label="E" onClick={() => onSubmit("move east")}  disabled={isPending || isGameOver} small />
+        </div>
+      </div>
 
       {/* ── Command input ── */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 mt-auto">
         <div className="relative flex-1">
           <span
-            className="absolute left-3 top-1/2 -translate-y-1/2 font-code text-sm pointer-events-none"
-            style={{ color: "rgba(179,18,47,0.5)" }}
+            className="absolute left-3 top-1/2 -translate-y-1/2 font-code text-sm pointer-events-none select-none"
+            style={{ color: "rgba(139,30,30,0.55)" }}
           >
             &gt;
           </span>
@@ -210,10 +248,10 @@ export function VoiceControl({
             placeholder={isListening ? "Listening..." : "Type command..."}
             autoComplete="off"
             spellCheck="false"
-            className="command-input w-full pl-8 pr-3 py-2.5 font-code text-sm disabled:opacity-40 transition-all"
+            className="command-input w-full pl-8 pr-3 py-2 font-code text-sm disabled:opacity-40 transition-all"
             style={{
-              background: "rgba(255,255,255,0.03)",
-              border: "1px solid rgba(255,255,255,0.1)",
+              background: "rgba(11,15,20,0.7)",
+              border: "1px solid rgba(200,155,60,0.2)",
               color: "#e8e0d0",
               outline: "none",
             }}
@@ -221,23 +259,24 @@ export function VoiceControl({
           />
         </div>
         <motion.button
-          whileHover={{ scale: isPending || !command.trim() || isGameOver ? 1 : 1.03 }}
-          whileTap={{ scale: isPending || !command.trim() || isGameOver ? 1 : 0.96 }}
+          whileHover={{ scale: isPending || !command.trim() || isGameOver ? 1 : 1.04 }}
+          whileTap={{ scale: isPending || !command.trim() || isGameOver ? 1 : 0.95 }}
           onClick={() => { if (command.trim()) onSubmit(command); }}
           disabled={isPending || !command.trim() || isGameOver}
-          className="px-4 font-display text-xs tracking-widest uppercase transition-all"
+          className="action-btn px-4 font-display text-xs tracking-widest uppercase transition-all"
           style={{
-            background: "rgba(179,18,47,0.15)",
-            border: "1px solid rgba(179,18,47,0.45)",
+            background: "rgba(139,30,30,0.18)",
+            border: "1px solid rgba(139,30,30,0.5)",
             color: "#f87171",
+            borderRadius: "0.5rem",
             opacity: isPending || !command.trim() || isGameOver ? 0.3 : 1,
             cursor: isPending || !command.trim() || isGameOver ? "not-allowed" : "pointer",
-            letterSpacing: "0.15em",
+            letterSpacing: "0.14em",
             whiteSpace: "nowrap",
           }}
           aria-label="Execute command"
         >
-          Execute
+          Go
         </motion.button>
       </div>
     </div>

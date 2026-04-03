@@ -27,49 +27,58 @@
   --font-mono: 'Fira Code', monospace;
   --font-display: 'Cinzel', serif;
 
-  --radius-sm: 0.125rem;
-  --radius-md: 0.25rem;
-  --radius-lg: 0.5rem;
-  --radius-xl: 0.75rem;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
 }
 
 :root {
-  /* Cinematic dark — near-black with warm undertone */
-  --background: 240 15% 4%;
+  --background: 220 22% 5%;
   --foreground: 38 18% 88%;
 
-  --card: 240 13% 6%;
+  --card: 220 20% 7%;
   --card-foreground: 38 18% 88%;
 
-  --popover: 240 13% 7%;
+  --popover: 220 20% 7%;
   --popover-foreground: 38 18% 88%;
 
-  /* Crimson */
-  --primary: 350 82% 42%;
-  --primary-foreground: 0 0% 100%;
+  /* Gold accent */
+  --primary: 40 58% 50%;
+  --primary-foreground: 0 0% 0%;
 
-  /* Charcoal panel */
-  --secondary: 240 10% 10%;
+  /* Dark panel */
+  --secondary: 220 16% 10%;
   --secondary-foreground: 38 18% 88%;
 
-  --muted: 240 10% 13%;
-  --muted-foreground: 240 6% 48%;
+  --muted: 220 14% 13%;
+  --muted-foreground: 220 8% 48%;
 
-  /* Gold */
-  --accent: 42 65% 52%;
+  --accent: 40 58% 50%;
   --accent-foreground: 0 0% 0%;
 
-  --destructive: 2 90% 42%;
+  --destructive: 2 72% 34%;
   --destructive-foreground: 0 0% 100%;
 
-  --border: 240 12% 14%;
-  --input: 240 12% 9%;
-  --ring: 350 82% 42%;
+  --border: 220 14% 16%;
+  --input: 220 14% 9%;
+  --ring: 40 58% 50%;
 
-  --radius: 0.25rem;
+  --radius: 0.5rem;
+
+  /* Design tokens */
+  --gold: #c89b3c;
+  --gold-dim: rgba(200, 155, 60, 0.6);
+  --gold-glow: rgba(200, 155, 60, 0.25);
+  --blood: #8b1e1e;
+  --blood-glow: rgba(139, 30, 30, 0.35);
+  --magic: #3a86ff;
+  --magic-glow: rgba(58, 134, 255, 0.3);
+  --panel: #1a1f29;
+  --panel-border: rgba(200, 155, 60, 0.15);
 }
 
-/* ─── Base ─────────────────────────────────────────────── */
+/* ─── Base ────────────────────────────────────────────────── */
 @layer base {
   * { @apply border-border; box-sizing: border-box; }
 
@@ -83,9 +92,7 @@
     @apply antialiased bg-background text-foreground overflow-x-hidden;
     font-family: 'Crimson Text', Georgia, serif;
     font-size: 18px;
-    background-image:
-      radial-gradient(ellipse at 50% 0%, rgba(179,18,47,0.04) 0%, transparent 60%),
-      radial-gradient(ellipse at 50% 100%, rgba(0,0,0,0.5) 0%, transparent 70%);
+    background-color: #0b0f14;
   }
 
   h1, h2, h3, h4 {
@@ -95,16 +102,45 @@
   }
 
   ::-webkit-scrollbar { width: 4px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 2px; }
-  ::-webkit-scrollbar-thumb:hover { background: hsl(var(--primary) / 0.4); }
+  ::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); }
+  ::-webkit-scrollbar-thumb { background: rgba(200,155,60,0.25); border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(200,155,60,0.45); }
 }
 
-/* ─── Atmospheric overlays ──────────────────────────────── */
+/* ─── Typography ────────────────────────────────────────────── */
+.font-display   { font-family: 'Cinzel', serif; }
+.font-narration { font-family: 'Crimson Text', Georgia, serif; }
+.font-code      { font-family: 'Fira Code', monospace; }
+
+/* ─── Dungeon background ───────────────────────────────────── */
+.dungeon-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background-color: #0b0f14;
+  background-image: url('/images/dungeon-bg.png');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+}
+
+.dungeon-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(11,15,20,0.78) 0%,
+    rgba(11,15,20,0.60) 40%,
+    rgba(11,15,20,0.85) 100%
+  );
+}
+
+/* ─── Atmospheric overlays ─────────────────────────────────── */
 .vignette {
   position: fixed;
   inset: 0;
-  background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.65) 100%);
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.72) 100%);
   pointer-events: none;
   z-index: 1;
 }
@@ -112,80 +148,260 @@
 .combat-overlay {
   position: fixed;
   inset: 0;
-  background: radial-gradient(ellipse at center, transparent 55%, rgba(139,12,24,0.22) 100%);
+  background: radial-gradient(ellipse at center, transparent 50%, rgba(139,30,30,0.28) 100%);
   pointer-events: none;
   z-index: 1;
   animation: combat-breathe 2.5s ease-in-out infinite;
 }
 
 @keyframes combat-breathe {
-  0%, 100% { opacity: 0.7; }
-  50% { opacity: 1; }
+  0%, 100% { opacity: 0.6; }
+  50%       { opacity: 1; }
 }
 
-/* ─── Typography ────────────────────────────────────────── */
-.font-display { font-family: 'Cinzel', serif; }
-.font-narration { font-family: 'Crimson Text', Georgia, serif; }
-.font-code { font-family: 'Fira Code', monospace; }
+/* ─── Scanline ─────────────────────────────────────────────── */
+@keyframes scanline-move {
+  0%   { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+
+.scanline-overlay {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw; height: 6vh;
+  background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.012) 50%, transparent);
+  pointer-events: none;
+  z-index: 50;
+  opacity: 0.45;
+  animation: scanline-move 16s linear infinite;
+}
+
+/* ─── Navbar ───────────────────────────────────────────────── */
+.dd-navbar {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 1.25rem;
+  background: rgba(11, 15, 20, 0.82);
+  border-bottom: 1px solid rgba(200, 155, 60, 0.15);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  min-height: 56px;
+  gap: 0.5rem;
+}
+
+.dd-navbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.dd-navbar-title {
+  font-family: 'Cinzel', serif;
+  font-size: clamp(0.75rem, 2vw, 1.1rem);
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  background: linear-gradient(135deg, #c89b3c 0%, #f0d060 50%, #c89b3c 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: none;
+  white-space: nowrap;
+}
+
+.dd-navbar-center {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dd-navbar-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+/* ─── Status badge ─────────────────────────────────────────── */
+.status-badge {
+  font-family: 'Fira Code', monospace;
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid;
+  white-space: nowrap;
+}
+
+/* ─── Location strip ───────────────────────────────────────── */
+.location-strip {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 1.25rem;
+  background: rgba(11, 15, 20, 0.65);
+  border-bottom: 1px solid rgba(200, 155, 60, 0.1);
+  backdrop-filter: blur(6px);
+  flex-wrap: wrap;
+}
+
+/* ─── Terminal (narration feed) ────────────────────────────── */
+.terminal-panel {
+  background: rgba(11, 15, 20, 0.78);
+  border: 1px solid rgba(200, 155, 60, 0.18);
+  border-radius: 0.75rem;
+  box-shadow:
+    0 0 0 1px rgba(200, 155, 60, 0.06),
+    0 4px 32px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  overflow: hidden;
+}
+
+.terminal-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid rgba(200, 155, 60, 0.1);
+  background: rgba(200, 155, 60, 0.04);
+}
+
+.terminal-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+/* ─── Glass panel (HUD panels) ─────────────────────────────── */
+.glass-panel {
+  background: rgba(26, 31, 41, 0.82);
+  border: 1px solid rgba(200, 155, 60, 0.15);
+  border-radius: 0.75rem;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+/* ─── Action buttons ───────────────────────────────────────── */
+.action-btn {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.18s ease;
+  border-radius: 0.5rem;
+}
+
+.action-btn:hover:not(:disabled)::after {
+  opacity: 1;
+}
+
+.action-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(255,255,255,0.1) 0%, transparent 65%);
+  opacity: 0;
+  transition: opacity 0.18s;
+  border-radius: inherit;
+}
+
+.action-btn:hover:not(:disabled) {
+  box-shadow: 0 0 12px rgba(200, 155, 60, 0.2);
+}
+
+.action-btn:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+/* ─── Gold glow text ───────────────────────────────────────── */
+.gold-text {
+  background: linear-gradient(135deg, #c89b3c 0%, #f0d060 50%, #c89b3c 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
 
 .logo-glow {
   text-shadow:
-    0 0 20px rgba(179, 18, 47, 0.5),
-    0 0 60px rgba(179, 18, 47, 0.2),
-    0 0 100px rgba(179, 18, 47, 0.1);
+    0 0 20px rgba(200, 155, 60, 0.4),
+    0 0 60px rgba(200, 155, 60, 0.15);
 }
 
 .gold-glow {
   text-shadow:
-    0 0 10px rgba(212, 175, 55, 0.4),
-    0 0 30px rgba(212, 175, 55, 0.15);
+    0 0 10px rgba(200, 155, 60, 0.4),
+    0 0 30px rgba(200, 155, 60, 0.15);
 }
 
-/* ─── Narration message animations ─────────────────────── */
-@keyframes message-in {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-.message-in {
-  animation: message-in 0.4s ease-out both;
-}
-
-/* Typewriter for new narration messages */
-@keyframes type-reveal {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
-/* ─── Mic button states ─────────────────────────────────── */
+/* ─── Mic button states ────────────────────────────────────── */
 @keyframes mic-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(179, 18, 47, 0.7); }
-  50%       { box-shadow: 0 0 0 16px rgba(179, 18, 47, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(139, 30, 30, 0.7); }
+  50%       { box-shadow: 0 0 0 14px rgba(139, 30, 30, 0); }
 }
 
 @keyframes speaking-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.6); }
-  50%       { box-shadow: 0 0 0 12px rgba(59, 130, 246, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(58, 134, 255, 0.5); }
+  50%       { box-shadow: 0 0 0 10px rgba(58, 134, 255, 0); }
 }
 
-.mic-listening {
-  animation: mic-pulse 1.2s ease-in-out infinite;
-}
+.mic-listening { animation: mic-pulse 1.2s ease-in-out infinite; }
+.mic-speaking  { animation: speaking-pulse 1.8s ease-in-out infinite; }
 
-.mic-speaking {
-  animation: speaking-pulse 1.8s ease-in-out infinite;
-}
-
-/* ─── HP/MP/XP bar animations ──────────────────────────── */
-@keyframes bar-fill {
-  from { width: 0%; }
-}
-
+/* ─── Stat bar ─────────────────────────────────────────────── */
 .stat-bar-fill {
   transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* ─── Intro scene ──────────────────────────────────────── */
+/* ─── Command input ────────────────────────────────────────── */
+.command-input {
+  border-radius: 0.5rem;
+  transition: all 0.18s ease;
+}
+
+.command-input:focus {
+  box-shadow:
+    0 0 0 1px rgba(200, 155, 60, 0.45),
+    0 0 18px rgba(200, 155, 60, 0.1);
+  border-color: rgba(200, 155, 60, 0.5) !important;
+  outline: none;
+}
+
+/* ─── Narration message entrance ───────────────────────────── */
+@keyframes message-in {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Rune divider ─────────────────────────────────────────── */
+.rune-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: rgba(200, 155, 60, 0.4);
+  font-family: 'Cinzel', serif;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+.rune-divider::before, .rune-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(200,155,60,0.25), transparent);
+}
+
+/* ─── Fog / intro ──────────────────────────────────────────── */
 @keyframes fog-drift {
   0%   { transform: translateX(-5%) scale(1.05); opacity: 0.4; }
   50%  { transform: translateX(5%) scale(1.1);  opacity: 0.6; }
@@ -198,78 +414,4 @@
   background: radial-gradient(ellipse at 50% 80%, rgba(40,10,10,0.8) 0%, transparent 70%);
   animation: fog-drift 12s ease-in-out infinite;
   pointer-events: none;
-}
-
-@keyframes ember-float {
-  0%   { transform: translateY(0) translateX(0); opacity: 0; }
-  20%  { opacity: 0.6; }
-  80%  { opacity: 0.3; }
-  100% { transform: translateY(-120px) translateX(30px); opacity: 0; }
-}
-
-/* ─── Separator divider ─────────────────────────────────── */
-.rune-divider {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  color: hsl(var(--primary) / 0.4);
-  font-family: 'Cinzel', serif;
-  font-size: 11px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-}
-.rune-divider::before,
-.rune-divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: linear-gradient(to right, transparent, hsl(var(--primary) / 0.25), transparent);
-}
-
-/* ─── Button effects ────────────────────────────────────── */
-.action-btn {
-  position: relative;
-  overflow: hidden;
-  transition: all 0.2s ease;
-}
-.action-btn::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at center, rgba(255,255,255,0.08) 0%, transparent 70%);
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-.action-btn:hover::after { opacity: 1; }
-.action-btn:active { transform: scale(0.96); }
-
-/* ─── Panel glass effect ────────────────────────────────── */
-.glass-panel {
-  background: linear-gradient(135deg, rgba(255,255,255,0.02) 0%, transparent 100%);
-  border: 1px solid hsl(var(--border));
-  backdrop-filter: blur(2px);
-}
-
-/* ─── Input focus glow ──────────────────────────────────── */
-.command-input:focus {
-  box-shadow: 0 0 0 1px hsl(var(--primary) / 0.4), 0 0 20px rgba(179, 18, 47, 0.1);
-  border-color: hsl(var(--primary) / 0.6);
-  outline: none;
-}
-
-/* ─── Scanning line (very subtle) ──────────────────────── */
-@keyframes scanline-move {
-  0%   { transform: translateY(-100%); }
-  100% { transform: translateY(100vh); }
-}
-
-.scanline-overlay {
-  position: fixed;
-  top: 0; left: 0;
-  width: 100vw; height: 6vh;
-  background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.015) 50%, transparent);
-  pointer-events: none;
-  z-index: 50;
-  opacity: 0.5;
-  animation: scanline-move 14s linear infinite;
 }
