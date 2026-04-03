@@ -1,0 +1,159 @@
+You are a senior frontend + voice UX engineer.
+
+Implement a fully voice-controlled onboarding system for "Dora Dungeons" with automatic TTS narration and continuous speech recognition. No manual input or buttons should be required.
+
+---
+
+## GOAL
+
+Users must be able to:
+
+* Navigate login/signup using voice only
+* Fill form fields using speech
+* Complete authentication hands-free
+
+---
+
+## GLOBAL RULES
+
+* Auto-start TTS on app load
+* Auto-start microphone after TTS finishes
+* No "start voice input" button
+* Use continuous speech recognition
+* Use an IntentProcessor to map speech → commands
+* Do NOT break existing auth logic
+* Remove password field (email-only auth)
+
+---
+
+## INITIAL FLOW (BEFORE AUTH)
+
+On app load:
+
+1. Speak (clear female voice):
+   "Welcome to Dora Dungeons. Do you wish to create a new account, or continue with an existing one?"
+
+2. Start listening immediately after speech ends
+
+---
+
+## SCENARIO 1 — CREATE ACCOUNT
+
+If user says: "create account", "sign up", etc:
+
+1. Navigate to Sign Up page
+
+2. Speak:
+   "Let us begin your journey. What name shall your character be known by?"
+
+3. Listen → capture name
+   → Auto-fill name field
+
+4. Speak:
+   "Character name recorded. Now, speak the email address you would like to link to your account."
+
+5. Listen → capture email
+   → Normalize speech-to-email (e.g. "john dot doe at gmail dot com")
+   → Auto-fill email field
+
+6. Speak:
+   "Your email has been recorded. Shall I proceed to create your account?"
+
+7. If user says YES:
+   → Call signup API
+   → On success:
+   Speak:
+   "Your account has been created. Entering the dungeon now."
+   → Navigate into game
+
+8. If user says NO:
+   → Cancel process
+   → Speak:
+   "Account creation cancelled. You may start again at any time."
+
+---
+
+## SCENARIO 2 — LOGIN
+
+If user says: "log in", "login", "continue":
+
+1. Navigate to Login page
+
+2. Speak:
+   "Please say the email associated with your account."
+
+3. Listen → capture email
+   → Normalize + auto-fill email field
+
+4. Speak:
+   "Email received. Shall I proceed to enter the dungeon?"
+
+5. If user says YES:
+   → Call login API
+   → On success:
+   Speak:
+   "Welcome back. Restoring your journey."
+   → Load saved game state
+   → Navigate into game
+
+6. If user says NO:
+   → Cancel process
+   → Speak:
+   "Login cancelled. Awaiting your command."
+
+---
+
+## VOICE SYSTEM REQUIREMENTS
+
+1. TTS (AudioManager)
+
+* Clear, natural female voice
+* Slightly slowed rate (0.9–1.0)
+* Interrupt previous speech on new actions
+
+2. Speech Recognition (useVoiceInput)
+
+* Continuous mode
+* Auto-restart on silence
+* Ignore system TTS playback (prevent feedback loop)
+
+3. Intent Processing
+   Map phrases like:
+
+* "create account" → SIGNUP
+* "log in" → LOGIN
+* "yes" → CONFIRM
+* "no" → CANCEL
+
+---
+
+## FORM INTEGRATION
+
+* Programmatically fill inputs
+* Trigger validation automatically
+* No manual typing required
+
+---
+
+## ERROR HANDLING
+
+* If speech unclear:
+  Speak: "I did not catch that. Please repeat."
+
+* If email invalid:
+  Speak: "That email does not appear valid. Please say it again clearly."
+
+---
+
+## OUTPUT
+
+* Voice-driven onboarding flow
+* Updated Login & Signup screens (voice-controlled)
+* IntentProcessor updates
+* AudioManager + SpeechRecognition integration
+
+---
+
+## STOP AFTER THIS STEP
+
+Do NOT implement voice settings or gameplay changes yet

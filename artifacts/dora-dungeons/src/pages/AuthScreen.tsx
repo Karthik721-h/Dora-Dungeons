@@ -1,194 +1,593 @@
-import { useState, useRef, useEffect } from "react";
-import { Loader2 } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Loader2, Mic, MicOff, Volume2 } from "lucide-react";
 import type { UseJwtAuth } from "@/hooks/useJwtAuth";
+import { AudioManager } from "@/audio/AudioManager";
+import { useVoiceInput } from "@/hooks/useVoiceInput";
+import { normalizeEmailSpeech, isValidEmail } from "@/audio/emailNormalizer";
 
 interface AuthScreenProps {
   auth: UseJwtAuth;
 }
 
-type Mode = "login" | "signup";
+// ── Flow step type ────────────────────────────────────────────────────────────
+type Step =
+  | "welcome"
+  | "signup_name"
+  | "signup_email"
+  | "signup_confirm"
+  | "login_email"
+  | "login_confirm"
+  | "processing";
 
+// ── Step labels shown to the user ────────────────────────────────────────────
+const STEP_LABEL: Record<Step, string> = {
+  welcome:        "Say 'create account' or 'log in'",
+  signup_name:    "Say your character's name",
+  signup_email:   "Say your email address",
+  signup_confirm: "Say 'yes' to confirm or 'no' to cancel",
+  login_email:    "Say your email address",
+  login_confirm:  "Say 'yes' to enter or 'no' to cancel",
+  processing:     "Please wait…",
+};
+
+// ── Intent helpers ────────────────────────────────────────────────────────────
+const isSignup  = (t: string) => /create|sign.?up|new account|register|begin|new|start/i.test(t);
+const isLogin   = (t: string) => /log.?in|login|continue|existing|sign.?in|enter/i.test(t);
+const isYes     = (t: string) => /^(yes|yeah|yep|correct|confirm|proceed|create|go|sure|do it|absolutely|affirmative)$/i.test(t.trim());
+const isNo      = (t: string) => /^(no|nope|cancel|stop|wrong|incorrect|start over|restart|negative|never mind)$/i.test(t.trim());
+
+// ── Component ─────────────────────────────────────────────────────────────────
 export function AuthScreen({ auth }: AuthScreenProps) {
-  const [mode, setMode] = useState<Mode>("login");
-  const [email, setEmail] = useState("");
-  const [firstName, setFirstName] = useState("");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+  // ── Voice-mode state ──────────────────────────────────────────────────────
+  const [step, setStep] = useState<Step>("welcome");
+  const [capturedEmail, setCapturedEmail] = useState("");
+  const [capturedName, setCapturedName] = useState("");
+  const [voiceError, setVoiceError] = useState("");
+
+  // ── Manual fallback state ─────────────────────────────────────────────────
+  const [useManual, setUseManual] = useState(false);
+  const [manualMode, setManualMode] = useState<"login" | "signup">("login");
+  const [manualEmail, setManualEmail] = useState("");
+  const [manualName, setManualName] = useState("");
+  const [manualBusy, setManualBusy] = useState(false);
+  const [manualError, setManualError] = useState("");
   const emailRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    emailRef.current?.focus();
-  }, [mode]);
+  // ── Always-fresh refs for use inside speech callbacks ─────────────────────
+  const stepRef         = useRef<Step>("welcome");
+  const capturedEmailRef = useRef("");
+  const capturedNameRef  = useRef("");
+  stepRef.current         = step;
+  capturedEmailRef.current = capturedEmail;
+  capturedNameRef.current  = capturedName;
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError("");
-    setBusy(true);
+  // Forward-ref for speakThenListen — set after hook init
+  const speakThenListenRef = useRef<(msg: string) => void>(() => {});
+  const doLoginRef         = useRef<() => void>(() => {});
+  const doSignupRef        = useRef<() => void>(() => {});
+  const hasStartedRef      = useRef(false);
+
+  // ── Transcript handler — all deps via refs (zero stale closures) ──────────
+  const handleTranscript = useCallback((raw: string) => {
+    const text = raw.trim();
+    const lower = text.toLowerCase();
+    const s = speakThenListenRef.current;
+
+    switch (stepRef.current) {
+
+      case "welcome":
+        if (isSignup(lower)) {
+          setStep("signup_name");
+          s("Let us begin your journey. What name shall your character be known by? Speak any name.");
+        } else if (isLogin(lower)) {
+          setStep("login_email");
+          s("Please say the email address associated with your account.");
+        } else {
+          s("I didn't catch that. Say create account to begin a new adventure, or say log in to continue an existing one.");
+        }
+        break;
+
+      case "signup_name": {
+        if (!text) {
+          s("I didn't catch a name. Please say your character's name.");
+          break;
+        }
+        setCapturedName(text);
+        capturedNameRef.current = text;
+        setStep("signup_email");
+        s(`${text} — a fine name. Now speak the email address you would like to link to your account. Say 'dot' for periods and 'at' for the at symbol.`);
+        break;
+      }
+
+      case "signup_email": {
+        const email = normalizeEmailSpeech(raw);
+        if (isValidEmail(email)) {
+          setCapturedEmail(email);
+          capturedEmailRef.current = email;
+          setStep("signup_confirm");
+          const namePart = capturedNameRef.current
+            ? ` Your character name is ${capturedNameRef.current}.`
+            : "";
+          s(`Your email is ${email}.${namePart} Shall I create your account? Say yes to confirm, or no to start over.`);
+        } else {
+          s("That email doesn't look right. Please say your email address again — for example: name dot surname at gmail dot com.");
+        }
+        break;
+      }
+
+      case "signup_confirm":
+        if (isYes(lower)) {
+          doSignupRef.current();
+        } else if (isNo(lower)) {
+          setCapturedEmail(""); setCapturedName("");
+          setStep("welcome");
+          s("Account creation cancelled. Say create account to try again, or log in to enter the dungeon.");
+        } else {
+          s("Please say yes to create your account, or no to cancel and start over.");
+        }
+        break;
+
+      case "login_email": {
+        const email = normalizeEmailSpeech(raw);
+        if (isValidEmail(email)) {
+          setCapturedEmail(email);
+          capturedEmailRef.current = email;
+          setStep("login_confirm");
+          s(`Your email is ${email}. Shall I proceed to enter the dungeon? Say yes or no.`);
+        } else {
+          s("That email doesn't look right. Please say your email address again — for example: name at gmail dot com.");
+        }
+        break;
+      }
+
+      case "login_confirm":
+        if (isYes(lower)) {
+          doLoginRef.current();
+        } else if (isNo(lower)) {
+          setCapturedEmail("");
+          setStep("welcome");
+          s("Login cancelled. Say log in to try again, or create account to begin a new adventure.");
+        } else {
+          s("Please say yes to enter the dungeon, or no to cancel.");
+        }
+        break;
+    }
+  }, []); // zero dependencies — all reads via refs
+
+  // ── Voice input hook ──────────────────────────────────────────────────────
+  const {
+    isSupported,
+    voiceState,
+    interimTranscript,
+    startListening,
+    stopListening,
+  } = useVoiceInput({ onFinalTranscript: handleTranscript });
+
+  // ── speakThenListen helper ────────────────────────────────────────────────
+  const speakThenListen = useCallback((msg: string) => {
+    stopListening();
+    AudioManager.speak(msg, { interrupt: true });
+    AudioManager.onQueueDrained(() => startListening());
+  }, [startListening, stopListening]);
+
+  speakThenListenRef.current = speakThenListen;
+
+  // ── API: signup ───────────────────────────────────────────────────────────
+  const doSignup = useCallback(async () => {
+    const email = capturedEmailRef.current;
+    const name  = capturedNameRef.current;
+    setStep("processing");
+    stopListening();
+    AudioManager.speak("Creating your account now. One moment.", { interrupt: true });
     try {
-      if (mode === "signup") {
-        await auth.signup(email, firstName || undefined);
+      await auth.signup(email, name || undefined);
+      AudioManager.speak("Your account has been created. Entering the dungeon now.", { interrupt: true });
+    } catch (err: any) {
+      if (err?.data?.error === "EMAIL_TAKEN") {
+        setStep("login_confirm");
+        speakThenListenRef.current(
+          "An account with that email already exists. Say yes to log in instead, or no to try a different email."
+        );
       } else {
-        await auth.login(email);
+        setVoiceError(err.message ?? "Something went wrong.");
+        setStep("welcome");
+        speakThenListenRef.current(
+          "There was a problem creating your account. Say create account to try again, or log in to enter."
+        );
+      }
+    }
+  }, [auth, stopListening]);
+
+  doSignupRef.current = doSignup;
+
+  // ── API: login ────────────────────────────────────────────────────────────
+  const doLogin = useCallback(async () => {
+    const email = capturedEmailRef.current;
+    setStep("processing");
+    stopListening();
+    AudioManager.speak("Logging in. One moment.", { interrupt: true });
+    try {
+      await auth.login(email);
+      AudioManager.speak("Welcome back. Restoring your journey.", { interrupt: true });
+    } catch (err: any) {
+      if (err?.data?.error === "NOT_FOUND") {
+        setStep("signup_confirm");
+        setCapturedName("");
+        speakThenListenRef.current(
+          "No account was found with that email. Say yes to create a new account with it, or no to try a different email."
+        );
+      } else {
+        setVoiceError(err.message ?? "Something went wrong.");
+        setStep("welcome");
+        speakThenListenRef.current(
+          "There was a problem logging in. Say log in to try again, or create account to begin anew."
+        );
+      }
+    }
+  }, [auth, stopListening]);
+
+  doLoginRef.current = doLogin;
+
+  // ── Auto-start voice on mount ─────────────────────────────────────────────
+  useEffect(() => {
+    if (hasStartedRef.current || !isSupported) return;
+    hasStartedRef.current = true;
+    AudioManager.initializeVoices();
+    const t = setTimeout(() => {
+      speakThenListen(
+        "Welcome to Dora Dungeons. Would you like to create a new account, or log in to an existing one?"
+      );
+    }, 700);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Switch to manual mode if voice not supported
+  useEffect(() => {
+    if (!isSupported) setUseManual(true);
+  }, [isSupported]);
+
+  // When switching back to voice mode, restart from welcome
+  const handleSwitchToVoice = () => {
+    setUseManual(false);
+    setStep("welcome");
+    setCapturedEmail(""); setCapturedName("");
+    hasStartedRef.current = false;
+    setTimeout(() => {
+      if (!hasStartedRef.current) {
+        hasStartedRef.current = true;
+        speakThenListen(
+          "Voice mode active. Say create account to begin, or log in to continue."
+        );
+      }
+    }, 200);
+  };
+
+  // Cleanup TTS on unmount
+  useEffect(() => () => { AudioManager.stop(); }, []);
+
+  // ── Manual submit ─────────────────────────────────────────────────────────
+  async function handleManualSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setManualError(""); setManualBusy(true);
+    try {
+      if (manualMode === "signup") {
+        await auth.signup(manualEmail, manualName || undefined);
+      } else {
+        await auth.login(manualEmail);
       }
     } catch (err: any) {
-      setError(err.message ?? "Something went wrong.");
+      setManualError(err.message ?? "Something went wrong.");
     } finally {
-      setBusy(false);
+      setManualBusy(false);
     }
   }
 
-  const tagline = mode === "login"
-    ? "Speak, and the dungeon shall answer"
-    : "Your legend begins here";
+  useEffect(() => {
+    if (useManual) emailRef.current?.focus();
+  }, [useManual, manualMode]);
 
+  // ── Mic indicator colour ──────────────────────────────────────────────────
+  const micColor =
+    step === "processing" ? "rgba(200,155,60,0.6)"
+    : voiceState === "listening"   ? "#34d399"
+    : voiceState === "speaking"    ? "#3a86ff"
+    : voiceState === "processing"  ? "#c89b3c"
+    : "rgba(200,185,160,0.25)";
+
+  // ────────────────────────────────────────────────────────────────────────────
   return (
     <div
       className="min-h-screen w-full flex flex-col items-center justify-center px-4 relative overflow-hidden"
       style={{ background: "#060810" }}
     >
-      {/* ── Dungeon background ── */}
+      {/* Backgrounds */}
       <div className="dungeon-bg" />
-
-      {/* ── Strong vignette ── */}
       <div className="vignette" />
-
-      {/* ── Torch flicker light (left + right walls) ── */}
       <div className="auth-torch-light" />
-
-      {/* ── Atmospheric fog at floor ── */}
       <div className="auth-fog" />
-
-      {/* ── Scanline ── */}
       <div className="scanline-overlay" />
 
       {/* ── Panel ── */}
       <motion.div
         className="auth-panel"
-        initial={{ opacity: 0, y: 24, scale: 0.97 }}
+        initial={{ opacity: 0, y: 28, scale: 0.96 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
       >
         {/* Logo */}
-        <div className="flex flex-col items-center mb-7">
+        <div className="flex flex-col items-center mb-5">
           <img
             src={`${import.meta.env.BASE_URL}images/logo.png`}
             alt="Dora Dungeons"
-            className="auth-logo w-28 h-28 object-contain mb-4"
+            className="auth-logo w-24 h-24 object-contain mb-3"
           />
-
-          {/* Tagline */}
-          <AnimatePresence mode="wait">
-            <motion.p
-              key={tagline}
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.3 }}
-              style={{
-                fontFamily: "'Crimson Text', serif",
-                fontStyle: "italic",
-                fontSize: "0.95rem",
-                color: "rgba(200,175,130,0.55)",
-                letterSpacing: "0.04em",
-                textAlign: "center",
-              }}
-            >
-              {tagline}
-            </motion.p>
-          </AnimatePresence>
+          <p style={{
+            fontFamily: "'Crimson Text', serif",
+            fontStyle: "italic",
+            fontSize: "0.9rem",
+            color: "rgba(200,175,130,0.5)",
+            letterSpacing: "0.04em",
+          }}>
+            Speak, and the dungeon shall answer
+          </p>
         </div>
 
-        {/* Rune divider */}
-        <div className="auth-divider mb-6">⬡</div>
+        <div className="auth-divider mb-5">⬡</div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
+        {/* ── VOICE MODE ── */}
+        {!useManual && (
+          <div className="flex flex-col items-center gap-4">
 
-          {/* Name (signup only) */}
-          <AnimatePresence>
-            {mode === "signup" && (
+            {/* Mic circle + step label */}
+            <div className="flex flex-col items-center gap-2">
               <motion.div
-                className="auth-field"
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.28 }}
+                animate={{
+                  boxShadow: voiceState === "listening"
+                    ? ["0 0 0 0 rgba(52,211,153,0.5)", "0 0 0 14px rgba(52,211,153,0)", "0 0 0 0 rgba(52,211,153,0.5)"]
+                    : voiceState === "speaking"
+                    ? ["0 0 0 0 rgba(58,134,255,0.5)", "0 0 0 12px rgba(58,134,255,0)", "0 0 0 0 rgba(58,134,255,0.5)"]
+                    : "none",
+                }}
+                transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+                style={{
+                  width: 56, height: 56,
+                  borderRadius: "50%",
+                  background: "rgba(16,20,28,0.9)",
+                  border: `2px solid ${micColor}`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  transition: "border-color 0.3s ease",
+                }}
               >
-                <label className="auth-label" htmlFor="dd-firstName">
-                  Name (optional)
-                </label>
-                <input
-                  id="dd-firstName"
-                  type="text"
-                  autoComplete="given-name"
-                  value={firstName}
-                  onChange={e => setFirstName(e.target.value)}
-                  placeholder="Adventurer"
-                  className="auth-input"
-                  disabled={busy}
-                />
+                {step === "processing" || voiceState === "processing"
+                  ? <Loader2 size={22} className="animate-spin" style={{ color: micColor }} />
+                  : voiceState === "listening" || voiceState === "speaking"
+                  ? <Mic size={22} style={{ color: micColor }} />
+                  : <MicOff size={22} style={{ color: micColor }} />
+                }
               </motion.div>
-            )}
-          </AnimatePresence>
 
-          {/* Email */}
-          <div className="auth-field">
-            <label className="auth-label" htmlFor="dd-email">Email</label>
-            <input
-              ref={emailRef}
-              id="dd-email"
-              type="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="hero@dungeon.com"
-              className="auth-input"
-              disabled={busy}
-            />
-          </div>
+              {/* Step instruction */}
+              <AnimatePresence mode="wait">
+                <motion.p
+                  key={step}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.25 }}
+                  style={{
+                    fontFamily: "'Cinzel', serif",
+                    fontWeight: 700,
+                    fontSize: "0.7rem",
+                    letterSpacing: "0.18em",
+                    textTransform: "uppercase",
+                    color: step === "processing" ? "rgba(200,155,60,0.7)" : "rgba(200,185,160,0.7)",
+                    textAlign: "center",
+                  }}
+                >
+                  {STEP_LABEL[step]}
+                </motion.p>
+              </AnimatePresence>
+            </div>
 
-          {/* Error */}
-          <AnimatePresence>
-            {error && (
-              <motion.p
-                className="auth-error"
-                role="alert"
-                initial={{ opacity: 0, y: -4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.22 }}
-              >
-                ⚠ {error}
-              </motion.p>
-            )}
-          </AnimatePresence>
+            {/* Interim transcript — what the mic is hearing */}
+            <AnimatePresence>
+              {interimTranscript && (
+                <motion.p
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  style={{
+                    fontFamily: "'Crimson Text', serif",
+                    fontStyle: "italic",
+                    fontSize: "1rem",
+                    color: "rgba(200,185,160,0.45)",
+                    textAlign: "center",
+                    maxWidth: "100%",
+                    wordBreak: "break-word",
+                  }}
+                >
+                  "{interimTranscript}"
+                </motion.p>
+              )}
+            </AnimatePresence>
 
-          {/* Submit */}
-          <button
-            type="submit"
-            disabled={busy}
-            className="auth-btn flex items-center justify-center gap-2 mt-1"
-          >
-            {busy && <Loader2 className="w-4 h-4 animate-spin" />}
-            {mode === "login" ? "Enter the Dungeon" : "Begin Your Quest"}
-          </button>
+            {/* Captured values display */}
+            <AnimatePresence>
+              {(capturedName || capturedEmail) && (
+                <motion.div
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="w-full flex flex-col gap-2"
+                >
+                  {capturedName && (
+                    <div className="flex items-center gap-2 px-3 py-2"
+                      style={{
+                        background: "rgba(200,155,60,0.07)",
+                        border: "1px solid rgba(200,155,60,0.2)",
+                        borderRadius: "0.5rem",
+                      }}
+                    >
+                      <span style={{ fontFamily: "'Fira Code', monospace", fontSize: "0.65rem", color: "rgba(200,155,60,0.5)", letterSpacing: "0.15em", textTransform: "uppercase", flexShrink: 0 }}>
+                        NAME
+                      </span>
+                      <span style={{ fontFamily: "'Crimson Text', serif", fontSize: "1rem", color: "#e8dcc8" }}>
+                        {capturedName}
+                      </span>
+                    </div>
+                  )}
+                  {capturedEmail && (
+                    <div className="flex items-center gap-2 px-3 py-2"
+                      style={{
+                        background: "rgba(200,155,60,0.07)",
+                        border: "1px solid rgba(200,155,60,0.2)",
+                        borderRadius: "0.5rem",
+                      }}
+                    >
+                      <span style={{ fontFamily: "'Fira Code', monospace", fontSize: "0.65rem", color: "rgba(200,155,60,0.5)", letterSpacing: "0.15em", textTransform: "uppercase", flexShrink: 0 }}>
+                        EMAIL
+                      </span>
+                      <span style={{ fontFamily: "'Fira Code', monospace", fontSize: "0.82rem", color: "#e8dcc8" }}>
+                        {capturedEmail}
+                      </span>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-          {/* Switch mode */}
-          <div className="flex items-center justify-center gap-2 mt-1">
-            <span className="auth-mode-label">
-              {mode === "login" ? "No Account?" : "Already a member?"}
-            </span>
+            {/* Error */}
+            <AnimatePresence>
+              {voiceError && (
+                <motion.p
+                  className="auth-error text-center"
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                >
+                  ⚠ {voiceError}
+                </motion.p>
+              )}
+            </AnimatePresence>
+
+            {/* Switch to manual */}
             <button
               type="button"
-              onClick={() => { setMode(m => m === "login" ? "signup" : "login"); setError(""); }}
-              className="auth-mode-btn"
+              onClick={() => { stopListening(); AudioManager.stop(); setUseManual(true); }}
+              style={{
+                marginTop: "0.5rem",
+                background: "none", border: "none", cursor: "pointer",
+                fontFamily: "'Cinzel', serif",
+                fontSize: "0.65rem",
+                letterSpacing: "0.14em",
+                textTransform: "uppercase",
+                color: "rgba(200,155,60,0.3)",
+                transition: "color 0.2s",
+              }}
+              onMouseEnter={e => (e.currentTarget.style.color = "rgba(200,155,60,0.7)")}
+              onMouseLeave={e => (e.currentTarget.style.color = "rgba(200,155,60,0.3)")}
             >
-              {mode === "login" ? "Create Account" : "Sign In"}
+              Switch to manual input
             </button>
           </div>
-        </form>
+        )}
+
+        {/* ── MANUAL FALLBACK MODE ── */}
+        {useManual && (
+          <form onSubmit={handleManualSubmit} noValidate className="flex flex-col gap-4">
+            {manualMode === "signup" && (
+              <div className="auth-field">
+                <label className="auth-label" htmlFor="dd-name">Name (optional)</label>
+                <input
+                  id="dd-name"
+                  type="text"
+                  autoComplete="given-name"
+                  value={manualName}
+                  onChange={e => setManualName(e.target.value)}
+                  placeholder="Adventurer"
+                  className="auth-input"
+                  disabled={manualBusy}
+                />
+              </div>
+            )}
+
+            <div className="auth-field">
+              <label className="auth-label" htmlFor="dd-email">Email</label>
+              <input
+                ref={emailRef}
+                id="dd-email"
+                type="email"
+                autoComplete="email"
+                required
+                value={manualEmail}
+                onChange={e => setManualEmail(e.target.value)}
+                placeholder="hero@dungeon.com"
+                className="auth-input"
+                disabled={manualBusy}
+              />
+            </div>
+
+            <AnimatePresence>
+              {manualError && (
+                <motion.p
+                  className="auth-error"
+                  role="alert"
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                >
+                  ⚠ {manualError}
+                </motion.p>
+              )}
+            </AnimatePresence>
+
+            <button
+              type="submit"
+              disabled={manualBusy}
+              className="auth-btn flex items-center justify-center gap-2 mt-1"
+            >
+              {manualBusy && <Loader2 className="w-4 h-4 animate-spin" />}
+              {manualMode === "login" ? "Enter the Dungeon" : "Begin Your Quest"}
+            </button>
+
+            {/* Mode switch */}
+            <div className="flex items-center justify-center gap-2 mt-1">
+              <span className="auth-mode-label">
+                {manualMode === "login" ? "No Account?" : "Already a member?"}
+              </span>
+              <button
+                type="button"
+                onClick={() => { setManualMode(m => m === "login" ? "signup" : "login"); setManualError(""); }}
+                className="auth-mode-btn"
+              >
+                {manualMode === "login" ? "Create Account" : "Sign In"}
+              </button>
+            </div>
+
+            {/* Back to voice */}
+            {isSupported && (
+              <button
+                type="button"
+                onClick={handleSwitchToVoice}
+                style={{
+                  background: "none", border: "none", cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: "0.35rem",
+                  fontFamily: "'Cinzel', serif",
+                  fontSize: "0.65rem",
+                  letterSpacing: "0.14em",
+                  textTransform: "uppercase",
+                  color: "rgba(200,155,60,0.35)",
+                  transition: "color 0.2s",
+                  marginTop: "0.25rem",
+                }}
+                onMouseEnter={e => (e.currentTarget.style.color = "rgba(200,155,60,0.75)")}
+                onMouseLeave={e => (e.currentTarget.style.color = "rgba(200,155,60,0.35)")}
+              >
+                <Volume2 size={11} /> Switch to voice mode
+              </button>
+            )}
+          </form>
+        )}
       </motion.div>
     </div>
   );
