@@ -18,8 +18,8 @@ interface AuthState {
 }
 
 export interface UseJwtAuth extends AuthState {
-  signup: (email: string, password: string, firstName?: string) => Promise<void>;
-  login: (email: string, password: string) => Promise<void>;
+  signup: (email: string, firstName?: string) => Promise<void>;
+  login: (email: string) => Promise<void>;
   logout: () => void;
   authHeader: () => Record<string, string>;
 }
@@ -59,21 +59,21 @@ export function useJwtAuth(): UseJwtAuth {
       });
   }, []);
 
-  const signup = useCallback(async (email: string, password: string, firstName?: string) => {
+  const signup = useCallback(async (email: string, firstName?: string) => {
     const data = await apiFetch("/api/auth/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, firstName }),
+      body: JSON.stringify({ email, firstName }),
     });
     localStorage.setItem(TOKEN_KEY, data.token);
     setState({ user: data.user, token: data.token, isLoading: false, isAuthenticated: true });
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
+  const login = useCallback(async (email: string) => {
     const data = await apiFetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email }),
     });
     localStorage.setItem(TOKEN_KEY, data.token);
     setState({ user: data.user, token: data.token, isLoading: false, isAuthenticated: true });

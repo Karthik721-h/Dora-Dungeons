@@ -12,7 +12,6 @@ type Mode = "login" | "signup";
 export function AuthScreen({ auth }: AuthScreenProps) {
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -28,9 +27,9 @@ export function AuthScreen({ auth }: AuthScreenProps) {
     setBusy(true);
     try {
       if (mode === "signup") {
-        await auth.signup(email, password, firstName || undefined);
+        await auth.signup(email, firstName || undefined);
       } else {
-        await auth.login(email, password);
+        await auth.login(email);
       }
     } catch (err: any) {
       setError(err.message ?? "Something went wrong.");
@@ -145,23 +144,6 @@ export function AuthScreen({ auth }: AuthScreenProps) {
               value={email}
               onChange={e => setEmail(e.target.value)}
               placeholder="hero@dungeon.com"
-              className="auth-input"
-              disabled={busy}
-            />
-          </div>
-
-          {/* Password */}
-          <div className="auth-field">
-            <label className="auth-label" htmlFor="dd-password">Password</label>
-            <input
-              id="dd-password"
-              type="password"
-              autoComplete={mode === "signup" ? "new-password" : "current-password"}
-              required
-              minLength={8}
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder={mode === "signup" ? "At least 8 characters" : "• • • • • • • •"}
               className="auth-input"
               disabled={busy}
             />
