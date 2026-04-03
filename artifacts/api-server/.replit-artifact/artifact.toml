@@ -10,7 +10,7 @@ name = "API Server"
 paths = ["/api"]
 
 [services.development]
-run = "pnpm --filter @workspace/api-server run dev"
+run = "bash -c 'trap \"\" SIGTERM; fuser -k 8080/tcp 2>/dev/null || true; export NODE_ENV=development; pnpm --filter @workspace/api-server run build && while true; do pnpm --filter @workspace/api-server run start; echo \"[api-server] restarting...\"; sleep 1; done'"
 
 [services.production]
 
