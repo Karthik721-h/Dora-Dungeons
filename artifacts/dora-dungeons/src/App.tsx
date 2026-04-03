@@ -1,13 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import { Switch, Route, Router as WouterRouter } from "wouter";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { StartScreen } from "@/pages/StartScreen";
 import { GameScreen } from "@/pages/GameScreen";
 import { AuthScreen } from "@/pages/AuthScreen";
 import { IntroScene } from "@/components/IntroScene";
-import { useGetGameState, getGetGameStateQueryKey } from "@workspace/api-client-react";
+import { useGetGameState, useStartGame, getGetGameStateQueryKey } from "@workspace/api-client-react";
 import { useJwtAuth } from "@/hooks/useJwtAuth";
 import { Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -28,14 +27,35 @@ const queryClient = new QueryClient({
 const INTRO_SEEN_KEY = "dd_intro_seen";
 
 function GameOrchestrator({ skipIntro, onLogout, playerFirstName }: { skipIntro: boolean; onLogout: () => void; playerFirstName?: string | null }) {
-  const { data: gameState, isLoading, isError } = useGetGameState({
+  const queryClient = useQueryClient();
+  const hasStartedRef = useRef(false);
+
+  const { data: gameState, isLoading: stateLoading, isError } = useGetGameState({
     query: {
       queryKey: getGetGameStateQueryKey(),
       retry: false,
     }
   });
 
-  if (isLoading) {
+  const { mutate: startGame, isPending: isStarting, error: startError } = useStartGame({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetGameStateQueryKey() });
+      },
+    },
+  });
+
+  // When there is no existing session, auto-start immediately using the player's auth name
+  useEffect(() => {
+    if (stateLoading) return;
+    if (gameState) return;
+    if (hasStartedRef.current) return;
+    hasStartedRef.current = true;
+    startGame({ data: { playerName: playerFirstName || "Wanderer" } });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stateLoading, gameState]);
+
+  if (stateLoading || isStarting || (!gameState && !startError)) {
     return (
       <div
         className="min-h-screen w-full flex items-center justify-center"
@@ -50,25 +70,23 @@ function GameOrchestrator({ skipIntro, onLogout, playerFirstName }: { skipIntro:
             className="font-code text-xs animate-pulse tracking-widest"
             style={{ color: "rgba(200,190,180,0.3)", letterSpacing: "0.3em" }}
           >
-            CONNECTING...
+            {isError || isStarting ? "INITIALIZING SESSION..." : "CONNECTING..."}
           </p>
         </div>
       </div>
     );
   }
 
-  if (isError || !gameState) {
+  if (startError) {
     return (
-      <AnimatePresence>
-        <motion.div
-          key="start"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.6 }}
-        >
-          <StartScreen initialName={playerFirstName ?? undefined} />
-        </motion.div>
-      </AnimatePresence>
+      <div
+        className="min-h-screen w-full flex items-center justify-center"
+        style={{ background: "#09080c" }}
+      >
+        <p className="font-mono text-sm" style={{ color: "rgba(220,60,60,0.8)" }}>
+          Failed to start game session. Please refresh.
+        </p>
+      </div>
     );
   }
 
@@ -81,7 +99,7 @@ function GameOrchestrator({ skipIntro, onLogout, playerFirstName }: { skipIntro:
         transition={{ duration: 0.7 }}
         className="h-screen"
       >
-        <GameScreen gameState={gameState} onLogout={onLogout} />
+        <GameScreen gameState={gameState!} onLogout={onLogout} />
       </motion.div>
     </AnimatePresence>
   );
