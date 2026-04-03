@@ -10,27 +10,22 @@ const INTRO_NARRATION = "You descend into darkness. Ancient stones surround you.
 
 export function IntroScene({ onComplete }: IntroSceneProps) {
   const [phase, setPhase] = useState<"rising" | "held" | "exiting">("rising");
-  const [showSkip, setShowSkip] = useState(false);
   const hasSpoken = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
-    // Show skip after a brief moment
-    const skipTimer = setTimeout(() => setShowSkip(true), 800);
-
-    // Start TTS narration
+    // Start TTS narration immediately
     const narrationTimer = setTimeout(() => {
       if (!hasSpoken.current) {
         hasSpoken.current = true;
         AudioManager.speak(INTRO_NARRATION, { interrupt: true });
       }
-    }, 1200);
+    }, 600);
 
-    // Auto-advance after 7s
-    const autoTimer = setTimeout(() => handleSkip(), 7000);
+    // Auto-advance after 4s (down from 7s)
+    const autoTimer = setTimeout(() => handleSkip(), 4000);
 
     return () => {
-      clearTimeout(skipTimer);
       clearTimeout(narrationTimer);
       clearTimeout(autoTimer);
     };
@@ -40,7 +35,8 @@ export function IntroScene({ onComplete }: IntroSceneProps) {
     if (phase === "exiting") return;
     AudioManager.stop();
     setPhase("exiting");
-    timerRef.current = setTimeout(onComplete, 900);
+    // Shortened exit: 500ms (was 900ms)
+    timerRef.current = setTimeout(onComplete, 500);
   };
 
   return (
@@ -51,7 +47,7 @@ export function IntroScene({ onComplete }: IntroSceneProps) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.9, ease: "easeInOut" }}
+          transition={{ duration: 0.6, ease: "easeInOut" }}
           className="fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden"
           style={{ background: "#07060a" }}
         >
@@ -84,12 +80,11 @@ export function IntroScene({ onComplete }: IntroSceneProps) {
 
           {/* Main content */}
           <div className="relative z-10 flex flex-col items-center gap-8 px-8 text-center max-w-lg">
-
             {/* Ornamental top */}
             <motion.div
               initial={{ opacity: 0, scaleX: 0 }}
               animate={{ opacity: 1, scaleX: 1 }}
-              transition={{ delay: 0.6, duration: 1.2, ease: "easeOut" }}
+              transition={{ delay: 0.3, duration: 0.9, ease: "easeOut" }}
               className="rune-divider w-64"
             >
               ✦
@@ -97,9 +92,9 @@ export function IntroScene({ onComplete }: IntroSceneProps) {
 
             {/* Logo */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3, duration: 1.4, ease: "easeOut" }}
+              transition={{ delay: 0.15, duration: 0.9, ease: "easeOut" }}
             >
               <h1
                 className="font-display text-5xl md:text-7xl font-bold tracking-widest logo-glow"
@@ -110,9 +105,9 @@ export function IntroScene({ onComplete }: IntroSceneProps) {
               <h1
                 className="font-display text-5xl md:text-7xl font-black tracking-widest"
                 style={{
-                  color: "#b3122f",
+                  color: "#8b1e1e",
                   letterSpacing: "0.1em",
-                  textShadow: "0 0 30px rgba(179,18,47,0.6), 0 0 80px rgba(179,18,47,0.2)",
+                  textShadow: "0 0 30px rgba(139,30,30,0.6), 0 0 80px rgba(139,30,30,0.2)",
                 }}
               >
                 DUNGEONS
@@ -123,9 +118,9 @@ export function IntroScene({ onComplete }: IntroSceneProps) {
             <motion.p
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ delay: 1.4, duration: 1.2 }}
+              transition={{ delay: 0.7, duration: 0.8 }}
               className="font-narration italic text-lg md:text-xl"
-              style={{ color: "rgba(212, 175, 55, 0.75)", letterSpacing: "0.05em" }}
+              style={{ color: "rgba(200,155,60,0.75)", letterSpacing: "0.05em" }}
             >
               An audio-first descent into darkness
             </motion.p>
@@ -134,40 +129,35 @@ export function IntroScene({ onComplete }: IntroSceneProps) {
             <motion.div
               initial={{ opacity: 0, scaleX: 0 }}
               animate={{ opacity: 1, scaleX: 1 }}
-              transition={{ delay: 0.8, duration: 1.2, ease: "easeOut" }}
+              transition={{ delay: 0.4, duration: 0.9, ease: "easeOut" }}
               className="rune-divider w-64"
             >
               ✦
             </motion.div>
 
-            {/* Skip button */}
-            <AnimatePresence>
-              {showSkip && (
-                <motion.button
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.5 }}
-                  onClick={handleSkip}
-                  className="mt-4 px-8 py-3 font-display text-sm tracking-widest uppercase transition-all duration-300 hover:scale-105"
-                  style={{
-                    border: "1px solid rgba(179,18,47,0.5)",
-                    color: "rgba(232,224,208,0.7)",
-                    background: "rgba(179,18,47,0.08)",
-                    letterSpacing: "0.25em",
-                  }}
-                  aria-label="Skip the intro"
-                >
-                  Enter the Dungeon
-                </motion.button>
-              )}
-            </AnimatePresence>
+            {/* Skip button — visible immediately */}
+            <motion.button
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4, duration: 0.5 }}
+              onClick={handleSkip}
+              className="mt-2 px-8 py-3 font-display text-sm tracking-widest uppercase transition-all duration-200 hover:scale-105 action-btn"
+              style={{
+                border: "1px solid rgba(139,30,30,0.5)",
+                color: "rgba(232,224,208,0.75)",
+                background: "rgba(139,30,30,0.1)",
+                letterSpacing: "0.25em",
+                borderRadius: "0.5rem",
+              }}
+              aria-label="Skip the intro and enter the dungeon"
+            >
+              Enter the Dungeon
+            </motion.button>
 
-            {/* Keyboard hint */}
             <motion.p
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ delay: 2.5, duration: 1 }}
+              transition={{ delay: 1.2, duration: 0.8 }}
               className="font-code text-xs"
               style={{ color: "rgba(200,200,200,0.2)", letterSpacing: "0.1em" }}
             >
@@ -178,9 +168,7 @@ export function IntroScene({ onComplete }: IntroSceneProps) {
           {/* Bottom vignette */}
           <div
             className="absolute bottom-0 left-0 right-0 h-32"
-            style={{
-              background: "linear-gradient(to top, rgba(7,6,10,0.9), transparent)",
-            }}
+            style={{ background: "linear-gradient(to top, rgba(7,6,10,0.9), transparent)" }}
           />
         </motion.div>
       ) : (
@@ -188,7 +176,7 @@ export function IntroScene({ onComplete }: IntroSceneProps) {
           key="fade-out"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: 0.9 }}
+          transition={{ duration: 0.5 }}
           className="fixed inset-0 z-50"
           style={{ background: "#07060a" }}
         />

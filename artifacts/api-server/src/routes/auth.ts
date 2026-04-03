@@ -6,7 +6,7 @@ import { signJwt } from "../lib/auth.js";
 import { requireAuth } from "../middlewares/authMiddleware.js";
 
 const router: IRouter = Router();
-const SALT_ROUNDS = 12;
+const SALT_ROUNDS = 10;
 
 router.post("/auth/signup", async (req: Request, res: Response) => {
   const { email, password, firstName, lastName } = req.body ?? {};

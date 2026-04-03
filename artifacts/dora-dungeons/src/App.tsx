@@ -162,7 +162,7 @@ function App() {
               key="main"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ duration: 0.8 }}
+              transition={{ duration: 0.35 }}
               className="h-screen"
             >
               <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
