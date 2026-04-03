@@ -68,6 +68,11 @@ export function AuthScreen({ auth }: AuthScreenProps) {
   const doSignupRef        = useRef<() => void>(() => {});
   const hasStartedRef      = useRef(false);
 
+  // ── Audio unlock gate ─────────────────────────────────────────────────────
+  // Browsers block Web Speech API until a user gesture occurs.
+  // The gate provides that gesture on first tap/click.
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
+
   // ── Transcript handler — all deps via refs (zero stale closures) ──────────
   const handleTranscript = useCallback((raw: string) => {
     const text = raw.trim();
@@ -251,17 +256,20 @@ export function AuthScreen({ auth }: AuthScreenProps) {
 
   doLoginRef.current = doLogin;
 
-  // ── Auto-start voice on mount ─────────────────────────────────────────────
-  useEffect(() => {
-    if (hasStartedRef.current || !isSupported) return;
+  // ── Audio gate unlock handler ─────────────────────────────────────────────
+  // Called on the first tap/click (the user gesture that satisfies the browser).
+  // TTS is triggered INSIDE this click handler so the browser permits it.
+  const handleAudioUnlock = useCallback(() => {
+    if (hasStartedRef.current) return;
     hasStartedRef.current = true;
+    setAudioUnlocked(true);
     AudioManager.initializeVoices();
-    const t = setTimeout(() => {
-      speakThenListen(
+    // Small delay so React has flushed the gate removal before TTS starts
+    setTimeout(() => {
+      speakThenListenRef.current(
         "Welcome to Dora Dungeons. Would you like to create a new account, or log in to an existing one?"
       );
-    }, 700);
-    return () => clearTimeout(t);
+    }, 120);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -330,6 +338,120 @@ export function AuthScreen({ auth }: AuthScreenProps) {
       <div className="auth-torch-light" />
       <div className="auth-fog" />
       <div className="scanline-overlay" />
+
+      {/* ── Audio gate — shown until first user gesture ── */}
+      <AnimatePresence>
+        {!audioUnlocked && (
+          <motion.div
+            key="audio-gate"
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.4 }}
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 200,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "radial-gradient(ellipse at center, #0e1420 0%, #060810 100%)",
+              cursor: "pointer",
+            }}
+            onClick={handleAudioUnlock}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handleAudioUnlock(); }}
+            role="button"
+            tabIndex={0}
+            aria-label="Tap to begin Dora Dungeons"
+          >
+            <div className="dungeon-bg" style={{ opacity: 0.4 }} />
+            <div className="vignette" />
+            <div className="scanline-overlay" />
+
+            <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "2rem" }}>
+              <motion.img
+                src={`${import.meta.env.BASE_URL}images/logo.png`}
+                alt="Dora Dungeons"
+                initial={{ opacity: 0, scale: 0.88 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+                style={{ width: 120, height: 120, objectFit: "contain" }}
+              />
+
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3, duration: 0.5 }}
+                style={{ textAlign: "center" }}
+              >
+                <p style={{
+                  fontFamily: "'Cinzel', serif",
+                  fontSize: "1.5rem",
+                  fontWeight: 700,
+                  letterSpacing: "0.15em",
+                  color: "#c89b3c",
+                  textTransform: "uppercase",
+                  marginBottom: "0.5rem",
+                }}>
+                  Dora Dungeons
+                </p>
+                <p style={{
+                  fontFamily: "'Crimson Text', serif",
+                  fontStyle: "italic",
+                  fontSize: "0.95rem",
+                  color: "rgba(200,175,130,0.55)",
+                  letterSpacing: "0.04em",
+                }}>
+                  Speak, and the dungeon shall answer
+                </p>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, scale: 0.92 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.55, duration: 0.45 }}
+              >
+                <motion.button
+                  animate={{ boxShadow: ["0 0 18px rgba(200,155,60,0.25)", "0 0 32px rgba(200,155,60,0.5)", "0 0 18px rgba(200,155,60,0.25)"] }}
+                  transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+                  onClick={handleAudioUnlock}
+                  style={{
+                    fontFamily: "'Cinzel', serif",
+                    fontSize: "0.85rem",
+                    fontWeight: 700,
+                    letterSpacing: "0.22em",
+                    textTransform: "uppercase",
+                    color: "#c89b3c",
+                    background: "rgba(200,155,60,0.08)",
+                    border: "1px solid rgba(200,155,60,0.4)",
+                    borderRadius: "4px",
+                    padding: "0.85rem 2.4rem",
+                    cursor: "pointer",
+                  }}
+                >
+                  Tap to Enter
+                </motion.button>
+              </motion.div>
+
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.9, duration: 0.5 }}
+                style={{
+                  fontFamily: "'Fira Code', monospace",
+                  fontSize: "0.68rem",
+                  letterSpacing: "0.12em",
+                  color: "rgba(200,190,180,0.22)",
+                  textTransform: "uppercase",
+                  textAlign: "center",
+                }}
+              >
+                Voice narration will begin automatically
+              </motion.p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Panel ── */}
       <motion.div
