@@ -36,46 +36,34 @@
 :root {
   --background: 220 22% 5%;
   --foreground: 38 18% 88%;
-
   --card: 220 20% 7%;
   --card-foreground: 38 18% 88%;
-
   --popover: 220 20% 7%;
   --popover-foreground: 38 18% 88%;
-
-  /* Gold accent */
   --primary: 40 58% 50%;
   --primary-foreground: 0 0% 0%;
-
-  /* Dark panel */
   --secondary: 220 16% 10%;
   --secondary-foreground: 38 18% 88%;
-
   --muted: 220 14% 13%;
   --muted-foreground: 220 8% 48%;
-
   --accent: 40 58% 50%;
   --accent-foreground: 0 0% 0%;
-
   --destructive: 2 72% 34%;
   --destructive-foreground: 0 0% 100%;
-
   --border: 220 14% 16%;
   --input: 220 14% 9%;
   --ring: 40 58% 50%;
-
   --radius: 0.5rem;
 
-  /* Design tokens */
   --gold: #c89b3c;
-  --gold-dim: rgba(200, 155, 60, 0.6);
-  --gold-glow: rgba(200, 155, 60, 0.25);
+  --gold-dim: rgba(200,155,60,0.6);
+  --gold-glow: rgba(200,155,60,0.25);
   --blood: #8b1e1e;
-  --blood-glow: rgba(139, 30, 30, 0.35);
+  --blood-glow: rgba(139,30,30,0.35);
   --magic: #3a86ff;
-  --magic-glow: rgba(58, 134, 255, 0.3);
+  --magic-glow: rgba(58,134,255,0.3);
   --panel: #1a1f29;
-  --panel-border: rgba(200, 155, 60, 0.15);
+  --panel-border: rgba(200,155,60,0.15);
 }
 
 /* ─── Base ────────────────────────────────────────────────── */
@@ -92,6 +80,7 @@
     @apply antialiased bg-background text-foreground overflow-x-hidden;
     font-family: 'Crimson Text', Georgia, serif;
     font-size: 18px;
+    line-height: 1.65;
     background-color: #0b0f14;
   }
 
@@ -101,23 +90,27 @@
     text-transform: uppercase;
   }
 
-  ::-webkit-scrollbar { width: 4px; }
-  ::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); }
-  ::-webkit-scrollbar-thumb { background: rgba(200,155,60,0.25); border-radius: 2px; }
-  ::-webkit-scrollbar-thumb:hover { background: rgba(200,155,60,0.45); }
+  /* Gold-tinted scrollbar */
+  ::-webkit-scrollbar { width: 3px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: linear-gradient(to bottom, rgba(200,155,60,0.15), rgba(200,155,60,0.35));
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(200,155,60,0.55); }
 }
 
-/* ─── Typography ────────────────────────────────────────────── */
+/* ─── Typography ─────────────────────────────────────────── */
 .font-display   { font-family: 'Cinzel', serif; }
-.font-narration { font-family: 'Crimson Text', Georgia, serif; }
+.font-narration { font-family: 'Crimson Text', Georgia, serif; line-height: 1.7; }
 .font-code      { font-family: 'Fira Code', monospace; }
 
-/* ─── Dungeon background ───────────────────────────────────── */
+/* ─── Dungeon background ──────────────────────────────────── */
 .dungeon-bg {
   position: fixed;
   inset: 0;
   z-index: 0;
-  background-color: #0b0f14;
+  background-color: #060810;
   background-image: url('/images/dungeon-bg.png');
   background-size: cover;
   background-position: center;
@@ -130,36 +123,38 @@
   inset: 0;
   background: linear-gradient(
     to bottom,
-    rgba(11,15,20,0.78) 0%,
-    rgba(11,15,20,0.60) 40%,
-    rgba(11,15,20,0.85) 100%
+    rgba(6,8,16,0.88) 0%,
+    rgba(6,8,16,0.65) 35%,
+    rgba(6,8,16,0.88) 100%
   );
 }
 
-/* ─── Atmospheric overlays ─────────────────────────────────── */
+/* ─── Vignette — stronger for contrast ───────────────────── */
 .vignette {
   position: fixed;
   inset: 0;
-  background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.72) 100%);
+  background:
+    radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.82) 100%);
   pointer-events: none;
   z-index: 1;
 }
 
+/* ─── Combat overlay ─────────────────────────────────────── */
 .combat-overlay {
   position: fixed;
   inset: 0;
-  background: radial-gradient(ellipse at center, transparent 50%, rgba(139,30,30,0.28) 100%);
+  background: radial-gradient(ellipse at center, transparent 45%, rgba(139,30,30,0.32) 100%);
   pointer-events: none;
   z-index: 1;
   animation: combat-breathe 2.5s ease-in-out infinite;
 }
 
 @keyframes combat-breathe {
-  0%, 100% { opacity: 0.6; }
+  0%, 100% { opacity: 0.55; }
   50%       { opacity: 1; }
 }
 
-/* ─── Scanline ─────────────────────────────────────────────── */
+/* ─── Scanline ───────────────────────────────────────────── */
 @keyframes scanline-move {
   0%   { transform: translateY(-100%); }
   100% { transform: translateY(100vh); }
@@ -168,49 +163,54 @@
 .scanline-overlay {
   position: fixed;
   top: 0; left: 0;
-  width: 100vw; height: 6vh;
-  background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.012) 50%, transparent);
+  width: 100vw; height: 5vh;
+  background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.01) 50%, transparent);
   pointer-events: none;
   z-index: 50;
-  opacity: 0.45;
-  animation: scanline-move 16s linear infinite;
+  opacity: 0.4;
+  animation: scanline-move 18s linear infinite;
 }
 
-/* ─── Navbar ───────────────────────────────────────────────── */
+/* ─── Navbar ─────────────────────────────────────────────── */
 .dd-navbar {
   position: relative;
   z-index: 10;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.5rem 1.25rem;
-  background: rgba(11, 15, 20, 0.82);
-  border-bottom: 1px solid rgba(200, 155, 60, 0.15);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  min-height: 56px;
-  gap: 0.5rem;
+  padding: 0.5rem 1.5rem;
+  background: rgba(6, 8, 16, 0.92);
+  border-bottom: 1px solid rgba(200,155,60,0.22);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  min-height: 58px;
+  gap: 0.75rem;
+  /* Subtle gold underline glow */
+  box-shadow:
+    0 1px 0 rgba(200,155,60,0.1),
+    0 4px 24px rgba(0,0,0,0.5);
 }
 
 .dd-navbar-brand {
   display: flex;
   align-items: center;
-  gap: 0.625rem;
+  gap: 0.75rem;
   flex-shrink: 0;
   min-width: 0;
 }
 
 .dd-navbar-title {
   font-family: 'Cinzel', serif;
-  font-size: clamp(0.75rem, 2vw, 1.1rem);
+  font-size: clamp(0.85rem, 2.2vw, 1.3rem);
   font-weight: 700;
-  letter-spacing: 0.18em;
-  background: linear-gradient(135deg, #c89b3c 0%, #f0d060 50%, #c89b3c 100%);
+  letter-spacing: 0.3em;
+  background: linear-gradient(135deg, #a87830 0%, #f0d060 45%, #e8b840 75%, #a87830 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  text-shadow: none;
   white-space: nowrap;
+  /* Gold glow via filter (works with gradient text) */
+  filter: drop-shadow(0 0 8px rgba(200,155,60,0.55)) drop-shadow(0 0 22px rgba(200,155,60,0.2));
 }
 
 .dd-navbar-center {
@@ -223,108 +223,213 @@
 .dd-navbar-controls {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.625rem;
   flex-shrink: 0;
 }
 
-/* ─── Status badge ─────────────────────────────────────────── */
+/* ─── Status badge ───────────────────────────────────────── */
 .status-badge {
   font-family: 'Fira Code', monospace;
   font-size: 10px;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  padding: 3px 10px;
+  padding: 4px 12px;
   border-radius: 999px;
   border: 1px solid;
   white-space: nowrap;
+  transition: box-shadow 0.3s ease;
 }
 
-/* ─── Location strip ───────────────────────────────────────── */
+/* ─── Location strip ──────────────────────────────────────── */
 .location-strip {
   position: relative;
   z-index: 10;
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.375rem 1.25rem;
-  background: rgba(11, 15, 20, 0.65);
-  border-bottom: 1px solid rgba(200, 155, 60, 0.1);
-  backdrop-filter: blur(6px);
+  padding: 0.4rem 1.5rem;
+  background: rgba(6,8,16,0.72);
+  border-bottom: 1px solid rgba(200,155,60,0.1);
+  backdrop-filter: blur(8px);
   flex-wrap: wrap;
 }
 
-/* ─── Terminal (narration feed) ────────────────────────────── */
+/* ─── Terminal (narration feed) ──────────────────────────── */
+@keyframes terminal-shimmer {
+  0%   { transform: translate(-120%, -120%) rotate(-30deg); opacity: 0; }
+  20%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { transform: translate(120%, 120%) rotate(-30deg); opacity: 0; }
+}
+
 .terminal-panel {
-  background: rgba(11, 15, 20, 0.78);
-  border: 1px solid rgba(200, 155, 60, 0.18);
-  border-radius: 0.75rem;
-  box-shadow:
-    0 0 0 1px rgba(200, 155, 60, 0.06),
-    0 4px 32px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  position: relative;
+  background: rgba(7, 10, 17, 0.88);
+  border: 1px solid rgba(200,155,60,0.2);
+  border-radius: 0.875rem;
   overflow: hidden;
+  /* Multi-layer shadow for depth */
+  box-shadow:
+    0 0 0 1px rgba(200,155,60,0.07),
+    0 12px 48px rgba(0,0,0,0.65),
+    inset 0 1px 0 rgba(255,255,255,0.04),
+    inset 0 -32px 48px rgba(0,0,0,0.35),
+    inset 1px 0 0 rgba(200,155,60,0.04),
+    inset -1px 0 0 rgba(200,155,60,0.04);
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+}
+
+/* Slow diagonal shimmer across the terminal */
+.terminal-panel::before {
+  content: '';
+  position: absolute;
+  top: -80%; left: -80%;
+  width: 60%; height: 260%;
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgba(200,155,60,0.022) 50%,
+    transparent 60%
+  );
+  animation: terminal-shimmer 12s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
 }
 
 .terminal-header {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 1rem;
-  border-bottom: 1px solid rgba(200, 155, 60, 0.1);
-  background: rgba(200, 155, 60, 0.04);
+  border-bottom: 1px solid rgba(200,155,60,0.1);
+  background: linear-gradient(to right, rgba(200,155,60,0.06), rgba(200,155,60,0.02), transparent);
 }
 
 .terminal-dot {
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
+  box-shadow: 0 0 5px currentColor;
 }
 
-/* ─── Glass panel (HUD panels) ─────────────────────────────── */
+/* ─── Blinking cursor ─────────────────────────────────────── */
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  45%, 55% { opacity: 0; }
+}
+
+.terminal-cursor {
+  display: inline-block;
+  width: 9px;
+  height: 1.05em;
+  background: rgba(200,155,60,0.75);
+  vertical-align: text-bottom;
+  margin-left: 3px;
+  border-radius: 1px;
+  animation: cursor-blink 1.15s ease-in-out infinite;
+  box-shadow: 0 0 6px rgba(200,155,60,0.6);
+}
+
+/* ─── Glass panel (HUD panels) ────────────────────────────── */
 .glass-panel {
-  background: rgba(26, 31, 41, 0.82);
-  border: 1px solid rgba(200, 155, 60, 0.15);
-  border-radius: 0.75rem;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: linear-gradient(
+    148deg,
+    rgba(28,34,46,0.92) 0%,
+    rgba(16,20,28,0.96) 100%
+  );
+  border: 1px solid rgba(200,155,60,0.2);
+  border-radius: 0.875rem;
+  backdrop-filter: blur(16px) saturate(1.3);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
   box-shadow:
-    0 4px 24px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    0 8px 36px rgba(0,0,0,0.55),
+    0 1px 0 rgba(255,255,255,0.04),
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    inset 0 0 30px rgba(200,155,60,0.025);
 }
 
-/* ─── Action buttons ───────────────────────────────────────── */
+/* ─── Action buttons ─────────────────────────────────────── */
 .action-btn {
   position: relative;
   overflow: hidden;
-  transition: all 0.18s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
   border-radius: 0.5rem;
 }
 
-.action-btn:hover:not(:disabled)::after {
-  opacity: 1;
-}
-
+/* Radial sheen on hover */
 .action-btn::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at center, rgba(255,255,255,0.1) 0%, transparent 65%);
+  background: radial-gradient(circle at 50% 30%, rgba(255,255,255,0.13) 0%, transparent 60%);
   opacity: 0;
-  transition: opacity 0.18s;
+  transition: opacity 0.15s;
   border-radius: inherit;
+  pointer-events: none;
 }
 
+.action-btn:hover:not(:disabled)::after { opacity: 1; }
+
 .action-btn:hover:not(:disabled) {
-  box-shadow: 0 0 12px rgba(200, 155, 60, 0.2);
+  transform: translateY(-1px) scale(1.03);
+  box-shadow:
+    0 0 14px rgba(200,155,60,0.28),
+    0 4px 12px rgba(0,0,0,0.35);
 }
 
 .action-btn:active:not(:disabled) {
-  transform: scale(0.94);
+  transform: translateY(0) scale(0.94);
+  box-shadow: 0 0 6px rgba(200,155,60,0.15);
+  transition-duration: 0.08s;
 }
 
-/* ─── Gold glow text ───────────────────────────────────────── */
+/* ─── Message glow effects ────────────────────────────────── */
+.msg-heal {
+  text-shadow:
+    0 0 10px rgba(52,211,153,0.55),
+    0 0 28px rgba(52,211,153,0.2);
+}
+
+.msg-victory {
+  text-shadow:
+    0 0 12px rgba(200,155,60,0.65),
+    0 0 32px rgba(200,155,60,0.25);
+}
+
+.msg-reward {
+  text-shadow:
+    0 0 10px rgba(217,119,6,0.55),
+    0 0 24px rgba(217,119,6,0.2);
+}
+
+.msg-combat {
+  text-shadow:
+    0 0 10px rgba(248,113,113,0.45),
+    0 0 22px rgba(248,113,113,0.15);
+}
+
+/* Shimmer sweep for reward text (level-up / gold) */
+@keyframes gold-shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.msg-victory-shimmer {
+  background: linear-gradient(
+    90deg,
+    #c89b3c 0%, #fce588 30%, #f0d060 50%, #fce588 70%, #c89b3c 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: gold-shimmer 3s linear infinite;
+}
+
+/* ─── Gold glow text ─────────────────────────────────────── */
 .gold-text {
   background: linear-gradient(135deg, #c89b3c 0%, #f0d060 50%, #c89b3c 100%);
   -webkit-background-clip: text;
@@ -334,36 +439,36 @@
 
 .logo-glow {
   text-shadow:
-    0 0 20px rgba(200, 155, 60, 0.4),
-    0 0 60px rgba(200, 155, 60, 0.15);
+    0 0 20px rgba(200,155,60,0.45),
+    0 0 60px rgba(200,155,60,0.18);
 }
 
 .gold-glow {
   text-shadow:
-    0 0 10px rgba(200, 155, 60, 0.4),
-    0 0 30px rgba(200, 155, 60, 0.15);
+    0 0 10px rgba(200,155,60,0.45),
+    0 0 30px rgba(200,155,60,0.18);
 }
 
-/* ─── Mic button states ────────────────────────────────────── */
+/* ─── Mic button states ──────────────────────────────────── */
 @keyframes mic-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(139, 30, 30, 0.7); }
-  50%       { box-shadow: 0 0 0 14px rgba(139, 30, 30, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(139,30,30,0.8); }
+  50%       { box-shadow: 0 0 0 14px rgba(139,30,30,0); }
 }
 
 @keyframes speaking-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(58, 134, 255, 0.5); }
-  50%       { box-shadow: 0 0 0 10px rgba(58, 134, 255, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(58,134,255,0.6); }
+  50%       { box-shadow: 0 0 0 12px rgba(58,134,255,0); }
 }
 
 .mic-listening { animation: mic-pulse 1.2s ease-in-out infinite; }
 .mic-speaking  { animation: speaking-pulse 1.8s ease-in-out infinite; }
 
-/* ─── Stat bar ─────────────────────────────────────────────── */
+/* ─── Stat bar ───────────────────────────────────────────── */
 .stat-bar-fill {
-  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: width 0.65s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* ─── Command input ────────────────────────────────────────── */
+/* ─── Command input ──────────────────────────────────────── */
 .command-input {
   border-radius: 0.5rem;
   transition: all 0.18s ease;
@@ -371,24 +476,25 @@
 
 .command-input:focus {
   box-shadow:
-    0 0 0 1px rgba(200, 155, 60, 0.45),
-    0 0 18px rgba(200, 155, 60, 0.1);
-  border-color: rgba(200, 155, 60, 0.5) !important;
+    0 0 0 1px rgba(200,155,60,0.5),
+    0 0 20px rgba(200,155,60,0.12),
+    inset 0 1px 0 rgba(255,255,255,0.03);
+  border-color: rgba(200,155,60,0.55) !important;
   outline: none;
 }
 
-/* ─── Narration message entrance ───────────────────────────── */
+/* ─── Narration message entrance ─────────────────────────── */
 @keyframes message-in {
   from { opacity: 0; transform: translateY(5px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ─── Rune divider ─────────────────────────────────────────── */
+/* ─── Rune divider ───────────────────────────────────────── */
 .rune-divider {
   display: flex;
   align-items: center;
   gap: 12px;
-  color: rgba(200, 155, 60, 0.4);
+  color: rgba(200,155,60,0.4);
   font-family: 'Cinzel', serif;
   font-size: 11px;
   letter-spacing: 0.2em;
@@ -398,10 +504,10 @@
   content: '';
   flex: 1;
   height: 1px;
-  background: linear-gradient(to right, transparent, rgba(200,155,60,0.25), transparent);
+  background: linear-gradient(to right, transparent, rgba(200,155,60,0.28), transparent);
 }
 
-/* ─── Fog / intro ──────────────────────────────────────────── */
+/* ─── Fog / intro ────────────────────────────────────────── */
 @keyframes fog-drift {
   0%   { transform: translateX(-5%) scale(1.05); opacity: 0.4; }
   50%  { transform: translateX(5%) scale(1.1);  opacity: 0.6; }

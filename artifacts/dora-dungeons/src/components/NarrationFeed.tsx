@@ -41,14 +41,32 @@ function classifyLog(log: string): MessageKind {
   return "narration";
 }
 
+// Base inline styles per kind (colour + font only — no glow here, that goes in className)
 const KIND_STYLE: Record<MessageKind, React.CSSProperties> = {
-  system:    { color: "rgba(200,190,180,0.28)", fontStyle: "italic", fontFamily: "'Fira Code', monospace", fontSize: "0.78rem" },
-  combat:    { color: "#f87171", fontFamily: "'Crimson Text', serif", fontSize: "1.05rem" },
-  victory:   { color: "#c89b3c", fontFamily: "'Crimson Text', serif", fontSize: "1.05rem", fontWeight: 600 },
-  reward:    { color: "#d97706", fontFamily: "'Crimson Text', serif", fontSize: "1rem" },
-  heal:      { color: "#34d399", fontFamily: "'Crimson Text', serif", fontSize: "1.05rem" },
-  room:      { color: "rgba(220,210,195,0.62)", fontFamily: "'Crimson Text', serif", fontSize: "1rem", fontStyle: "italic" },
-  narration: { color: "#e8e0d0", fontFamily: "'Crimson Text', serif", fontSize: "1.05rem" },
+  system:    {
+    color: "rgba(200,190,180,0.25)",
+    fontStyle: "italic",
+    fontFamily: "'Fira Code', monospace",
+    fontSize: "0.75rem",
+    letterSpacing: "0.04em",
+  },
+  combat:    { color: "#f87171", fontFamily: "'Crimson Text', serif", fontSize: "1.05rem", lineHeight: 1.7 },
+  victory:   { fontFamily: "'Crimson Text', serif", fontSize: "1.08rem", lineHeight: 1.7, fontWeight: 600 },
+  reward:    { color: "#d97706", fontFamily: "'Crimson Text', serif", fontSize: "1rem", lineHeight: 1.7 },
+  heal:      { color: "#34d399", fontFamily: "'Crimson Text', serif", fontSize: "1.05rem", lineHeight: 1.7 },
+  room:      { color: "rgba(220,210,195,0.58)", fontFamily: "'Crimson Text', serif", fontSize: "1rem", fontStyle: "italic", lineHeight: 1.7 },
+  narration: { color: "#e8e0d0", fontFamily: "'Crimson Text', serif", fontSize: "1.05rem", lineHeight: 1.7 },
+};
+
+// Extra glow className per kind
+const KIND_GLOW_CLASS: Record<MessageKind, string> = {
+  system:    "",
+  combat:    "msg-combat",
+  victory:   "msg-victory-shimmer",   // gold shimmer sweep
+  reward:    "msg-reward",
+  heal:      "msg-heal",
+  narration: "",
+  room:      "",
 };
 
 const KIND_PREFIX: Record<MessageKind, string> = {
@@ -64,21 +82,23 @@ const KIND_PREFIX: Record<MessageKind, string> = {
 function LogMessage({ log, isNew, index }: { log: string; isNew: boolean; index: number }) {
   const kind = classifyLog(log);
   const prefix = KIND_PREFIX[kind];
+  const glowClass = KIND_GLOW_CLASS[kind];
 
   return (
     <motion.div
-      initial={isNew ? { opacity: 0, y: 5 } : { opacity: 1, y: 0 }}
+      initial={isNew ? { opacity: 0, y: 6 } : { opacity: 1, y: 0 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay: isNew ? Math.min(index * 0.07, 0.28) : 0 }}
-      className="leading-relaxed"
+      transition={{ duration: 0.38, delay: isNew ? Math.min(index * 0.07, 0.28) : 0, ease: "easeOut" }}
+      className={`leading-relaxed ${glowClass}`}
       style={{
         ...KIND_STYLE[kind],
-        paddingTop: kind === "system" ? "0.75rem" : undefined,
+        paddingTop: kind === "system" ? "0.875rem" : undefined,
+        paddingBottom: kind === "system" ? "0.125rem" : undefined,
       }}
       role="listitem"
     >
       {prefix && (
-        <span style={{ opacity: 0.7, marginRight: "0.25rem" }}>{prefix}</span>
+        <span style={{ opacity: 0.75, marginRight: "0.3rem" }}>{prefix}</span>
       )}
       {log}
     </motion.div>
@@ -94,11 +114,11 @@ export function NarrationFeed({ logs, newFromIndex = 0 }: NarrationFeedProps) {
 
   return (
     <div
-      className="h-full overflow-y-auto px-5 py-4 space-y-2.5"
+      className="h-full overflow-y-auto px-5 py-5 space-y-3"
       role="log"
       aria-live="polite"
       aria-label="Game narration"
-      style={{ scrollbarGutter: "stable" }}
+      style={{ scrollbarGutter: "stable", position: "relative", zIndex: 1 }}
     >
       {logs.map((log, i) => (
         <LogMessage
@@ -108,6 +128,21 @@ export function NarrationFeed({ logs, newFromIndex = 0 }: NarrationFeedProps) {
           index={i - newFromIndex}
         />
       ))}
+
+      {/* Blinking cursor — always at the end of the log */}
+      <div
+        className="flex items-center mt-1"
+        aria-hidden="true"
+      >
+        <span
+          className="font-code"
+          style={{ color: "rgba(200,155,60,0.4)", fontSize: "0.78rem", letterSpacing: "0.05em" }}
+        >
+          &gt;
+        </span>
+        <span className="terminal-cursor ml-1" />
+      </div>
+
       <div ref={endRef} className="h-1" />
     </div>
   );
