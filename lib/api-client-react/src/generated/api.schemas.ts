@@ -80,8 +80,6 @@ export interface GameStateResponse {
   /** The command that was parsed (only present on action responses) */
   parsedCommand?: ParsedCommand;
   turnCount: number;
-  /** Player's current gold balance */
-  gold: number;
 }
 
 export interface ErrorResponse {

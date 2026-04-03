@@ -176,36 +176,6 @@ const PHRASE_PATTERNS: PhrasePair[] = [
     pattern: /^(?:use|drink|eat|consume|equip|wield|wear|apply)\s+(?:the\s+|a\s+)?(.+)$/,
     canonical: (m) => `use ${m[1]!.trim()}`,
   },
-
-  // --- Shop: open ---
-  {
-    pattern: /^(?:open\s+(?:the\s+)?shop|enter\s+(?:the\s+)?shop|visit\s+(?:the\s+)?(?:shop|blacksmith|smith)|go\s+to\s+(?:the\s+)?(?:shop|blacksmith|smith)|show\s+(?:me\s+)?(?:the\s+)?shop|shop|blacksmith)$/,
-    canonical: () => "open_shop",
-  },
-
-  // --- Shop: buy weapon ---
-  {
-    pattern: /^(?:buy|purchase|get|acquire)\s+(?:the\s+|a\s+)?(?:weapon\s+)?(?:called\s+|named\s+)?(.+)$/,
-    canonical: (m) => `shop_buy ${m[1]!.trim()}`,
-  },
-
-  // --- Shop: sell item ---
-  {
-    pattern: /^(?:sell|trade|exchange)\s+(?:my\s+|the\s+)?(.+)$/,
-    canonical: (m) => `shop_sell ${m[1]!.trim()}`,
-  },
-
-  // --- Shop: upgrade armor ---
-  {
-    pattern: /^(?:upgrade|enhance|improve|reinforce)\s+(?:my\s+|the\s+)?(.+)(?:\s+armor)?$/,
-    canonical: (m) => `shop_upgrade ${m[1]!.trim()}`,
-  },
-
-  // --- Shop: close ---
-  {
-    pattern: /^(?:close\s+(?:the\s+)?shop|leave\s+(?:the\s+)?shop|exit\s+(?:the\s+)?shop|done\s+shopping)$/,
-    canonical: () => "close_shop",
-  },
 ];
 
 /**
