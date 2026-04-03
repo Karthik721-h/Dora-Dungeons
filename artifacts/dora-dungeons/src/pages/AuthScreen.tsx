@@ -194,15 +194,18 @@ export function AuthScreen({ auth }: AuthScreenProps) {
           </button>
 
           {/* Switch mode */}
-          <button
-            type="button"
-            onClick={() => { setMode(m => m === "login" ? "signup" : "login"); setError(""); }}
-            className="auth-link mt-1"
-          >
-            {mode === "login"
-              ? "No account? \u00A0 Create one"
-              : "Already a member? \u00A0 Sign in"}
-          </button>
+          <div className="flex items-center justify-center gap-2 mt-1">
+            <span className="auth-mode-label">
+              {mode === "login" ? "No Account?" : "Already a member?"}
+            </span>
+            <button
+              type="button"
+              onClick={() => { setMode(m => m === "login" ? "signup" : "login"); setError(""); }}
+              className="auth-mode-btn"
+            >
+              {mode === "login" ? "Sign Up" : "Sign In"}
+            </button>
+          </div>
         </form>
       </motion.div>
     </div>

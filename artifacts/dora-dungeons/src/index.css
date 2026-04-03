@@ -764,3 +764,42 @@
 
 /* Field group spacing */
 .auth-field { display: flex; flex-direction: column; gap: 0; }
+
+/* "No Account?" label — bold, clearly readable */
+.auth-mode-label {
+  font-family: 'Cinzel', serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #b8a87a;
+}
+
+/* "Sign Up" / "Sign In" — visible button with gold tint */
+.auth-mode-btn {
+  font-family: 'Cinzel', serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #f5e8cc;
+  background: rgba(200,155,60,0.18);
+  border: 1px solid rgba(200,155,60,0.4);
+  border-radius: 0.375rem;
+  padding: 0.3rem 0.75rem;
+  cursor: pointer;
+  transition: background 0.18s ease, box-shadow 0.18s ease, transform 0.15s ease, color 0.18s ease;
+}
+
+.auth-mode-btn:hover {
+  background: rgba(200,155,60,0.32);
+  color: #fff8e8;
+  box-shadow: 0 0 14px rgba(200,155,60,0.35);
+  transform: translateY(-1px);
+}
+
+.auth-mode-btn:active {
+  transform: translateY(0);
+  background: rgba(200,155,60,0.22);
+  transition-duration: 0.08s;
+}
