@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { getGetGameStateQueryKey } from "@workspace/api-client-react";
 import {
   Map, Skull, TerminalSquare, Volume2, VolumeX, Plus, Minus,
-  Eye, Info, LogOut, Swords,
+  Eye, Info, LogOut, Swords, ChevronDown,
 } from "lucide-react";
 
 import { AudioManager } from "@/audio/AudioManager";
@@ -61,11 +61,15 @@ export function GameScreen({
   const [audioSpeaking, setAudioSpeaking] = useState(false);
   const [intentHint, setIntentHint] = useState<string | null>(null);
   const [newFromIndex, setNewFromIndex] = useState(gameState.logs.length);
+  const [voiceGender, setVoiceGender] = useState<"female" | "male">(() => AudioManager.getVoiceGender());
+  const [voiceDropdownOpen, setVoiceDropdownOpen] = useState(false);
 
   const prevLogsRef = useRef<string[]>(gameState.logs);
   const queryClient = useQueryClient();
   const stopListeningRef = useRef<() => void>(() => {});
   const onLogoutRef = useRef(onLogout);
+  const voiceGenderRef = useRef(voiceGender);
+  const voiceDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     AudioManager.onStateChange(setAudioSpeaking);
@@ -158,6 +162,22 @@ export function GameScreen({
         return;
       }
 
+      if (trimmed === "change_voice") {
+        const newGender: "female" | "male" = voiceGenderRef.current === "female" ? "male" : "female";
+        try {
+          AudioManager.setVoiceGender(newGender);
+          setVoiceGender(newGender);
+          const msg =
+            newGender === "male"
+              ? "Switched to male narrator voice."
+              : "Switched to female narrator voice.";
+          AudioManager.speak(msg, { interrupt: true });
+        } catch {
+          AudioManager.speak("I was unable to change the voice. Please try again.", { interrupt: true });
+        }
+        return;
+      }
+
       if (/^help$/i.test(trimmed)) {
         AudioManager.speakLines(
           [
@@ -170,6 +190,7 @@ export function GameScreen({
             "Say flee — to escape from combat and retreat.",
             "Say status — to hear your current health, mana, and level.",
             "Say repeat — to hear the last message again.",
+            "Say change voice — to switch between female and male narrator.",
             "Say log out — to exit the game and return to the login screen.",
             "Say help — to hear these commands again at any time.",
             "Exits are always announced after every action, so you always know where you can go.",
@@ -221,6 +242,36 @@ export function GameScreen({
   // Keep refs fresh so submitCommand (a useCallback) always has current values
   stopListeningRef.current = stopListening;
   onLogoutRef.current = onLogout;
+  voiceGenderRef.current = voiceGender;
+
+  // ── Click-outside: close voice dropdown ──────────────────────────────────────
+  useEffect(() => {
+    if (!voiceDropdownOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (voiceDropdownRef.current && !voiceDropdownRef.current.contains(e.target as Node)) {
+        setVoiceDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [voiceDropdownOpen]);
+
+  // ── Voice gender helper ──────────────────────────────────────────────────────
+  const handleVoiceSelect = (gender: "female" | "male") => {
+    setVoiceDropdownOpen(false);
+    if (gender === voiceGenderRef.current) return;
+    try {
+      AudioManager.setVoiceGender(gender);
+      setVoiceGender(gender);
+      const msg =
+        gender === "male"
+          ? "Voice changed to male narrator."
+          : "Voice changed to female narrator.";
+      AudioManager.speak(msg, { interrupt: true });
+    } catch {
+      AudioManager.speak("I was unable to change the voice. Please try again.", { interrupt: true });
+    }
+  };
 
   // ── Rate / mute ─────────────────────────────────────────────────────────────
   const adjustRate = (delta: number) => {
@@ -318,6 +369,82 @@ export function GameScreen({
               : audioState === "processing" ? "● …"
               : "○ idle"}
           </span>
+
+          {/* Voice gender switcher */}
+          <div className="relative" ref={voiceDropdownRef}>
+            <button
+              onClick={() => setVoiceDropdownOpen(v => !v)}
+              className="flex items-center gap-1 px-2 py-0.5 rounded transition-colors hover:text-white"
+              style={{
+                fontSize: "10px",
+                letterSpacing: "0.14em",
+                textTransform: "uppercase",
+                color: "rgba(200,190,180,0.5)",
+                border: "1px solid rgba(200,190,180,0.15)",
+                background: voiceDropdownOpen ? "rgba(200,190,180,0.06)" : "transparent",
+              }}
+              aria-label="Change narrator voice"
+              aria-haspopup="listbox"
+              aria-expanded={voiceDropdownOpen}
+            >
+              <span>{voiceGender === "female" ? "♀" : "♂"}</span>
+              <span className="hidden sm:inline">Voice</span>
+              <ChevronDown size={9} />
+            </button>
+            <AnimatePresence>
+              {voiceDropdownOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: -4, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -4, scale: 0.96 }}
+                  transition={{ duration: 0.12 }}
+                  role="listbox"
+                  aria-label="Narrator voice"
+                  style={{
+                    position: "absolute",
+                    right: 0,
+                    top: "calc(100% + 6px)",
+                    minWidth: "120px",
+                    background: "#1a1f29",
+                    border: "1px solid rgba(200,155,60,0.25)",
+                    borderRadius: "6px",
+                    boxShadow: "0 8px 24px rgba(0,0,0,0.55)",
+                    zIndex: 100,
+                    overflow: "hidden",
+                  }}
+                >
+                  {(["female", "male"] as const).map((g) => (
+                    <button
+                      key={g}
+                      role="option"
+                      aria-selected={voiceGender === g}
+                      onClick={() => handleVoiceSelect(g)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        width: "100%",
+                        padding: "9px 14px",
+                        fontSize: "12px",
+                        textAlign: "left",
+                        background: voiceGender === g ? "rgba(200,155,60,0.1)" : "transparent",
+                        color: voiceGender === g ? "#c89b3c" : "rgba(200,190,180,0.7)",
+                        letterSpacing: "0.06em",
+                        cursor: "pointer",
+                        transition: "background 0.12s",
+                      }}
+                      onMouseEnter={e => { if (voiceGender !== g) (e.currentTarget as HTMLButtonElement).style.background = "rgba(200,190,180,0.06)"; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = voiceGender === g ? "rgba(200,155,60,0.1)" : "transparent"; }}
+                    >
+                      <span style={{ fontSize: "13px" }}>{g === "female" ? "♀" : "♂"}</span>
+                      <span style={{ textTransform: "capitalize" }}>{g}</span>
+                      {voiceGender === g && <span style={{ marginLeft: "auto", fontSize: "10px" }}>✓</span>}
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
 
           {/* Rate control */}
           <div className="flex items-center gap-0.5" style={{ color: "rgba(200,190,180,0.35)" }}>

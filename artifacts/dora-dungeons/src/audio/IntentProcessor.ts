@@ -51,6 +51,12 @@ const PHRASE_PATTERNS: PhrasePair[] = [
     canonical: () => "logout",
   },
 
+  // --- Voice toggle ---
+  {
+    pattern: /^(?:change\s+voice|switch\s+voice|toggle\s+voice|change\s+narrator|switch\s+narrator|voice\s+change|voice\s+switch)$/,
+    canonical: () => "change_voice",
+  },
+
   // --- Repeat last message ---
   {
     pattern: /^(repeat|say (that |it )?again|what did you say|again|huh|what\??)/,

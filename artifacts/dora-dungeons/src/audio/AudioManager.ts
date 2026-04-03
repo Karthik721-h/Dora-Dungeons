@@ -27,14 +27,27 @@ interface QueueEntry {
   pan?: number;
 }
 
-/** Priority-ordered list of preferred voice names (case-sensitive exact match first). */
-const PREFERRED_VOICE_NAMES: string[] = [
+/** Priority-ordered preferred female voice names. */
+const FEMALE_VOICE_NAMES: string[] = [
   "Google UK English Female",
   "Google US English",
   "Samantha",
   "Microsoft Zira Desktop",
   "Microsoft Zira",
 ];
+
+/** Priority-ordered preferred male voice names. */
+const MALE_VOICE_NAMES: string[] = [
+  "Google UK English Male",
+  "Daniel",
+  "Alex",
+  "Microsoft David Desktop",
+  "Microsoft David",
+  "Microsoft Mark",
+  "Fred",
+];
+
+const VOICE_GENDER_KEY = "dd_voice_gender";
 
 class AudioManagerClass {
   // ── Narration ──────────────────────────────────────────────────────────────
@@ -46,6 +59,8 @@ class AudioManagerClass {
   /** The resolved preferred voice (null until voices load). */
   private selectedVoice: SpeechSynthesisVoice | null = null;
   private voicesLoaded = false;
+  /** Current gender preference — persisted to localStorage. */
+  private voiceGender: "female" | "male" = "female";
 
   // ── Audio parameters (user-adjustable) ────────────────────────────────────
   /**
@@ -55,6 +70,7 @@ class AudioManagerClass {
   private rate = 0.95;
   /**
    * Base pitch: 1.2 gives a clear, slightly feminine tone.
+   * Male mode uses 0.9 for a deeper register.
    * Adjustable via setPitch().
    */
   private pitch = 1.2;
@@ -93,6 +109,15 @@ class AudioManagerClass {
   initializeVoices() {
     if (!("speechSynthesis" in window)) return;
 
+    // Load persisted gender preference
+    try {
+      const saved = localStorage.getItem(VOICE_GENDER_KEY);
+      if (saved === "male" || saved === "female") {
+        this.voiceGender = saved;
+        this.pitch = saved === "male" ? 0.9 : 1.2;
+      }
+    } catch { /* localStorage unavailable */ }
+
     const populate = () => {
       const voices = window.speechSynthesis.getVoices();
       if (voices.length === 0) return; // not yet ready
@@ -108,34 +133,59 @@ class AudioManagerClass {
   }
 
   /**
-   * Select the best available female voice from the provided list.
-   * Logs a console.warn if no known female voice is found.
+   * Switch the narrator gender, re-resolve the voice, and persist to localStorage.
+   * The confirmation TTS is handled by the caller (GameScreen / voice command).
+   */
+  setVoiceGender(gender: "female" | "male") {
+    this.voiceGender = gender;
+    this.pitch = gender === "male" ? 0.9 : 1.2;
+    try { localStorage.setItem(VOICE_GENDER_KEY, gender); } catch { /* ok */ }
+
+    // Re-resolve voice immediately if voices are loaded
+    if ("speechSynthesis" in window) {
+      const voices = window.speechSynthesis.getVoices();
+      if (voices.length > 0) {
+        this.selectedVoice = this.getPreferredVoice(voices);
+      }
+    }
+    console.log(`[AudioManager] Voice gender → ${gender}`, this.selectedVoice?.name ?? "default");
+  }
+
+  getVoiceGender(): "female" | "male" {
+    return this.voiceGender;
+  }
+
+  /**
+   * Select the best available voice matching the current gender preference.
+   * Falls back gracefully if no gender-specific voice is available.
    */
   getPreferredVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
     if (voices.length === 0) return null;
 
+    const gender       = this.voiceGender;
+    const preferredNames = gender === "male" ? MALE_VOICE_NAMES : FEMALE_VOICE_NAMES;
+    const genderWord   = gender;
+
     // 1. Exact name matches in priority order
-    for (const name of PREFERRED_VOICE_NAMES) {
+    for (const name of preferredNames) {
       const match = voices.find(v => v.name === name);
       if (match) return match;
     }
 
-    // 2. Any voice with "Female" or "Woman" in the name (case-insensitive)
-    const femaleByName = voices.find(v =>
-      /female|woman/i.test(v.name)
-    );
-    if (femaleByName) return femaleByName;
+    // 2. Any voice whose name contains the gender keyword
+    const byName = voices.find(v => v.name.toLowerCase().includes(genderWord));
+    if (byName) return byName;
 
-    // 3. Partial match on priority names (e.g. "Google UK English Female - en-GB")
-    for (const name of PREFERRED_VOICE_NAMES) {
+    // 3. Partial match on preferred names
+    for (const name of preferredNames) {
       const partial = voices.find(v => v.name.toLowerCase().includes(name.toLowerCase()));
       if (partial) return partial;
     }
 
-    // 4. Prefer en-GB or en-US over other locales
+    // 4. Prefer en-GB or en-US English as neutral fallback
     const englishVoice = voices.find(v => /^en[-_](GB|US)/i.test(v.lang));
     if (englishVoice) {
-      console.warn("[AudioManager] No known female voice found. Using:", englishVoice.name);
+      console.warn(`[AudioManager] No ${gender} voice found. Using:`, englishVoice.name);
       return englishVoice;
     }
 

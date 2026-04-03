@@ -1,0 +1,145 @@
+You are a senior frontend + voice systems engineer.
+
+Implement narrator voice switching (male/female) for "Dora Dungeons", supporting BOTH UI dropdown control and voice command.
+
+---
+
+## GOAL
+
+Allow users to switch narrator voice:
+
+1. Via navbar dropdown (manual)
+2. Via voice command ("change voice")
+
+Default voice must be FEMALE.
+
+---
+
+## STATE MANAGEMENT
+
+Create global state:
+
+voicePreference: "female" | "male"
+
+* Default = "female"
+* Persist in localStorage
+* Load on app start
+
+---
+
+## TTS SYSTEM (AudioManager)
+
+1. Detect available voices using speechSynthesis.getVoices()
+
+2. Select voices:
+
+* Female → prefer voice with "female" or higher pitch
+* Male → prefer voice with "male" or lower pitch
+
+3. Apply selected voice dynamically before speaking
+
+4. If exact match not found:
+
+* Fallback to closest match
+
+---
+
+## NAVBAR UI (IMPORTANT)
+
+Add voice switcher in top navbar:
+
+* Icon or label: "Voice"
+* On click → dropdown menu
+
+Dropdown options:
+
+* Female (default)
+* Male
+
+When user selects:
+
+* Update voicePreference
+* Save to localStorage
+* Immediately apply to TTS
+
+Speak confirmation:
+
+If switched to male:
+"Voice changed to male narrator."
+
+If switched to female:
+"Voice changed to female narrator."
+
+---
+
+## VOICE COMMAND (CRITICAL)
+
+Update IntentProcessor:
+
+Map:
+
+* "change voice"
+* "switch voice"
+* "toggle voice"
+
+→ VOICE_TOGGLE intent
+
+---
+
+## VOICE TOGGLE LOGIC
+
+When command detected:
+
+IF current voice = female:
+→ switch to male
+
+IF current voice = male:
+→ switch to female
+
+After switching:
+Speak confirmation:
+
+If now male:
+"Switched to male narrator voice."
+
+If now female:
+"Switched to female narrator voice."
+
+---
+
+## Voice change Should be announced to the users also when the user say the "help" command
+
+Example: Say "Change Voice" to change the narrator voice
+
+---
+
+## UX RULES
+
+* Voice switching must be instant
+* Do not interrupt critical narration unless needed
+* Keep transitions smooth
+
+---
+
+## ERROR HANDLING
+
+If voice switching fails:
+
+Speak:
+"I was unable to change the voice. Please try again."
+
+---
+
+## OUTPUT
+
+* Updated AudioManager (voice selection logic)
+* Navbar dropdown component
+* Voice state management
+* IntentProcessor update
+* Voice toggle handler
+
+---
+
+## STOP AFTER THIS STEP
+
+Do NOT implement shop or gameplay changes yet
