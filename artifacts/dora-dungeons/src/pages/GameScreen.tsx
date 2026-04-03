@@ -27,6 +27,25 @@ function extractDirection(cmd: string): string | null {
   return m ? m[1]! : null;
 }
 
+/**
+ * Build a short, natural TTS announcement of available exits.
+ * Always spoken after narration so visually impaired users always
+ * know where they can go without needing to ask.
+ */
+function buildExitsAnnouncement(exits: Record<string, string>): string {
+  const dirs = Object.keys(exits);
+  if (dirs.length === 0) return "There are no exits from this room.";
+  if (dirs.length === 1) return `The only exit is to the ${dirs[0]}.`;
+  const last = dirs[dirs.length - 1]!;
+  const rest = dirs.slice(0, -1).join(", ");
+  return `Exits: ${rest} and ${last}.`;
+}
+
+/** True if the exits line is already inside the spoken narration lines */
+function exitsAlreadySpoken(lines: string[]): boolean {
+  return lines.some(l => /^exits:/i.test(l.trim()));
+}
+
 // ─── Component ──────────────────────────────────────────────────────────────
 
 export function GameScreen({
@@ -61,8 +80,13 @@ export function GameScreen({
       AudioManager.speak(
         "Welcome to Dora Dungeons. Voice control is active. Speak your command when ready."
       );
-      const lines = gameState.logs.slice(-3);
+      // Speak the last few log lines so the player hears the starting room
+      const lines = gameState.logs.slice(-5);
       AudioManager.speakLines(lines);
+      // Always append exits so blind users know immediately where they can go
+      if (!exitsAlreadySpoken(lines)) {
+        AudioManager.speak(buildExitsAnnouncement(gameState.currentRoom.exits), { interrupt: false });
+      }
       AudioManager.onQueueDrained(() => {
         if (!hasAutoStartedRef.current) return;
         startListening();
@@ -88,6 +112,14 @@ export function GameScreen({
 
         if (!isMuted && newLines.length > 0) {
           AudioManager.speakLines(newLines, { interrupt: true });
+          // Always queue exits after narration so visually impaired users
+          // always know where they can go, regardless of which command fired.
+          if (!exitsAlreadySpoken(newLines) && newData.gameStatus !== "GAME_OVER") {
+            AudioManager.speak(
+              buildExitsAnnouncement(newData.currentRoom.exits),
+              { interrupt: false }
+            );
+          }
         }
         if (!isMuted) {
           if (newData.gameStatus === "IN_COMBAT" && gameState.gameStatus !== "IN_COMBAT") {
@@ -114,9 +146,11 @@ export function GameScreen({
 
       if (/^help$/i.test(trimmed)) {
         AudioManager.speak(
-          "Basic commands: say north, south, east, or west to move. " +
-          "Say attack to fight. Say cast fireball to use magic. " +
-          "Say look to examine your surroundings. " +
+          "Basic commands: " +
+          "Say north, south, east, or west to move between rooms. " +
+          "Exits are always announced after every action so you always know where you can go. " +
+          "Say look to re-hear the room description and exits. " +
+          "Say attack to fight an enemy. Say cast fireball to use magic. " +
           "Say status to check your health and stats. " +
           "Say repeat to hear the last message again.",
           { interrupt: true }
