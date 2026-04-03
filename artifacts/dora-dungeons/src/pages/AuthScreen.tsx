@@ -203,7 +203,7 @@ export function AuthScreen({ auth }: AuthScreenProps) {
               onClick={() => { setMode(m => m === "login" ? "signup" : "login"); setError(""); }}
               className="auth-mode-btn"
             >
-              {mode === "login" ? "Sign Up" : "Sign In"}
+              {mode === "login" ? "Create Account" : "Sign In"}
             </button>
           </div>
         </form>
