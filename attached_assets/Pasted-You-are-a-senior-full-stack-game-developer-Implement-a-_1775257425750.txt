@@ -1,0 +1,248 @@
+You are a senior full-stack game developer.
+
+Implement a complete Blacksmith Shop system for "Dora Dungeons" with BOTH UI interaction and full voice control.
+
+---
+
+## GOAL
+
+Add a shop where players can:
+
+* Buy weapons
+* Sell items
+* Upgrade armor
+  All actions must work via UI and voice.
+
+---
+
+## CORE SYSTEMS
+
+1. PLAYER DATA MODEL (EXTEND)
+
+* gold: number
+* weapons: Weapon[]
+* armors: Armor[] (each has level: 1–3)
+* inventory: Item[]
+
+---
+
+2. SHOP ACCESS
+
+UI:
+
+* Add bold "SHOP" button in game UI navbar
+
+On click:
+Speak:
+"The shop is now open. You can purchase weapons, sell items, or upgrade your armor."
+
+Show options in terminal:
+
+* Buy Weapons
+* Sell Items
+* Upgrade Armor
+
+---
+
+VOICE ACCESS
+
+Intent mappings:
+
+* "open shop" → OPEN_SHOP
+* "buy weapons" → SHOP_BUY
+* "sell items" → SHOP_SELL
+* "upgrade armor" → SHOP_UPGRADE
+
+When user says "open shop":
+Speak:
+"The shop is open. You may buy weapons, sell items, or upgrade your armor. What would you like to do?"
+
+---
+
+3. BUY WEAPONS
+
+Define 6 weapons:
+(name, description, price)
+
+When triggered:
+Speak:
+"Here are the available weapons:"
+
+Then list naturally:
+"Ashbringer, a legendary blade, costs 10 gold..."
+(continue for all)
+
+Then:
+"say the name of the weapon you wished to buy"
+
+UI:
+
+* Show 6 buttons (name + price)
+
+On purchase:
+IF enough gold:
+
+* Deduct gold
+* Add weapon to player.weapons
+
+Speak:
+"Purchase successful. The weapon has been added to your arsenal."
+
+IF insufficient gold:
+Speak:
+"You do not have enough gold for this purchase. Continue exploring to earn more."
+
+---
+
+4. SELL ITEMS
+
+UI:
+
+* Show inventory items as buttons (with sell price)
+
+VOICE:
+Speak:
+"These are the items in your inventory:"
+
+Example:
+"You have a healing potion worth 15 gold, and two elixirs worth 10 gold each."
+
+Then:
+"Say the name of the item you wish to sell."
+
+On sell:
+
+* Remove item
+* Add gold
+
+Speak:
+"Item sold successfully. Your gold balance has been updated."
+
+If no items:
+Speak:
+"Your inventory is empty. Explore the dungeon to collect items."
+
+---
+
+5. UPGRADE ARMOR
+
+Armor rules:
+
+* Level range: 1 → 3
+* Default: Level 1
+
+Upgrade cost per level:
+
+* Level 1 → 2
+* Level 2 → 3
+
+UI:
+
+* Show each armor + upgrade cost
+
+VOICE:
+Speak:
+"These are your available armors for upgrade:"
+
+Example:
+"Judgment Armor can be upgraded to level 2 for 20 gold."
+
+Then:
+"say the name of the weapon you wish to upgrade"
+
+On upgrade:
+IF enough gold:
+
+* Deduct gold
+* Increase level
+
+Speak:
+"Upgrade successful. Your armor is now stronger, and your gold has been adjusted."
+
+IF insufficient gold:
+Speak:
+"You do not have enough gold to upgrade this armor."
+
+IF no armor:
+Speak:
+"You currently have no armor to upgrade. Continue exploring to find gear."
+
+---
+
+6. ARMOR COMBAT SYSTEM
+
+When player uses "defend":
+
+* Select highest-level armor
+* If tie → pick random
+
+Damage reduction:
+
+VS ENEMIES:
+
+* Level 1 → 25%
+* Level 2 → 50%
+* Level 3 → 75%
+
+VS BOSSES:
+
+* Level 1 → 10%
+* Level 2 → 30%
+* Level 3 → 50%
+
+Apply reduction to incoming damage.
+
+---
+
+7. GOLD SYSTEM
+
+* Gain gold after defeating enemies
+* Gain items randomly from battles
+* Weapons/armors added to correct storage
+
+---
+
+8. Open Shop Should be announced to the users also when the user say the "help" command
+
+Example: Say "Open Shop" to access the black shop where you can purchase weapon, sell items and upgrade armor
+
+---
+
+9. VOICE CONFIRMATIONS (REFINED)
+
+Use professional tone:
+
+Purchase success:
+"Your purchase is complete. The weapon has been added to your equipment."
+
+Insufficient gold:
+"You do not have sufficient gold for this action."
+
+Upgrade success:
+"Your armor has been successfully upgraded. Your defenses have improved."
+
+Sell success:
+"The item has been sold. Your gold balance has increased."
+
+---
+
+## RULES
+
+* Do NOT break existing systems
+* Keep all actions voice-compatible
+* Ensure clean separation (ShopService / CombatSystem)
+
+---
+
+## OUTPUT
+
+* Shop system (UI + Voice)
+* Updated player model
+* Armor combat integration
+* Gold + inventory system
+
+---
+
+## STOP AFTER THIS STEP
+
+Do NOT implement subscriptions yet

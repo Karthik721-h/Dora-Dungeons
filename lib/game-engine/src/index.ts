@@ -19,3 +19,4 @@ export * from "./data/abilities.js";
 export * from "./data/enemies.js";
 export * from "./data/items.js";
 export * from "./data/statusEffects.js";
+export * from "./shop/ShopCatalog.js";

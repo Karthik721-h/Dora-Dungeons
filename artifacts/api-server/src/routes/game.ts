@@ -79,6 +79,7 @@ function serializeGameState(state: GameState) {
         }
       : undefined,
     turnCount: state.turnCount,
+    gold: state.gold,
   };
 }
 

@@ -83,6 +83,7 @@ export const StartGameResponse = zod.object({
     .optional()
     .describe("The command that was parsed (only present on action responses)"),
   turnCount: zod.number(),
+  gold: zod.number(),
 });
 
 /**
@@ -157,6 +158,7 @@ export const ProcessActionResponse = zod.object({
     .optional()
     .describe("The command that was parsed (only present on action responses)"),
   turnCount: zod.number(),
+  gold: zod.number(),
 });
 
 /**
@@ -223,6 +225,7 @@ export const GetGameStateResponse = zod.object({
     .optional()
     .describe("The command that was parsed (only present on action responses)"),
   turnCount: zod.number(),
+  gold: zod.number(),
 });
 
 /**

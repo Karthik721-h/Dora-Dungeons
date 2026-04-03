@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { getGetGameStateQueryKey } from "@workspace/api-client-react";
 import {
   Map, Skull, TerminalSquare, Volume2, VolumeX, Plus, Minus,
-  Eye, Info, LogOut, Swords, ChevronDown,
+  Eye, Info, LogOut, Swords, ChevronDown, ShoppingBag,
 } from "lucide-react";
 
 import { AudioManager } from "@/audio/AudioManager";
@@ -14,6 +14,8 @@ import { useVoiceInput } from "@/hooks/useVoiceInput";
 import { NarrationFeed } from "@/components/NarrationFeed";
 import { PlayerHUD } from "@/components/PlayerHUD";
 import { VoiceControl } from "@/components/VoiceControl";
+import { ShopModal } from "@/components/ShopModal";
+import { useShop } from "@/hooks/useShop";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -63,6 +65,8 @@ export function GameScreen({
   const [newFromIndex, setNewFromIndex] = useState(gameState.logs.length);
   const [voiceGender, setVoiceGender] = useState<"female" | "male">(() => AudioManager.getVoiceGender());
   const [voiceDropdownOpen, setVoiceDropdownOpen] = useState(false);
+  const [isShopOpen, setIsShopOpen] = useState(false);
+  const [liveGameState, setLiveGameState] = useState<GameStateResponse>(gameState);
 
   const prevLogsRef = useRef<string[]>(gameState.logs);
   const queryClient = useQueryClient();
@@ -70,10 +74,16 @@ export function GameScreen({
   const onLogoutRef = useRef(onLogout);
   const voiceGenderRef = useRef(voiceGender);
   const voiceDropdownRef = useRef<HTMLDivElement>(null);
+  const { fetchCatalog } = useShop();
 
   useEffect(() => {
     AudioManager.onStateChange(setAudioSpeaking);
   }, []);
+
+  // Keep liveGameState in sync when prop updates (e.g. from React Query refetch)
+  useEffect(() => {
+    setLiveGameState(gameState);
+  }, [gameState]);
 
   // ── Auto-start voice ───────────────────────────────────────────────────────
   const hasAutoStartedRef = useRef(false);
@@ -162,6 +172,24 @@ export function GameScreen({
         return;
       }
 
+      if (trimmed === "open_shop") {
+        setIsShopOpen(true);
+        fetchCatalog();
+        if (!isMuted) {
+          AudioManager.speak(
+            "Blacksmith Shop is open. Browse weapons, armor upgrades, and sell your items. Say close shop to leave.",
+            { interrupt: true }
+          );
+        }
+        return;
+      }
+
+      if (trimmed === "close_shop") {
+        setIsShopOpen(false);
+        if (!isMuted) AudioManager.speak("You leave the shop.", { interrupt: true });
+        return;
+      }
+
       if (trimmed === "change_voice") {
         const newGender: "female" | "male" = voiceGenderRef.current === "female" ? "male" : "female";
         try {
@@ -189,6 +217,11 @@ export function GameScreen({
             "Say cast fireball — to use a magic spell on an enemy.",
             "Say flee — to escape from combat and retreat.",
             "Say status — to hear your current health, mana, and level.",
+            "Say open shop — to visit the blacksmith and buy or upgrade weapons and armor.",
+            "Say buy Iron Sword — to purchase a weapon by name.",
+            "Say upgrade Iron Plate — to upgrade your armor.",
+            "Say sell health potion — to sell an item from your inventory.",
+            "Say close shop — to leave the shop.",
             "Say repeat — to hear the last message again.",
             "Say change voice — to switch between female and male narrator.",
             "Say log out — to exit the game and return to the login screen.",
@@ -291,7 +324,9 @@ export function GameScreen({
   };
 
   // ── Derived state ──────────────────────────────────────────────────────────
-  const { player, currentRoom, logs, gameStatus, parsedCommand } = gameState;
+  const activeGameState = liveGameState;
+  const { player, currentRoom, logs, gameStatus, parsedCommand } = activeGameState;
+  const gold = activeGameState.gold ?? 0;
   const isCombat = gameStatus === "IN_COMBAT";
   const isGameOver = gameStatus === "GAME_OVER";
 
@@ -333,8 +368,8 @@ export function GameScreen({
           <span className="dd-navbar-title hidden sm:block">Dora Dungeons</span>
         </div>
 
-        {/* Center: game status */}
-        <div className="dd-navbar-center">
+        {/* Center: game status + gold */}
+        <div className="dd-navbar-center" style={{ gap: 10 }}>
           <span
             className="status-badge"
             style={{
@@ -345,6 +380,21 @@ export function GameScreen({
             }}
           >
             {isCombat ? "⚔ In Combat" : isGameOver ? "☠ Fallen" : "◉ " + gameStatus.replace("_", " ")}
+          </span>
+          <span
+            className="font-code"
+            style={{
+              fontSize: "11px",
+              color: "rgba(200,155,60,0.8)",
+              letterSpacing: "0.08em",
+              border: "1px solid rgba(200,155,60,0.2)",
+              borderRadius: 4,
+              padding: "2px 8px",
+              background: "rgba(200,155,60,0.06)",
+            }}
+            aria-label={`Gold: ${gold}`}
+          >
+            🪙 {gold}
           </span>
         </div>
 
@@ -445,6 +495,30 @@ export function GameScreen({
               )}
             </AnimatePresence>
           </div>
+
+          {/* Shop button */}
+          {!isGameOver && (
+            <button
+              onClick={() => {
+                setIsShopOpen(true);
+                fetchCatalog();
+              }}
+              className="flex items-center gap-1 px-2 py-0.5 rounded transition-colors hover:text-white"
+              style={{
+                fontSize: "10px",
+                letterSpacing: "0.14em",
+                textTransform: "uppercase",
+                color: "rgba(200,155,60,0.65)",
+                border: "1px solid rgba(200,155,60,0.25)",
+                background: isShopOpen ? "rgba(200,155,60,0.1)" : "transparent",
+              }}
+              aria-label="Open Blacksmith Shop"
+              title="Blacksmith Shop"
+            >
+              <ShoppingBag size={11} />
+              <span className="hidden sm:inline">Shop</span>
+            </button>
+          )}
 
           {/* Rate control */}
           <div className="flex items-center gap-0.5" style={{ color: "rgba(200,190,180,0.35)" }}>
@@ -665,6 +739,20 @@ export function GameScreen({
           />
         </div>
       </div>
+
+      {/* ── Blacksmith Shop Modal ── */}
+      <ShopModal
+        isOpen={isShopOpen}
+        onClose={() => setIsShopOpen(false)}
+        onGameStateUpdate={(updated) => {
+          setLiveGameState(updated);
+          queryClient.setQueryData(getGetGameStateQueryKey(), updated);
+        }}
+        onAnnounce={(msg) => {
+          if (!isMuted) AudioManager.speak(msg, { interrupt: true });
+        }}
+        playerGold={gold}
+      />
 
       {/* ── Game Over overlay ── */}
       <AnimatePresence>

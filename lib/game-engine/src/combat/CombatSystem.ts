@@ -4,7 +4,12 @@ import {
   CombatState,
   AbilityTargetType,
   StatusEffectType,
+  EnemyType,
 } from "../types/index.js";
+import {
+  ARMOR_REDUCTION_NORMAL,
+  ARMOR_REDUCTION_BOSS,
+} from "../shop/ShopCatalog.js";
 import { NarrationEngine } from "../narration/NarrationEngine.js";
 import { tickStatusEffects, getDefenseBonus, isStunned } from "./StatusEffects.js";
 import { findAbilityByName } from "../systems/AbilitySystem.js";
@@ -31,6 +36,22 @@ function rollDamage(base: number, variance = 0.25): number {
 function calcDamage(attackerAtk: number, defenderDef: number, defenderBonus = 0): number {
   const raw = rollDamage(attackerAtk);
   return clamp(raw - Math.floor((defenderDef + defenderBonus) * 0.5), 1, 9999);
+}
+
+/**
+ * Returns the fraction of damage absorbed by the player's equipped armor.
+ * Armor level is stored in equippedArmor.effect.value (1–3).
+ * Returns 0 if no armor is equipped.
+ */
+function getArmorDamageReduction(player: Player, attacker: Enemy): number {
+  const armor = player.equippedArmor;
+  if (!armor || !armor.effect) return 0;
+  const level = armor.effect.value as 1 | 2 | 3;
+  if (level < 1 || level > 3) return 0;
+  const isBoss = attacker.type === EnemyType.BOSS;
+  return isBoss
+    ? (ARMOR_REDUCTION_BOSS[level] ?? 0)
+    : (ARMOR_REDUCTION_NORMAL[level] ?? 0);
 }
 
 function buildTurnOrder(player: Player, enemies: Enemy[]): string[] {
@@ -78,7 +99,8 @@ function enemyAttackPlayer(enemy: Enemy, player: Player): string[] {
 
   const defBonus = getDefenseBonus(player.statusEffects);
   const defenseMult = player.isDefending ? 0.5 : 1.0;
-  const dmg = Math.floor(calcDamage(enemy.attack, player.defense, defBonus) * defenseMult);
+  const armorReduction = getArmorDamageReduction(player, enemy);
+  const dmg = Math.max(1, Math.floor(calcDamage(enemy.attack, player.defense, defBonus) * defenseMult * (1 - armorReduction)));
   player.hp = clamp(player.hp - dmg, 0, player.maxHp);
   msgs.push(NarrationEngine.enemyTurn(enemy, dmg));
   if (player.hp <= 0) msgs.push(NarrationEngine.playerDefeated(player));
