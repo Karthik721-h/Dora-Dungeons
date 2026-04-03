@@ -7,8 +7,12 @@ import { motion } from "framer-motion";
 import { Skull, Volume2 } from "lucide-react";
 import { getGetGameStateQueryKey } from "@workspace/api-client-react";
 
-export function StartScreen() {
-  const [playerName, setPlayerName] = useState("");
+interface StartScreenProps {
+  initialName?: string;
+}
+
+export function StartScreen({ initialName = "" }: StartScreenProps) {
+  const [playerName, setPlayerName] = useState(initialName);
   const queryClient = useQueryClient();
   
   const { mutate: startGame, isPending, error } = useStartGame({
@@ -22,7 +26,7 @@ export function StartScreen() {
 
   const handleStart = (e: React.FormEvent) => {
     e.preventDefault();
-    startGame({ data: { playerName: playerName || "Wanderer" } });
+    startGame({ data: { playerName: playerName || initialName || "Wanderer" } });
   };
 
   return (
