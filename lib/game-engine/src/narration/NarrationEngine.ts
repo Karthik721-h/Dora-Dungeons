@@ -14,6 +14,9 @@ export const NarrationEngine = {
   playerDefend: (player: Player) =>
     NarrationRegistry.get("defend.player", { player: player.name }),
 
+  armorBlocked: (playerName: string, armorName: string, damageBlocked: number) =>
+    NarrationRegistry.get("defend.armor_blocked", { player: playerName, armor: armorName, damageBlocked }),
+
   spellCast: (playerName: string, abilityName: string, targetName: string, damage: number) => {
     const key = `ability.${abilityName.toLowerCase().replace(/\s+/g, "_")}`;
     const templateKey = NarrationRegistry.has(key) ? key : "ability.damage";

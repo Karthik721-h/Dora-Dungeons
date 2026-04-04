@@ -1,0 +1,144 @@
+You are a senior game engine developer.
+
+Integrate the Armor system into the CombatSystem of "Dora Dungeons" to provide defensive mechanics when the player uses the "defend" action.
+
+---
+
+## GOAL
+
+Allow armor to reduce incoming damage based on level and enemy type.
+
+---
+
+## STRICT RULES
+
+* DO NOT modify attack or ability logic
+* DO NOT break existing combat flow
+* ONLY extend defend behavior
+* Keep changes minimal and isolated
+
+---
+
+## STEP 1 — DETECT DEFEND ACTION
+
+In CombatSystem:
+
+When player action = "defend":
+
+* Trigger armor-based damage reduction logic
+
+---
+
+## STEP 2 — SELECT ARMOR
+
+From player.armors:
+
+* If empty → no reduction applied
+
+* Else:
+
+  1. Find highest-level armor
+  2. If multiple with same level → randomly select one
+
+---
+
+## STEP 3 — DAMAGE REDUCTION RULES
+
+Determine enemy type:
+
+IF enemy.isBoss = false:
+
+* Level 1 → 25% reduction
+* Level 2 → 50% reduction
+* Level 3 → 75% reduction
+
+IF enemy.isBoss = true:
+
+* Level 1 → 10% reduction
+* Level 2 → 30% reduction
+* Level 3 → 50% reduction
+
+---
+
+## STEP 4 — APPLY REDUCTION
+
+Formula:
+
+reducedDamage = incomingDamage * (1 - reductionPercent)
+
+* Round final damage (Math.floor or Math.round)
+* Apply reduced damage to player HP
+
+---
+
+## STEP 5 — RETURN COMBAT RESULT
+
+Include in combat result:
+
+* original damage
+* reduced damage
+* armor used (name + level)
+
+---
+
+## STEP 6 — NARRATION HOOK (IMPORTANT)
+
+Return structured data ONLY.
+
+Example:
+{
+action: "defend",
+armorUsed: "Judgment Armor",
+level: 2,
+damageReduced: 15
+}
+
+DO NOT generate narration text here (handled in Phase 3.5 system)
+
+---
+
+## STEP 7 — EDGE CASES
+
+* If no armor → full damage applied
+* If damage becomes < 0 → clamp to 0
+* Ensure no NaN values
+
+---
+
+## STEP 8 — DO NOT MODIFY
+
+* Enemy attack logic
+* Ability system
+* Turn order
+* Status effects
+
+---
+
+## VALIDATION
+
+Test:
+
+1. Player with no armor → takes full damage
+2. Player with level 1 armor → reduced damage
+3. Player with level 3 armor → heavy reduction
+4. Boss vs normal enemy → correct scaling
+
+Ensure:
+
+* Combat still flows correctly
+* No crashes
+* No incorrect HP calculations
+
+---
+
+## OUTPUT
+
+* Updated CombatSystem defend logic
+* Armor selection logic
+* Damage reduction integration
+
+---
+
+## STOP AFTER THIS STEP
+
+Do NOT implement rewards yet

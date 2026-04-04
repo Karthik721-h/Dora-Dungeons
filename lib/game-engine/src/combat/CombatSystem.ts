@@ -1,9 +1,11 @@
 import {
   Player,
   Enemy,
+  Armor,
   CombatState,
   AbilityTargetType,
   StatusEffectType,
+  EnemyType,
 } from "../types/index.js";
 import { NarrationEngine } from "../narration/NarrationEngine.js";
 import { tickStatusEffects, getDefenseBonus, isStunned } from "./StatusEffects.js";
@@ -31,6 +33,43 @@ function rollDamage(base: number, variance = 0.25): number {
 function calcDamage(attackerAtk: number, defenderDef: number, defenderBonus = 0): number {
   const raw = rollDamage(attackerAtk);
   return clamp(raw - Math.floor((defenderDef + defenderBonus) * 0.5), 1, 9999);
+}
+
+// ── Armor-based defense helpers ──────────────────────────────────────────────
+
+/**
+ * Pick the best armor from the player's collection.
+ *
+ * Rules (per spec):
+ *  1. Find the highest level across all owned armors.
+ *  2. If multiple armors share that highest level, choose one at random.
+ *  3. Return null when the player has no armor.
+ */
+function selectBestArmor(player: Player): Armor | null {
+  const armors = player.armors;
+  if (!armors || armors.length === 0) return null;
+
+  const maxLevel = Math.max(...armors.map((a) => a.level)) as 1 | 2 | 3;
+  const candidates = armors.filter((a) => a.level === maxLevel);
+  return candidates[Math.floor(Math.random() * candidates.length)]!;
+}
+
+/**
+ * Return the damage multiplier when the player is defending with armor.
+ *
+ * Non-boss enemies:  level 1 → 25 % off (×0.75)
+ *                    level 2 → 50 % off (×0.50)
+ *                    level 3 → 75 % off (×0.25)
+ *
+ * Boss enemies:      level 1 → 10 % off (×0.90)
+ *                    level 2 → 30 % off (×0.70)
+ *                    level 3 → 50 % off (×0.50)
+ */
+function armorReductionMult(armor: Armor, isBoss: boolean): number {
+  if (isBoss) {
+    return armor.level === 1 ? 0.90 : armor.level === 2 ? 0.70 : 0.50;
+  }
+  return armor.level === 1 ? 0.75 : armor.level === 2 ? 0.50 : 0.25;
 }
 
 function buildTurnOrder(player: Player, enemies: Enemy[]): string[] {
@@ -76,11 +115,33 @@ function enemyAttackPlayer(enemy: Enemy, player: Player): string[] {
     }
   }
 
-  const defBonus = getDefenseBonus(player.statusEffects);
-  const defenseMult = player.isDefending ? 0.5 : 1.0;
-  const dmg = Math.floor(calcDamage(enemy.attack, player.defense, defBonus) * defenseMult);
+  const defBonus    = getDefenseBonus(player.statusEffects);
+  const rawDamage   = calcDamage(enemy.attack, player.defense, defBonus);
+
+  let defenseMult   = player.isDefending ? 0.5 : 1.0;
+  let armorUsed: Armor | null = null;
+
+  // ── Armor-based damage reduction (only active while defending) ───────────
+  if (player.isDefending) {
+    const bestArmor = selectBestArmor(player);
+    if (bestArmor) {
+      const isBoss = enemy.type === EnemyType.BOSS;
+      defenseMult  = armorReductionMult(bestArmor, isBoss);
+      armorUsed    = bestArmor;
+    }
+  }
+
+  const dmg         = clamp(Math.floor(rawDamage * defenseMult), 0, 9999);
+  const damageBlocked = rawDamage - dmg;
+
   player.hp = clamp(player.hp - dmg, 0, player.maxHp);
   msgs.push(NarrationEngine.enemyTurn(enemy, dmg));
+
+  // Narrate armor absorption only when it meaningfully reduced damage.
+  if (armorUsed && damageBlocked > 0) {
+    msgs.push(NarrationEngine.armorBlocked(player.name, armorUsed.name, damageBlocked));
+  }
+
   if (player.hp <= 0) msgs.push(NarrationEngine.playerDefeated(player));
   return msgs;
 }

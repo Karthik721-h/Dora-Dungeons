@@ -19,6 +19,13 @@ NarrationRegistry.register("defend.player", [
   "{player} steadies themselves and prepares to absorb the attack.",
 ]);
 
+NarrationRegistry.register("defend.armor_blocked", [
+  "{armor} absorbs part of the blow, deflecting {damageBlocked} damage.",
+  "The {armor} holds firm — {damageBlocked} damage is turned aside.",
+  "{armor} takes the brunt of the strike, blocking {damageBlocked} damage.",
+  "The reinforced {armor} redirects {damageBlocked} damage away from {player}.",
+]);
+
 NarrationRegistry.register("ability.damage", [
   "{player} unleashes {ability} at {target} for {damage} damage!",
   "{player} channels {ability} — it tears into {target} for {damage} damage!",
