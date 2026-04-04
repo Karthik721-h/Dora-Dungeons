@@ -1,0 +1,208 @@
+You are a senior voice systems engineer.
+
+Extend the context-aware voice command system in "Dora Dungeons" to support SELL ITEMS and UPGRADE ARMOR using voice.
+
+---
+
+## GOAL
+
+Allow users to:
+
+* Sell items by saying item names
+* Upgrade armor by saying armor names
+
+ONLY when inside the correct shop context.
+
+---
+
+## STRICT RULES
+
+* DO NOT affect global commands
+* ONLY activate inside shop context
+* DO NOT break existing BUY_WEAPON logic
+* Keep system scalable
+
+---
+
+## STEP 1 — CONTEXT CHECK
+
+Use existing:
+
+gameState.context = {
+location: "shop" | "dungeon",
+shopMode: "buy" | "sell" | "upgrade" | null
+}
+
+---
+
+## STEP 2 — SELL ITEMS VOICE COMMAND
+
+ACTIVATE WHEN:
+
+location === "shop"
+AND shopMode === "sell"
+
+---
+
+Get player inventory:
+
+player.inventory = [
+{ name: "Health Potion", quantity: 2 },
+{ name: "Elixir", quantity: 1 }
+]
+
+---
+
+Normalize input:
+
+input = input.toLowerCase().trim();
+
+---
+
+MATCH ITEM:
+
+Find item where:
+
+item.name.toLowerCase() === input
+
+---
+
+IF MATCH FOUND:
+
+return {
+intent: "SELL_ITEM",
+itemName: item.name
+}
+
+---
+
+## STEP 3 — HANDLE SELL LOGIC
+
+In handler:
+
+GameEngine.sellItem(playerId, itemName)
+
+---
+
+ENGINE LOGIC:
+
+* Check item exists
+* Remove 1 quantity OR all (based on design)
+* Add gold to player.gold
+
+---
+
+TTS SUCCESS:
+
+"You have sold {itemName}. Gold has been added to your balance."
+
+---
+
+TTS FAIL:
+
+"You do not have that item in your inventory."
+
+---
+
+## STEP 4 — UPGRADE ARMOR VOICE COMMAND
+
+ACTIVATE WHEN:
+
+location === "shop"
+AND shopMode === "upgrade"
+
+---
+
+Get player armors:
+
+player.armors = [
+{ name: "Judgment Armor", level: 1 },
+{ name: "Bloodfang Armor", level: 2 }
+]
+
+---
+
+MATCH ARMOR:
+
+armor.name.toLowerCase() === input
+
+---
+
+IF MATCH FOUND:
+
+return {
+intent: "UPGRADE_ARMOR",
+armorName: armor.name
+}
+
+---
+
+## STEP 5 — HANDLE UPGRADE LOGIC
+
+GameEngine.upgradeArmor(playerId, armorName)
+
+---
+
+ENGINE RULES:
+
+* Max level = 3
+* Deduct gold
+* Increase armor level
+
+---
+
+TTS SUCCESS:
+
+"{armorName} has been upgraded to level {level}. Gold has been deducted."
+
+---
+
+TTS FAIL CASES:
+
+* Not enough gold:
+  "You do not have enough gold to upgrade this armor."
+
+* Max level:
+  "This armor is already at maximum level."
+
+* No armor:
+  "You do not have any armor to upgrade."
+
+---
+
+## STEP 8 — VALIDATION
+
+TEST:
+
+Sell mode:
+Say:
+"Health Potion"
+→ item sold
+
+Upgrade mode:
+Say:
+"Judgment Armor"
+→ upgraded
+
+
+---
+
+## EXPECTED RESULT
+
+* Fully voice-controlled shop
+* No UI dependency required
+* Clean, scalable system
+
+---
+
+## OUTPUT
+
+* Extended IntentProcessor
+* Sell + Upgrade voice mapping
+* Engine integration
+
+---
+
+## STOP AFTER THIS STEP
+
+Do NOT modify combat or navigation systems

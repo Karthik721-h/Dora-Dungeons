@@ -486,15 +486,35 @@ export function GameScreen({
       if (wasNormalized) setIntentHint(`"${raw}" → "${canonical}"`);
       else setIntentHint(null);
 
-      // ── Shop-buy context: weapon name spoken directly ─────────────────────
-      // When the shop is open in buy mode, bare weapon names are valid commands.
-      // Skip the "unknown command" feedback and let submitCommand's existing
-      // shop-buy handler (which uses fuzzyMatch) resolve and execute the purchase.
-      if (!matched && shopOpenRef.current && shopModeRef.current === "buy") {
-        const weaponHit = SHOP_WEAPONS.find((w) => fuzzyMatch(canonical, w.name));
-        if (weaponHit) {
-          submitCommand(canonical);
-          return;
+      // ── Shop context: bare item/armor/weapon names are valid commands ─────────
+      // When the shop is open in buy / sell / upgrade mode, spoken names map
+      // directly to the relevant action.  Bypass the "unknown command" path so
+      // the player never hears an error when saying a valid shop name.
+      if (!matched && shopOpenRef.current) {
+        const mode = shopModeRef.current;
+
+        if (mode === "buy") {
+          const weaponHit = SHOP_WEAPONS.find((w) => fuzzyMatch(canonical, w.name));
+          if (weaponHit) {
+            submitCommand(canonical);
+            return;
+          }
+        }
+
+        if (mode === "sell") {
+          const itemHit = shopItemsRef.current.find((i) => fuzzyMatch(canonical, i.name));
+          if (itemHit) {
+            submitCommand(canonical);
+            return;
+          }
+        }
+
+        if (mode === "upgrade") {
+          const armorHit = shopArmorsRef.current.find((a) => fuzzyMatch(canonical, a.name));
+          if (armorHit) {
+            submitCommand(canonical);
+            return;
+          }
         }
       }
 
