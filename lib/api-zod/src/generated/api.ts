@@ -46,6 +46,7 @@ export const StartGameResponse = zod.object({
     weapons: zod.array(zod.object({ id: zod.string(), name: zod.string(), description: zod.string(), price: zod.number() })),
     armors: zod.array(zod.object({ id: zod.string(), name: zod.string(), level: zod.union([zod.literal(1), zod.literal(2), zod.literal(3)]) })),
     inventoryItems: zod.array(zod.object({ id: zod.string(), name: zod.string(), value: zod.number() })),
+    dungeonLevel: zod.number().describe("Current dungeon depth (1-indexed)"),
   }),
   currentRoom: zod.object({
     id: zod.string(),
@@ -124,6 +125,7 @@ export const ProcessActionResponse = zod.object({
     weapons: zod.array(zod.object({ id: zod.string(), name: zod.string(), description: zod.string(), price: zod.number() })),
     armors: zod.array(zod.object({ id: zod.string(), name: zod.string(), level: zod.union([zod.literal(1), zod.literal(2), zod.literal(3)]) })),
     inventoryItems: zod.array(zod.object({ id: zod.string(), name: zod.string(), value: zod.number() })),
+    dungeonLevel: zod.number().describe("Current dungeon depth (1-indexed)"),
   }),
   currentRoom: zod.object({
     id: zod.string(),
@@ -169,6 +171,7 @@ export const ProcessActionResponse = zod.object({
     .optional()
     .describe("The command that was parsed (only present on action responses)"),
   turnCount: zod.number(),
+  event: zod.string().optional().describe("One-shot event emitted this turn (e.g. LEVEL_COMPLETED)"),
 });
 
 /**
@@ -198,6 +201,7 @@ export const GetGameStateResponse = zod.object({
     weapons: zod.array(zod.object({ id: zod.string(), name: zod.string(), description: zod.string(), price: zod.number() })),
     armors: zod.array(zod.object({ id: zod.string(), name: zod.string(), level: zod.union([zod.literal(1), zod.literal(2), zod.literal(3)]) })),
     inventoryItems: zod.array(zod.object({ id: zod.string(), name: zod.string(), value: zod.number() })),
+    dungeonLevel: zod.number().describe("Current dungeon depth (1-indexed)"),
   }),
   currentRoom: zod.object({
     id: zod.string(),
@@ -239,6 +243,7 @@ export const GetGameStateResponse = zod.object({
     .optional()
     .describe("The command that was parsed (only present on action responses)"),
   turnCount: zod.number(),
+  event: zod.string().optional().describe("One-shot event emitted this turn (e.g. LEVEL_COMPLETED)"),
 });
 
 /**

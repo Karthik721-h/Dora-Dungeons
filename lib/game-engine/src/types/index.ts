@@ -186,6 +186,10 @@ export interface Player extends StatBlock {
   weapons: Weapon[];
   /** Armors owned by the player (for future shop/equipment system). */
   armors: Armor[];
+  /** Which dungeon depth the player is currently on (1-indexed). */
+  dungeonLevel: number;
+  /** Set to true after the player defeats the boss on the current dungeon level. */
+  dungeonLevelCompleted: boolean;
 }
 
 export interface Enemy extends StatBlock {
@@ -258,4 +262,6 @@ export interface GameState {
   turnCount: number;
   combat: CombatState;
   gold: number;
+  /** Optional event signal emitted in this turn (e.g. "LEVEL_COMPLETED"). */
+  event?: string;
 }

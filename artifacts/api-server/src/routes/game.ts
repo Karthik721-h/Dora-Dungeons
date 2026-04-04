@@ -53,6 +53,7 @@ function serializePlayer(p: Player) {
     inventoryItems: (p.inventory ?? []).map((i: Item) => ({
       id: i.id, name: i.name, value: i.value ?? 0,
     })),
+    dungeonLevel: p.dungeonLevel ?? 1,
   };
 }
 
@@ -97,6 +98,7 @@ function serializeGameState(state: GameState) {
         }
       : undefined,
     turnCount: state.turnCount,
+    event: state.event,
   };
 }
 

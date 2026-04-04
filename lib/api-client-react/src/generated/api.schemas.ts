@@ -63,6 +63,8 @@ export interface PlayerState {
   armors: ArmorState[];
   /** Full inventory details (id + value) for the shop sell view */
   inventoryItems: { id: string; name: string; value: number }[];
+  /** Which dungeon depth the player is currently on (1-indexed) */
+  dungeonLevel: number;
 }
 
 export interface EnemyState {
@@ -103,6 +105,8 @@ export interface GameStateResponse {
   /** The command that was parsed (only present on action responses) */
   parsedCommand?: ParsedCommand;
   turnCount: number;
+  /** One-shot event emitted this turn (e.g. LEVEL_COMPLETED) */
+  event?: string;
 }
 
 export interface ErrorResponse {

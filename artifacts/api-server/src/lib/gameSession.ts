@@ -34,9 +34,11 @@ function toStorable(state: GameState): StoredState {
 function migratePlayer(player: GameState["player"]): GameState["player"] {
   return {
     ...player,
-    gold:    player.gold    ?? 0,
-    weapons: player.weapons ?? [],
-    armors:  player.armors  ?? [],
+    gold:                 player.gold                 ?? 0,
+    weapons:              player.weapons              ?? [],
+    armors:               player.armors               ?? [],
+    dungeonLevel:         player.dungeonLevel         ?? 1,
+    dungeonLevelCompleted: player.dungeonLevelCompleted ?? false,
   };
 }
 

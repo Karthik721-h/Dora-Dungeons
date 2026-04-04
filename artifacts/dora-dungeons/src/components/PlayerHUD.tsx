@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 interface PlayerHUDProps {
   name: string;
   level: number;
+  dungeonLevel: number;
   hp: number;
   maxHp: number;
   mp: number;
@@ -73,7 +74,7 @@ function Bar({
 }
 
 export function PlayerHUD({
-  name, level, hp, maxHp, mp, maxMp, xp, xpToNextLevel, attack, defense, isCombat,
+  name, level, dungeonLevel, hp, maxHp, mp, maxMp, xp, xpToNextLevel, attack, defense, isCombat,
 }: PlayerHUDProps) {
   const hpPct = maxHp > 0 ? hp / maxHp : 0;
   const hpColor =
@@ -107,20 +108,37 @@ export function PlayerHUD({
             adventurer
           </p>
         </div>
-        <div
-          className="font-display text-center flex-shrink-0"
-          style={{
-            border: "1px solid rgba(200,155,60,0.35)",
-            color: "rgba(200,155,60,0.9)",
-            fontSize: "10px",
-            letterSpacing: "0.15em",
-            padding: "3px 10px",
-            borderRadius: "999px",
-            background: "rgba(200,155,60,0.07)",
-            whiteSpace: "nowrap",
-          }}
-        >
-          LVL {level}
+        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+          <div
+            className="font-display text-center"
+            style={{
+              border: "1px solid rgba(200,155,60,0.35)",
+              color: "rgba(200,155,60,0.9)",
+              fontSize: "10px",
+              letterSpacing: "0.15em",
+              padding: "3px 10px",
+              borderRadius: "999px",
+              background: "rgba(200,155,60,0.07)",
+              whiteSpace: "nowrap",
+            }}
+          >
+            LVL {level}
+          </div>
+          <div
+            className="font-display text-center"
+            style={{
+              border: "1px solid rgba(58,134,255,0.35)",
+              color: "rgba(58,134,255,0.85)",
+              fontSize: "9px",
+              letterSpacing: "0.12em",
+              padding: "2px 8px",
+              borderRadius: "999px",
+              background: "rgba(58,134,255,0.07)",
+              whiteSpace: "nowrap",
+            }}
+          >
+            DUNGEON {dungeonLevel}
+          </div>
         </div>
       </div>
 

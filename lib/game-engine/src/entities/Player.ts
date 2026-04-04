@@ -25,6 +25,8 @@ export function createPlayer(name: string): Player {
     gold: 0,
     weapons: [],
     armors: [],
+    dungeonLevel: 1,
+    dungeonLevelCompleted: false,
   };
 }
 

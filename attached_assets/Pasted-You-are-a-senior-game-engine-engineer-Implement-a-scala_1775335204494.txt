@@ -1,0 +1,171 @@
+You are a senior game engine engineer.
+
+Implement a scalable Level System in "Dora Dungeons" WITHOUT modifying or breaking existing gameplay systems.
+
+---
+
+## GOAL
+
+Introduce an infinite level system where:
+
+* Player has a current level
+* Each level has a dungeon
+* Each level ends when the boss is defeated
+* Player can progress to next level
+
+---
+
+## STRICT RULES
+
+* DO NOT modify combat logic
+* DO NOT add payment logic
+* DO NOT change UI structure
+* ONLY extend GameEngine + minimal frontend hooks
+
+---
+
+## STEP 1 — EXTEND PLAYER MODEL
+
+In Player entity, add:
+
+currentLevel: number = 1
+levelCompleted: boolean = false
+
+---
+
+## STEP 2 — LEVEL INITIALIZATION
+
+In GameEngine.startGame():
+
+Ensure:
+
+player.currentLevel = player.currentLevel || 1
+player.levelCompleted = false
+
+---
+
+## STEP 3 — DUNGEON GENERATION PER LEVEL
+
+Modify dungeon generation:
+
+createDungeon(level: number)
+
+Use level as seed modifier:
+
+* Slightly vary rooms
+* Ensure boss exists in every level
+
+Call:
+
+this.dungeon = createDungeon(player.currentLevel)
+
+---
+
+## STEP 4 — LEVEL START NARRATION
+
+After dungeon is created:
+
+Return in response:
+
+{
+narration: "Level {level}. Your mission is to explore the dungeon and defeat the boss to progress.",
+level: player.currentLevel
+}
+
+---
+
+## STEP 5 — DETECT BOSS DEFEAT
+
+In CombatSystem or GameEngine:
+
+When enemy is defeated:
+
+IF enemy.type === "BOSS":
+
+Trigger:
+
+player.levelCompleted = true
+
+Return:
+
+{
+event: "LEVEL_COMPLETED",
+level: player.currentLevel,
+narration: "You have defeated the boss of this dungeon."
+}
+
+---
+
+## STEP 6 — PREVENT AUTO LEVEL SKIP
+
+DO NOT automatically increase level yet
+
+ONLY mark:
+
+levelCompleted = true
+
+---
+
+## STEP 7 — FRONTEND HOOK
+
+In GameScreen:
+
+IF response.event === "LEVEL_COMPLETED":
+
+Trigger TTS:
+
+"You have defeated the boss of this level."
+
+---
+
+## STEP 8 — ADD LEVEL DISPLAY
+
+In UI (non-breaking):
+
+Display:
+
+LEVEL: {currentLevel}
+
+Place near player stats
+
+---
+
+## STEP 9 — VALIDATION
+
+Test:
+
+1. Start game
+   → Level 1 narration appears
+
+2. Play dungeon
+   → Boss exists
+
+3. Kill boss
+   → LEVEL_COMPLETED event fires
+
+4. No crash
+   → No level progression yet
+
+---
+
+## EXPECTED RESULT
+
+* Player has level state
+* Dungeon tied to level
+* Boss completion detected
+* System ready for progression logic
+
+---
+
+## OUTPUT
+
+* Updated Player model
+* Updated GameEngine
+* Level-based dungeon generation
+* LEVEL_COMPLETED event
+
+---
+
+## STOP AFTER THIS STEP
+
+Do NOT implement progression or payment yet

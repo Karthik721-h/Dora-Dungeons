@@ -48,8 +48,14 @@ export class GameEngine {
    *                     Omit for a random dungeon each run.
    */
   startGame(playerName = "Hero", dungeonSeed?: string): GameState {
-    const dungeon = generateDungeon(dungeonSeed);
     const player = createPlayer(playerName);
+    // Ensure dungeon level defaults are set (guards hydrated sessions from old saves)
+    player.dungeonLevel = player.dungeonLevel || 1;
+    player.dungeonLevelCompleted = false;
+
+    // Mix the dungeon level into the seed so each level generates a different layout.
+    const effectiveSeed = dungeonSeed ?? `level-${player.dungeonLevel}-${uuid()}`;
+    const dungeon = generateDungeon(effectiveSeed);
 
     this.state = {
       sessionId: uuid(),
@@ -62,6 +68,7 @@ export class GameEngine {
         "   DORA DUNGEONS — BEGIN",
         "══════════════════════════════",
         `You are ${playerName}, a lone adventurer descending into an ancient dungeon.`,
+        `Level ${player.dungeonLevel}. Your mission is to explore the dungeon and defeat the boss to progress.`,
         "Your quest: reach the final chamber and slay the boss.",
         `Dungeon seed: ${dungeon.seed}`,
         "Commands: attack [enemy] | defend | move [direction] | cast [spell] [target] | use [item] | look | status | flee",
@@ -98,6 +105,9 @@ export class GameEngine {
       this.state.logs.push("The game is over. Start a new session to play again.");
       return this.state;
     }
+
+    // Clear the one-shot event flag so previous turns don't bleed through.
+    delete this.state.event;
 
     const parsed = this.parser.parse(input);
     this.state.parsedCommand = parsed;
@@ -479,12 +489,16 @@ export class GameEngine {
     if (mgr.isBossRoom(state.currentRoomId) && mgr.isAllClear(state.currentRoomId)) {
       state.gameStatus = GameStatus.VICTORY;
       state.combat.active = false;
+      // Mark level completion — progression logic lives outside this engine step.
+      state.player.dungeonLevelCompleted = true;
+      state.event = "LEVEL_COMPLETED";
       state.logs.push(
         "══════════════════════════════",
         "   VICTORY! THE DUNGEON FALLS",
         "══════════════════════════════",
         `The boss is slain. ${state.player.name} stands victorious in the silence.`,
-        `Final Level: ${state.player.level} | Gold: ${state.gold} | Turns: ${state.turnCount}`
+        "You have defeated the boss of this dungeon.",
+        `Final Level: ${state.player.level} | Dungeon: ${state.player.dungeonLevel} | Gold: ${state.gold} | Turns: ${state.turnCount}`
       );
       return;
     }
@@ -515,14 +529,18 @@ export class GameEngine {
     if (!this.state) throw new Error("No active game session");
     const state = this.state;
 
-    // Restore player vitals — keep all gear and gold
+    // Restore player vitals — keep all gear, gold and dungeon level progress
     state.player = {
       ...state.player,
       hp: state.player.maxHp,
       mp: state.player.maxMp,
       statusEffects: [],
       isDefending: false,
+      dungeonLevelCompleted: false,
     };
+
+    // Clear any lingering one-shot event so the restart response is clean.
+    delete state.event;
 
     // Return to the dungeon entrance
     state.currentRoomId = state.dungeon.startRoomId;

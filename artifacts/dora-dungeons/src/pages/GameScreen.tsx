@@ -264,6 +264,13 @@ export function GameScreen({
           if (newLines.some(l => l.toLowerCase().includes("experience") || l.toLowerCase().includes("level"))) {
             AudioManager.playRewardChime();
           }
+          // ── Dungeon level completion ──────────────────────────────────────────
+          if (newData.event === "LEVEL_COMPLETED") {
+            AudioManager.speak(
+              `Dungeon level ${newData.player.dungeonLevel} complete. You have defeated the boss of this level.`,
+              { interrupt: false }
+            );
+          }
         }
       },
     },
@@ -1139,6 +1146,7 @@ export function GameScreen({
           <PlayerHUD
             name={player.name}
             level={player.level}
+            dungeonLevel={player.dungeonLevel ?? 1}
             hp={player.hp}
             maxHp={player.maxHp}
             mp={player.mp}
