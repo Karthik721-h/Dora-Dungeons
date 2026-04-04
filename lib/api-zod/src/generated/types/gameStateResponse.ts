@@ -17,6 +17,8 @@ export interface GameStateResponse {
   currentRoom: RoomState;
   /** Narrative messages describing what happened */
   logs: string[];
+  /** Lines added by this specific command — only present on action responses */
+  newLogs?: string[];
   /** The command that was parsed (only present on action responses) */
   parsedCommand?: ParsedCommand;
   turnCount: number;

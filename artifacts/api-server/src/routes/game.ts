@@ -149,11 +149,22 @@ router.post("/action", async (req: Request, res: Response) => {
   }
 
   const body = ProcessActionBody.parse(req.body);
+
+  // Capture log count BEFORE the command so we can extract exactly which lines
+  // were added by this command (the server caps logs at 80 in the serializer,
+  // so comparing array lengths client-side breaks after 80 total log lines).
+  const logCountBefore = state.logs.length;
+
   const updatedState = engine.processCommand(body.command);
+
+  // Lines genuinely added by this command — used by the client for TTS so it
+  // knows exactly what to narrate regardless of the 80-line display cap.
+  const newLogs = updatedState.logs.slice(logCountBefore);
 
   await saveSession(userId, updatedState);
 
-  const response = ProcessActionResponse.parse(serializeGameState(updatedState));
+  const serialized = serializeGameState(updatedState);
+  const response = ProcessActionResponse.parse({ ...serialized, newLogs });
   res.json(response);
 });
 

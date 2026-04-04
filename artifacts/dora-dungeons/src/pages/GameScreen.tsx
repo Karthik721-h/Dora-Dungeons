@@ -99,7 +99,9 @@ export function GameScreen({
   const shopArmorsRef  = useRef(shopArmors);
   const shopItemsRef   = useRef(shopItems);
 
-  const prevLogsRef = useRef<string[]>(gameState.logs);
+  const prevLogsRef    = useRef<string[]>(gameState.logs);
+  const isMutedRef     = useRef(isMuted);
+  const gameStateRef   = useRef(gameState);
   const queryClient = useQueryClient();
   const stopListeningRef = useRef<() => void>(() => {});
   const onLogoutRef = useRef(onLogout);
@@ -147,11 +149,19 @@ export function GameScreen({
         setIntentHint(null);
 
         const prevLen = prevLogsRef.current.length;
-        const newLines = getNewLogs(prevLogsRef.current, newData.logs);
         prevLogsRef.current = newData.logs;
         setNewFromIndex(prevLen);
 
-        if (!isMuted && newLines.length > 0) {
+        // Use newLogs from the server — the exact lines this command added.
+        // Client-side diffing via getNewLogs() broke once cumulative logs
+        // exceeded the 80-line display cap (both arrays were always length 80).
+        const newLines: string[] = (newData.newLogs ?? []).filter(
+          l => l.trim() && !l.startsWith(">")
+        );
+
+        console.log("[GameScreen] New lines for TTS:", newLines);
+
+        if (!isMutedRef.current && newLines.length > 0) {
           // When the engine returns an "Unknown command" response, replace the
           // verbose hint text with a single accessible prompt instead of reading
           // out the raw developer-facing command syntax.
@@ -170,8 +180,8 @@ export function GameScreen({
             );
           }
         }
-        if (!isMuted) {
-          if (newData.gameStatus === "IN_COMBAT" && gameState.gameStatus !== "IN_COMBAT") {
+        if (!isMutedRef.current) {
+          if (newData.gameStatus === "IN_COMBAT" && gameStateRef.current.gameStatus !== "IN_COMBAT") {
             AudioManager.playCombatAlert();
           }
           if (newLines.some(l => l.toLowerCase().includes("experience") || l.toLowerCase().includes("level"))) {
@@ -404,6 +414,8 @@ export function GameScreen({
   stopListeningRef.current = stopListening;
   onLogoutRef.current = onLogout;
   voiceGenderRef.current = voiceGender;
+  isMutedRef.current = isMuted;
+  gameStateRef.current = gameState;
   shopOpenRef.current    = shopOpen;
   shopModeRef.current    = shopMode;
   shopGoldRef.current    = shopGold;

@@ -1,0 +1,155 @@
+You are a senior React + audio systems engineer.
+
+Fix a critical issue in "Dora Dungeons":
+
+---
+
+## PROBLEM
+
+The TTS (Text-to-Speech) only narrates the last command output on game start, but does NOT narrate new outputs when commands are executed.
+
+This breaks accessibility for visually impaired users.
+
+---
+
+## GOAL
+
+Ensure that EVERY new message added to the terminal/game log is automatically narrated via TTS.
+
+---
+
+## STRICT RULES
+
+* DO NOT modify game logic (combat, shop, etc.)
+* DO NOT modify IntentProcessor logic
+* DO NOT change how messages are generated
+* ONLY fix how TTS reacts to new messages
+* Must be safe and non-breaking
+
+---
+
+## STEP 1 — IDENTIFY MESSAGE SOURCE
+
+Locate where terminal/game messages are stored.
+
+Examples:
+
+* messages[]
+* gameLog[]
+* logs[]
+
+Use this as the single source of truth.
+
+---
+
+## STEP 2 — IMPLEMENT REACTIVE TTS HOOK
+
+In GameScreen (or main UI component):
+
+Add:
+
+const lastSpokenIndex = useRef(0);
+
+useEffect(() => {
+if (!messages || messages.length === 0) return;
+
+const newMessages = messages.slice(lastSpokenIndex.current);
+
+if (newMessages.length === 0) return;
+
+newMessages.forEach((msg) => {
+const text = typeof msg === "string" ? msg : msg.text;
+
+```
+if (text && text.trim()) {
+  AudioManager.speak(text);
+}
+```
+
+});
+
+lastSpokenIndex.current = messages.length;
+
+}, [messages]);
+
+---
+
+## STEP 3 — FIX AUDIOMANAGER (IMPORTANT)
+
+Ensure AudioManager.speak():
+
+* Cancels previous speech before speaking new text
+
+Implementation:
+
+speechSynthesis.cancel();
+speechSynthesis.speak(utterance);
+
+OR implement a queue system (preferred if already exists)
+
+---
+
+## STEP 4 — PREVENT DUPLICATE OR EMPTY SPEECH
+
+* Ignore empty messages
+* Do NOT re-speak old messages
+* Ensure lastSpokenIndex updates correctly
+
+---
+
+## STEP 5 — FAILSAFE (IMPORTANT)
+
+If TTS is not speaking:
+
+Add fallback:
+
+if (!speechSynthesis.speaking) {
+AudioManager.speak(text);
+}
+
+---
+
+## STEP 6 — DEBUG LOGGING (TEMPORARY)
+
+Add:
+
+console.log("New messages for TTS:", newMessages);
+
+---
+
+## STEP 7 — VALIDATION
+
+Test the following voice commands:
+
+* "move north"
+* "attack goblin"
+* "open shop"
+* "buy weapons"
+
+After EACH command:
+
+* Terminal updates MUST appear
+* TTS MUST narrate the SAME output
+
+---
+
+## EXPECTED RESULT
+
+* TTS narrates EVERY new message
+* No missed narration
+* No duplicate narration
+* No overlap issues
+
+---
+
+## OUTPUT
+
+* Updated GameScreen with reactive TTS hook
+* Fixed AudioManager behavior
+* Fully working narration system
+
+---
+
+## STOP AFTER THIS STEP
+
+Do NOT modify other systems

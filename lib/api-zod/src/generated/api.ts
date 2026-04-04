@@ -140,6 +140,10 @@ export const ProcessActionResponse = zod.object({
   logs: zod
     .array(zod.string())
     .describe("Narrative messages describing what happened"),
+  newLogs: zod
+    .array(zod.string())
+    .describe("Lines added by this specific command (subset of logs)")
+    .optional(),
   parsedCommand: zod
     .object({
       action: zod
