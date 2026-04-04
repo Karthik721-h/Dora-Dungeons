@@ -54,6 +54,13 @@ class AudioManagerClass {
   private narrationQueue: QueueEntry[] = [];
   private isSpeaking = false;
   private lastText = "";
+  /**
+   * Monotonically increasing counter — incremented each time a new utterance
+   * starts.  Each utterance closure captures its own value (mySeq) and
+   * compares against this.utteranceSeq in onend/onerror.  If they differ, the
+   * event belongs to a cancelled/stale utterance and must be ignored.
+   */
+  private utteranceSeq = 0;
 
   // ── Voice ──────────────────────────────────────────────────────────────────
   /** The resolved preferred voice (null until voices load). */
@@ -402,6 +409,11 @@ class AudioManagerClass {
   private _speakWithSynthesis(entry: QueueEntry) {
     if (!("speechSynthesis" in window)) return;
 
+    // Stamp this utterance with a sequence number.
+    // onend/onerror compare against this.utteranceSeq; if they differ the event
+    // belongs to a cancelled/stale utterance and is silently ignored.
+    const mySeq = ++this.utteranceSeq;
+
     const utterance = new SpeechSynthesisUtterance(entry.text);
 
     // Apply selected voice — always re-resolve in case voices changed
@@ -422,28 +434,46 @@ class AudioManagerClass {
     };
 
     utterance.onend = () => {
-      console.log("[AudioManager] TTS ended");
+      // Drop stale events from utterances cancelled by speak({ interrupt: true }).
+      // Chrome fires onend asynchronously even for cancelled utterances; without
+      // this guard the callback would incorrectly release the speak-lock while
+      // a fresh utterance is already running.
+      if (mySeq !== this.utteranceSeq) return;
+
+      // Reset isSpeaking so _flush() can proceed.
       this.isSpeaking = false;
-      this.speakLockCallback?.(false);
-      this.onSpeakingChange?.(false);
 
-      // Capture drained-ness BEFORE _flush consumes the next item
       const queueNowEmpty = this.narrationQueue.length === 0;
-      this._flush();
 
-      // Fire the one-shot queue-drained callback only when the last utterance ends
       if (queueNowEmpty) {
+        // ── Queue fully drained ─────────────────────────────────────────────
+        // Only NOW release the speak-lock so the voice-input hook starts the
+        // cooldown.  Releasing between sentences would cause a race where the
+        // cooldown timer fires at the same moment the next utterance starts.
+        console.log("[AudioManager] TTS ended");
+        this.speakLockCallback?.(false);
+        this.onSpeakingChange?.(false);
+
         const cb = this.queueDrainedCallback;
         this.queueDrainedCallback = undefined; // self-clear — one-shot
         cb?.();
+      } else {
+        // ── More sentences queued ───────────────────────────────────────────
+        // Advance the queue WITHOUT releasing the speak-lock.  This prevents
+        // the cooldown timer from starting (and recognition from restarting)
+        // between consecutive sentences — eliminating the race condition.
+        this._flush();
       }
     };
 
     utterance.onerror = () => {
+      // Also guard stale error events from cancelled utterances.
+      if (mySeq !== this.utteranceSeq) return;
       console.log("[AudioManager] TTS error — releasing speak-lock");
       this.isSpeaking = false;
       this.speakLockCallback?.(false);
       this.onSpeakingChange?.(false);
+      // Try to continue with whatever remains in the queue.
       this._flush();
     };
 
