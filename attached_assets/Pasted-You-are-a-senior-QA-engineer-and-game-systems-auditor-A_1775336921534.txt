@@ -1,0 +1,185 @@
+You are a senior QA engineer and game systems auditor.
+
+Audit the implementation of the Level System in "Dora Dungeons".
+
+---
+
+## GOAL
+
+Verify that the Level System is correctly implemented, stable, and does NOT break existing functionality.
+
+---
+
+## STRICT RULES
+
+* DO NOT modify code yet
+* ONLY inspect, test, and report
+* Identify bugs, inconsistencies, or risks
+
+---
+
+## SECTION 1 — PLAYER STATE VALIDATION
+
+Check Player model:
+
+* currentLevel exists and defaults to 1
+* levelCompleted exists and defaults to false
+
+Test:
+
+* Start new game → level should be 1
+* Reload game → level persists correctly (if persistence exists)
+
+---
+
+## SECTION 2 — LEVEL INITIALIZATION
+
+Verify:
+
+* GameEngine.startGame() correctly initializes:
+  currentLevel
+  levelCompleted
+
+Check:
+
+* No undefined values
+* No accidental resets
+
+---
+
+## SECTION 3 — DUNGEON GENERATION
+
+Verify:
+
+* Dungeon is generated using currentLevel
+* Boss exists in EVERY level
+
+Test:
+
+* Start multiple sessions → boss always present
+* No empty or broken dungeon
+
+---
+
+## SECTION 4 — BOSS DETECTION
+
+Verify:
+
+* Boss has correct type (e.g., "BOSS")
+* On boss defeat:
+
+Check:
+
+* player.levelCompleted becomes true
+* Event returned:
+
+{
+event: "LEVEL_COMPLETED",
+level: number
+}
+
+---
+
+## SECTION 5 — EVENT FLOW
+
+Verify:
+
+* LEVEL_COMPLETED event reaches frontend
+* No crashes or undefined errors
+
+---
+
+## SECTION 6 — NO AUTO PROGRESSION
+
+Confirm:
+
+* Level does NOT increment automatically
+* Player stays in same level after boss defeat
+
+---
+
+## SECTION 7 — TTS INTEGRATION
+
+Verify:
+
+* On level start:
+  TTS announces level mission
+
+* On boss defeat:
+  TTS announces completion
+
+Check:
+
+* No duplicate narration
+* No missing narration
+
+---
+
+## SECTION 8 — UI VALIDATION
+
+Verify:
+
+* LEVEL display exists
+* Shows correct value
+* Updates properly (if needed)
+
+---
+
+## SECTION 9 — REGRESSION TESTING
+
+Ensure NOTHING is broken:
+
+* Combat system works
+* Voice commands work
+* Shop still works
+* Navigation works
+
+---
+
+## SECTION 10 — EDGE CASES
+
+Test:
+
+1. Kill non-boss enemy
+   → Should NOT trigger LEVEL_COMPLETED
+
+2. Kill boss twice (if possible)
+   → Should NOT duplicate event
+
+3. Restart game mid-level
+   → State remains stable
+
+---
+
+## SECTION 11 — LOGGING & DEBUGGING
+
+Check console logs:
+
+* No errors
+* No undefined values
+* No broken references
+
+---
+
+## FINAL REPORT FORMAT
+
+Return:
+
+1. ✅ What is working correctly
+2. ⚠️ Minor issues (if any)
+3. ❌ Critical bugs (if any)
+4. 🧠 Recommendations before Phase 2
+
+---
+
+## EXPECTED RESULT
+
+* Clean, stable Level System
+* No regression bugs
+* Ready for progression logic
+
+---
+
+## STOP AFTER THIS STEP
+
+Do NOT fix anything yet — only report findings
