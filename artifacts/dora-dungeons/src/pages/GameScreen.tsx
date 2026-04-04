@@ -123,9 +123,15 @@ export function GameScreen({
   const voiceButtonRef  = useRef<HTMLButtonElement>(null);
   const voiceMenuRef    = useRef<HTMLDivElement>(null);
   const [dropdownPos, setDropdownPos] = useState({ top: 0, right: 0 });
+  // Captured after mount so createPortal always gets a real DOM node.
+  const [portalContainer, setPortalContainer] = useState<Element | null>(null);
 
   useEffect(() => {
     AudioManager.onStateChange(setAudioSpeaking);
+  }, []);
+
+  useEffect(() => {
+    setPortalContainer(document.body);
   }, []);
 
   // ── Auto-start voice ───────────────────────────────────────────────────────
@@ -703,7 +709,7 @@ export function GameScreen({
             </button>
             {/* Portal: renders directly into document.body, above all stacking contexts */}
             <AnimatePresence>
-              {voiceDropdownOpen && createPortal(
+              {voiceDropdownOpen && portalContainer && createPortal(
                 <motion.div
                   ref={voiceMenuRef}
                   initial={{ opacity: 0, y: -4, scale: 0.96 }}
@@ -754,7 +760,7 @@ export function GameScreen({
                     </button>
                   ))}
                 </motion.div>,
-                document.body
+                portalContainer
               )}
             </AnimatePresence>
           </div>
