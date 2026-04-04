@@ -208,14 +208,78 @@ const PHRASE_PATTERNS: PhrasePair[] = [
   },
 ];
 
+// ── Fuzzy suggestion helpers ──────────────────────────────────────────────────
+
+/**
+ * Short human-readable labels for each canonical intent, used to build
+ * "Did you mean …?" suggestions when the input nearly matches a known command.
+ */
+const KNOWN_COMMAND_HINTS: Array<{ keywords: string[]; suggestion: string }> = [
+  { keywords: ["north", "south", "east", "west", "up", "down", "go", "move", "walk", "head", "travel", "run"], suggestion: "move north / south / east / west" },
+  { keywords: ["attack", "hit", "strike", "fight", "kill", "slay", "stab", "slash"], suggestion: "attack [enemy]" },
+  { keywords: ["defend", "block", "guard", "shield", "parry"], suggestion: "defend" },
+  { keywords: ["flee", "run", "escape", "retreat"], suggestion: "flee" },
+  { keywords: ["look", "examine", "inspect", "observe", "describe", "where"], suggestion: "look" },
+  { keywords: ["status", "stats", "health", "hp", "inventory", "abilities"], suggestion: "status" },
+  { keywords: ["take", "grab", "pick", "loot", "collect"], suggestion: "take [item]" },
+  { keywords: ["use", "drink", "eat", "equip", "wield", "wear"], suggestion: "use [item]" },
+  { keywords: ["cast", "spell", "fireball", "lightning", "heal", "freeze", "inferno", "meteor", "poison"], suggestion: "cast [spell]" },
+  { keywords: ["shop", "buy", "sell", "purchase", "upgrade", "store", "merchant"], suggestion: "open shop" },
+  { keywords: ["help", "commands", "what", "how"], suggestion: "help" },
+  { keywords: ["repeat", "again", "huh"], suggestion: "repeat" },
+  { keywords: ["logout", "quit", "exit", "leave"], suggestion: "logout" },
+];
+
+/**
+ * Given unmatched input, see if any word in it closely resembles a known command
+ * keyword.  Returns a friendly suggestion string, or null if nothing is close.
+ *
+ * Uses two similarity checks (both must pass threshold):
+ *  - Common leading characters (prefix overlap)
+ *  - Levenshtein-inspired distance for short words
+ */
+function fuzzyCommandSuggestion(input: string): string | null {
+  const words = input.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return null;
+
+  for (const { keywords, suggestion } of KNOWN_COMMAND_HINTS) {
+    for (const kw of keywords) {
+      for (const word of words) {
+        if (word.length < 3) continue;
+        // Prefix match: first 3 chars match and word is similar length
+        if (
+          kw.startsWith(word.slice(0, 3)) &&
+          Math.abs(kw.length - word.length) <= 3
+        ) {
+          return suggestion;
+        }
+        // Full substring: spoken word contains the keyword or vice versa
+        if (kw.includes(word) || word.includes(kw)) {
+          return suggestion;
+        }
+      }
+    }
+  }
+  return null;
+}
+
 /**
  * Process a raw speech transcript into a canonical game command.
- * Returns the canonical string if a pattern matches, otherwise returns the
- * stripped input so the backend CommandParser can still attempt to parse it.
+ *
+ * Returns:
+ *  - canonical   — the normalised command to send to the backend
+ *  - wasNormalized — true when the canonical differs from the raw input
+ *  - matched     — true when a PHRASE_PATTERNS entry matched; false when the
+ *                  input passed through unchanged (may be valid for the engine
+ *                  but was not recognized by the client-side intent layer)
+ *  - suggestion  — a "Did you mean …?" string when matched=false and the input
+ *                  is vaguely similar to a known command; otherwise null
  */
 export function processIntent(rawTranscript: string): {
   canonical: string;
   wasNormalized: boolean;
+  matched: boolean;
+  suggestion: string | null;
 } {
   const stripped = stripFillers(rawTranscript);
 
@@ -224,11 +288,20 @@ export function processIntent(rawTranscript: string): {
     if (match) {
       const result = canonical(match);
       const wasNormalized = result !== rawTranscript.toLowerCase().trim();
-      return { canonical: result, wasNormalized };
+      return { canonical: result, wasNormalized, matched: true, suggestion: null };
     }
   }
 
-  return { canonical: stripped || rawTranscript.trim(), wasNormalized: false };
+  // No intent matched — the input will still be forwarded to the backend engine
+  // in case it understands something the client-side patterns don't cover, but
+  // we flag it and attach a suggestion so GameScreen can give richer feedback.
+  const suggestion = fuzzyCommandSuggestion(stripped || rawTranscript);
+  return {
+    canonical: stripped || rawTranscript.trim(),
+    wasNormalized: false,
+    matched: false,
+    suggestion,
+  };
 }
 
 /**

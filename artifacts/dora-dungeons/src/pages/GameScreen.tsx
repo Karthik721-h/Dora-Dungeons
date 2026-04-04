@@ -90,6 +90,9 @@ export function GameScreen({
   const [shopArmors, setShopArmors] = useState<ShopArmor[]>([]);
   const [shopItems, setShopItems] = useState<ShopInventoryItem[]>([]);
   const [shopExtraLogs, setShopExtraLogs] = useState<string[]>([]);
+  // Client-side messages (unknown command feedback) shown in the terminal
+  // without requiring a backend round-trip.
+  const [localExtraLogs, setLocalExtraLogs] = useState<string[]>([]);
 
   // Refs so submitCommand (a useCallback) always sees fresh shop state
   const shopOpenRef    = useRef(shopOpen);
@@ -99,9 +102,12 @@ export function GameScreen({
   const shopArmorsRef  = useRef(shopArmors);
   const shopItemsRef   = useRef(shopItems);
 
-  const prevLogsRef    = useRef<string[]>(gameState.logs);
-  const isMutedRef     = useRef(isMuted);
-  const gameStateRef   = useRef(gameState);
+  const prevLogsRef             = useRef<string[]>(gameState.logs);
+  const isMutedRef              = useRef(isMuted);
+  const gameStateRef            = useRef(gameState);
+  // Set to true when an unknown command is caught client-side so onSuccess
+  // knows to skip the backend's "Unknown command:" narration (already spoken).
+  const unknownHandledLocallyRef = useRef(false);
   const queryClient = useQueryClient();
   const stopListeningRef = useRef<() => void>(() => {});
   const onLogoutRef = useRef(onLogout);
@@ -166,11 +172,19 @@ export function GameScreen({
           // verbose hint text with a single accessible prompt instead of reading
           // out the raw developer-facing command syntax.
           const isUnknownCommand = newLines.some(l => /^Unknown command:/i.test(l));
-          const linesToSpeak = isUnknownCommand
-            ? ["Say help to hear the available voice commands."]
-            : newLines;
 
-          AudioManager.speakLines(linesToSpeak, { interrupt: true });
+          // If the client already handled an unknown command locally (via
+          // IntentProcessor's matched=false path), skip the backend narration so
+          // we don't speak the same message twice.
+          const alreadyHandled = unknownHandledLocallyRef.current && isUnknownCommand;
+          unknownHandledLocallyRef.current = false; // always reset after checking
+
+          if (!alreadyHandled) {
+            const linesToSpeak = isUnknownCommand
+              ? ["Say help to hear the available voice commands."]
+              : newLines;
+            AudioManager.speakLines(linesToSpeak, { interrupt: true });
+          }
           // Always queue exits after narration so visually impaired users
           // always know where they can go, regardless of which command fired.
           if (!exitsAlreadySpoken(newLines) && newData.gameStatus !== "GAME_OVER") {
@@ -398,10 +412,36 @@ export function GameScreen({
   } = useVoiceInput({
     onFinalTranscript: (raw) => {
       if (/^(skip intro|skip|enter)$/i.test(raw.trim())) return;
-      const { canonical, wasNormalized } = processIntent(raw);
+      const { canonical, wasNormalized, matched, suggestion } = processIntent(raw);
       setCommand(canonical);
       if (wasNormalized) setIntentHint(`"${raw}" → "${canonical}"`);
       else setIntentHint(null);
+
+      // ── Unknown command: no intent pattern matched ─────────────────────────
+      // Give instant client-side feedback without an API round-trip.
+      // We still fall through to submitCommand so the backend engine can attempt
+      // to parse it (it may recognise commands the client-side patterns don't cover).
+      if (!matched && !isMutedRef.current) {
+        const spokenMsg = suggestion
+          ? `Unknown command. Did you mean: ${suggestion}? Say help to hear all commands.`
+          : "Unknown command. Say help to hear the available voice commands.";
+
+        const terminalMsg = suggestion
+          ? `Unknown command. Did you mean: ${suggestion}?`
+          : "Unknown command. Say help to hear the available voice commands.";
+
+        AudioManager.speak(spokenMsg, { interrupt: true });
+        setLocalExtraLogs(prev => {
+          setNewFromIndex(logs.length + shopExtraLogs.length + prev.length);
+          return [...prev, terminalMsg];
+        });
+        // Flag so onSuccess skips the backend's duplicate "Unknown command" narration
+        unknownHandledLocallyRef.current = true;
+        // Still forward to backend — it may handle commands the client patterns miss
+        submitCommand(canonical);
+        return;
+      }
+
       submitCommand(canonical);
     },
     onInterimTranscript: (interim) => setCommand(interim),
@@ -474,8 +514,13 @@ export function GameScreen({
   const isCombat = gameStatus === "IN_COMBAT";
   const isGameOver = gameStatus === "GAME_OVER";
 
-  // Merge server logs with any shop action messages so they appear in the terminal
-  const displayLogs = shopExtraLogs.length > 0 ? [...logs, ...shopExtraLogs] : logs;
+  // Merge server logs with any shop action messages AND client-side feedback
+  // (e.g. unknown command notices) so they all appear in the terminal.
+  const displayLogs = [
+    ...logs,
+    ...shopExtraLogs,
+    ...localExtraLogs,
+  ];
 
   /** Append a shop action result to the terminal log feed. */
   const addShopLog = (msg: string) => {
