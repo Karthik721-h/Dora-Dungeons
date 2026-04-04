@@ -1,0 +1,141 @@
+You are a senior voice systems engineer.
+
+Enhance the voice command system in "Dora Dungeons" to support weapon name commands inside the shop.
+
+---
+
+## GOAL
+
+Allow users to purchase weapons by simply saying the weapon name, but ONLY when inside the shop → buy weapons section.
+
+---
+
+## STRICT RULES
+
+* DO NOT affect global command parsing
+* ONLY activate this logic in shop context
+* DO NOT break existing commands
+* Keep logic clean and scalable
+
+---
+
+## STEP 1 — DEFINE CONTEXT STATE
+
+In game state, ensure:
+
+gameState.context = {
+location: "shop" | "dungeon",
+shopMode: "buy" | "sell" | "upgrade" | null
+}
+
+---
+
+## STEP 2 — DETECT SHOP BUY MODE
+
+Only enable weapon name commands when:
+
+location === "shop"
+AND shopMode === "buy"
+
+---
+
+## STEP 3 — CREATE WEAPON MAP
+
+Define:
+
+const weaponMap = {
+"ashbringer": "ASHBRINGER",
+"keyblade": "KEYBLADE",
+"leviathan axe": "LEVIATHAN_AXE",
+"gjallarhorn": "GJALLARHORN",
+"buster sword": "BUSTER_SWORD",
+"gunblade": "GUNBLADE"
+};
+
+Normalize input:
+
+input = input.toLowerCase().trim();
+
+---
+
+## STEP 4 — EXTEND INTENT PROCESSOR
+
+Before returning UNKNOWN:
+
+IF in shop buy mode:
+
+Check:
+
+const matchedWeapon = weaponMap[input];
+
+IF found:
+
+return {
+intent: "BUY_WEAPON",
+weaponId: matchedWeapon
+}
+
+---
+
+## STEP 5 — HANDLE INTENT
+
+In command handler:
+
+IF intent === "BUY_WEAPON":
+
+Call:
+
+GameEngine.buyWeapon(playerId, weaponId)
+
+---
+
+## STEP 6 — VALIDATION
+
+Test:
+
+Inside shop → buy mode:
+
+Say:
+
+* "Ashbringer"
+* "Keyblade"
+* "Gunblade"
+
+Expected:
+
+* Correct weapon purchased
+* Gold deducted
+* Weapon added to status
+
+---
+
+Outside shop:
+
+Say:
+"Ashbringer"
+
+Expected:
+
+* Unknown command
+
+---
+
+## EXPECTED RESULT
+
+* Natural voice purchase works
+* Context-aware commands
+* No interference with other commands
+
+---
+
+## OUTPUT
+
+* Updated IntentProcessor
+* Context-aware weapon commands
+* Integrated purchase flow
+
+---
+
+## STOP AFTER THIS STEP
+
+Do NOT modify other systems

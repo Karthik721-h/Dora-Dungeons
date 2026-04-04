@@ -222,6 +222,15 @@ export function GameScreen({
     },
   });
 
+  // ── Shared name-matching helpers ─────────────────────────────────────────────
+  // Lifted to component scope so both submitCommand and the voice handler share them.
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]/g, "").trim();
+  const fuzzyMatch = (spoken: string, name: string) => {
+    const sp = norm(spoken);
+    const nm = norm(name);
+    return nm.includes(sp) || sp.includes(nm);
+  };
+
   // ── Submit ──────────────────────────────────────────────────────────────────
   const submitCommand = useCallback(
     (cmd: string) => {
@@ -262,16 +271,6 @@ export function GameScreen({
       }
 
       // ── Shop voice commands ────────────────────────────────────────────────────
-
-      /** Normalize a string for fuzzy name matching. */
-      const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]/g, "").trim();
-
-      /** True if spoken overlaps weapon/item/armor name, or vice versa. */
-      const fuzzyMatch = (spoken: string, name: string) => {
-        const sp = norm(spoken);
-        const nm = norm(name);
-        return nm.includes(sp) || sp.includes(nm);
-      };
 
       if (trimmed === "open_shop") {
         setShopOpen(true);
@@ -408,6 +407,18 @@ export function GameScreen({
       setCommand(canonical);
       if (wasNormalized) setIntentHint(`"${raw}" → "${canonical}"`);
       else setIntentHint(null);
+
+      // ── Shop-buy context: weapon name spoken directly ─────────────────────
+      // When the shop is open in buy mode, bare weapon names are valid commands.
+      // Skip the "unknown command" feedback and let submitCommand's existing
+      // shop-buy handler (which uses fuzzyMatch) resolve and execute the purchase.
+      if (!matched && shopOpenRef.current && shopModeRef.current === "buy") {
+        const weaponHit = SHOP_WEAPONS.find((w) => fuzzyMatch(canonical, w.name));
+        if (weaponHit) {
+          submitCommand(canonical);
+          return;
+        }
+      }
 
       // ── Unknown command: no intent pattern matched ─────────────────────────
       // Give instant client-side feedback without an API round-trip.
