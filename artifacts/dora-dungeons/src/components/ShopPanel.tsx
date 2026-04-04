@@ -140,7 +140,7 @@ export function ShopPanel({
   onClose,
 }: ShopPanelProps) {
   const [feedback, setFeedback] = useState<string | null>(null);
-  const [localGold, setLocalGold] = useState(gold);
+  // gold prop is the single source of truth (gameState.player.gold from parent)
   const [localWeapons, setLocalWeapons] = useState<ShopWeapon[]>(ownedWeapons);
   const [localArmors, setLocalArmors] = useState<ShopArmor[]>(ownedArmors);
   const [localItems, setLocalItems] = useState<ShopInventoryItem[]>(sellableItems);
@@ -152,9 +152,9 @@ export function ShopPanel({
   }
 
   function handleBuy(weaponId: string) {
-    const result = buyWeapon(localGold, localWeapons, weaponId);
+    console.log("Shop gold prop:", gold);
+    const result = buyWeapon(gold, localWeapons, weaponId);
     if (result.success) {
-      setLocalGold(result.data.gold);
       setLocalWeapons(result.data.weapons);
       onUpdate({ gold: result.data.gold, weapons: result.data.weapons, armors: localArmors });
       flash("✓ Weapon purchased successfully.");
@@ -166,9 +166,9 @@ export function ShopPanel({
   }
 
   function handleSell(itemId: string) {
-    const result = sellItem(localGold, localItems, itemId);
+    console.log("Shop gold prop:", gold);
+    const result = sellItem(gold, localItems, itemId);
     if (result.success) {
-      setLocalGold(result.data.gold);
       setLocalItems(result.data.inventory);
       onUpdate({ gold: result.data.gold, weapons: localWeapons, armors: localArmors, items: result.data.inventory });
       flash("✓ Item sold successfully.");
@@ -178,9 +178,9 @@ export function ShopPanel({
   }
 
   function handleUpgrade(armorId: string) {
-    const result = upgradeArmor(localGold, localArmors, armorId);
+    console.log("Shop gold prop:", gold);
+    const result = upgradeArmor(gold, localArmors, armorId);
     if (result.success) {
-      setLocalGold(result.data.gold);
       setLocalArmors(result.data.armors);
       onUpdate({ gold: result.data.gold, weapons: localWeapons, armors: result.data.armors });
       flash("✓ Armor upgraded successfully.");
@@ -203,7 +203,7 @@ export function ShopPanel({
       <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", overflowY: "auto", maxHeight: "clamp(160px, 28vh, 340px)" }}>
         {SHOP_WEAPONS.map((w) => {
           const owned = ownedIds.has(w.id);
-          const canAfford = localGold >= w.price;
+          const canAfford = gold >= w.price;
           return (
             <ShopBtn
               key={w.id}
@@ -261,7 +261,7 @@ export function ShopPanel({
           {localArmors.map((armor) => {
             const cost = armor.level < 3 ? ARMOR_UPGRADE_COSTS[armor.level as 1 | 2] : null;
             const isMax = armor.level === 3;
-            const canAfford = cost !== null && localGold >= cost;
+            const canAfford = cost !== null && gold >= cost;
             return (
               <ShopBtn
                 key={armor.id}
@@ -333,7 +333,7 @@ export function ShopPanel({
             color: "#c89b3c",
             letterSpacing: "0.06em",
           }}>
-            {localGold}g
+            {gold}g
           </span>
         </div>
 

@@ -13,6 +13,8 @@ export interface GameStateResponse {
   sessionId: string;
   /** IDLE, IN_COMBAT, EXPLORING, GAME_OVER, VICTORY */
   gameStatus: string;
+  /** Player's current gold */
+  gold: number;
   player: PlayerState;
   currentRoom: RoomState;
   /** Narrative messages describing what happened */

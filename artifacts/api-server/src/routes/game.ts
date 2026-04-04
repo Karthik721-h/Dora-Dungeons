@@ -59,6 +59,7 @@ function serializeGameState(state: GameState) {
   return {
     sessionId: state.sessionId,
     gameStatus: state.gameStatus,
+    gold: state.gold,
     player: serializePlayer(state.player),
     currentRoom: {
       id: room.id,

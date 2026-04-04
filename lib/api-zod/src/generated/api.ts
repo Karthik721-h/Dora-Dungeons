@@ -28,6 +28,7 @@ export const StartGameResponse = zod.object({
   gameStatus: zod
     .string()
     .describe("IDLE, IN_COMBAT, EXPLORING, GAME_OVER, VICTORY"),
+  gold: zod.number().describe("Player's current gold"),
   player: zod.object({
     id: zod.string(),
     name: zod.string(),
@@ -102,6 +103,7 @@ export const ProcessActionResponse = zod.object({
   gameStatus: zod
     .string()
     .describe("IDLE, IN_COMBAT, EXPLORING, GAME_OVER, VICTORY"),
+  gold: zod.number().describe("Player's current gold"),
   player: zod.object({
     id: zod.string(),
     name: zod.string(),
@@ -172,6 +174,7 @@ export const GetGameStateResponse = zod.object({
   gameStatus: zod
     .string()
     .describe("IDLE, IN_COMBAT, EXPLORING, GAME_OVER, VICTORY"),
+  gold: zod.number().describe("Player's current gold"),
   player: zod.object({
     id: zod.string(),
     name: zod.string(),

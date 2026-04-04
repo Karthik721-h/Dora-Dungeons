@@ -82,10 +82,10 @@ export function GameScreen({
   const [voiceGender, setVoiceGender] = useState<"female" | "male">(() => AudioManager.getVoiceGender());
   const [voiceDropdownOpen, setVoiceDropdownOpen] = useState(false);
 
-  // ── Shop state (fully client-side; server doesn't track gold/weapons/armors yet) ──
+  // ── Shop state (fully client-side; server doesn't track weapons/armors yet) ──
   const [shopOpen, setShopOpen] = useState(false);
   const [shopMode, setShopMode] = useState<"main" | "buy" | "sell" | "upgrade">("main");
-  const [shopGold, setShopGold] = useState(0);
+  // Gold comes directly from gameState.gold — no separate shopGold state.
   const [shopWeapons, setShopWeapons] = useState<ShopWeapon[]>([]);
   const [shopArmors, setShopArmors] = useState<ShopArmor[]>([]);
   const [shopItems, setShopItems] = useState<ShopInventoryItem[]>([]);
@@ -97,7 +97,7 @@ export function GameScreen({
   // Refs so submitCommand (a useCallback) always sees fresh shop state
   const shopOpenRef    = useRef(shopOpen);
   const shopModeRef    = useRef(shopMode);
-  const shopGoldRef    = useRef(shopGold);
+  // No shopGoldRef — gold is read from gameStateRef.current.gold
   const shopWeaponsRef = useRef(shopWeapons);
   const shopArmorsRef  = useRef(shopArmors);
   const shopItemsRef   = useRef(shopItems);
@@ -307,9 +307,9 @@ export function GameScreen({
         if (mode === "buy") {
           const match = SHOP_WEAPONS.find((w) => fuzzyMatch(trimmed, w.name));
           if (match) {
-            const result = buyWeapon(shopGoldRef.current, shopWeaponsRef.current, match.id);
+            const result = buyWeapon(gameStateRef.current.gold, shopWeaponsRef.current, match.id);
             if (result.success) {
-              setShopGold(result.data.gold);
+              patchPlayerGold(result.data.gold);
               setShopWeapons(result.data.weapons);
               speakPurchaseSuccess(match.name, result.data.gold);
               addShopLog(`✓ ${match.name} purchased successfully.`);
@@ -323,9 +323,9 @@ export function GameScreen({
         if (mode === "sell") {
           const match = shopItemsRef.current.find((i) => fuzzyMatch(trimmed, i.name));
           if (match) {
-            const result = sellItem(shopGoldRef.current, shopItemsRef.current, match.id);
+            const result = sellItem(gameStateRef.current.gold, shopItemsRef.current, match.id);
             if (result.success) {
-              setShopGold(result.data.gold);
+              patchPlayerGold(result.data.gold);
               setShopItems(result.data.inventory);
               speakSellSuccess(match.name, result.data.gold);
               addShopLog(`✓ ${match.name} sold successfully.`);
@@ -339,9 +339,9 @@ export function GameScreen({
         if (mode === "upgrade") {
           const match = shopArmorsRef.current.find((a) => fuzzyMatch(trimmed, a.name));
           if (match) {
-            const result = upgradeArmor(shopGoldRef.current, shopArmorsRef.current, match.id);
+            const result = upgradeArmor(gameStateRef.current.gold, shopArmorsRef.current, match.id);
             if (result.success) {
-              setShopGold(result.data.gold);
+              patchPlayerGold(result.data.gold);
               setShopArmors(result.data.armors);
               const upgraded = result.data.armors.find((a) => a.id === match.id);
               speakUpgradeSuccess(match.name, upgraded?.level ?? 0, result.data.gold);
@@ -458,7 +458,6 @@ export function GameScreen({
   gameStateRef.current = gameState;
   shopOpenRef.current    = shopOpen;
   shopModeRef.current    = shopMode;
-  shopGoldRef.current    = shopGold;
   shopWeaponsRef.current = shopWeapons;
   shopArmorsRef.current  = shopArmors;
   shopItemsRef.current   = shopItems;
@@ -530,8 +529,22 @@ export function GameScreen({
     });
   };
 
+  /**
+   * Patch only the player's gold in the React Query cache so that
+   * gameState.gold — the single source of truth — reflects the
+   * updated value immediately without a full refetch.
+   */
+  const patchPlayerGold = (gold: number) => {
+    console.log("Player gold updated:", gold);
+    queryClient.setQueryData(
+      getGetGameStateQueryKey(),
+      (old: typeof gameState | undefined) =>
+        old ? { ...old, player: { ...old.player, gold } } : old
+    );
+  };
+
   const handleShopUpdate = (next: { gold: number; weapons: ShopWeapon[]; armors: ShopArmor[]; items?: ShopInventoryItem[] }) => {
-    setShopGold(next.gold);
+    patchPlayerGold(next.gold);
     setShopWeapons(next.weapons);
     setShopArmors(next.armors);
     if (next.items !== undefined) setShopItems(next.items);
@@ -901,7 +914,7 @@ export function GameScreen({
             <AnimatePresence>
               {shopOpen && (
                 <ShopPanel
-                  gold={shopGold}
+                  gold={gameState.gold}
                   ownedWeapons={shopWeapons}
                   ownedArmors={shopArmors}
                   sellableItems={shopItems}
