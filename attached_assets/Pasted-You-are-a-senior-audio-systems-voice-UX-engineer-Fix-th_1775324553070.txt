@@ -1,0 +1,157 @@
+You are a senior audio systems + voice UX engineer.
+
+Fix the TTS and voice behavior when the player dies in "Dora Dungeons".
+
+---
+
+## GOAL
+
+When player falls:
+
+* Stop ALL current narration immediately
+* Speak ONLY the death message
+* Activate voice input automatically
+* Prevent any old narration from playing
+
+---
+
+## STRICT RULES
+
+* DO NOT break existing TTS system
+* DO NOT delay mic activation
+* MUST work on app load and runtime
+* MUST prioritize death narration
+
+---
+
+## STEP 1 — ADD HARD STOP FUNCTION
+
+In AudioManager:
+
+Add:
+
+stopAll() {
+speechSynthesis.cancel();
+this.queue = [];
+}
+
+---
+
+## STEP 2 — PRIORITY SPEAK METHOD
+
+Update speak():
+
+speak(text, priority = "normal") {
+
+IF priority === "critical":
+this.stopAll();
+
+// continue speaking normally
+}
+
+---
+
+## STEP 3 — TRIGGER ON PLAYER DEATH
+
+In GameScreen (or event handler):
+
+IF event === "PLAYER_DEAD":
+
+1. Call:
+
+AudioManager.stopAll();
+
+2. Speak death message:
+
+AudioManager.speak(
+"You have fallen. Would you like to restart from the beginning of this level?",
+"critical"
+);
+
+---
+
+## STEP 4 — FORCE VOICE INPUT ACTIVE
+
+Ensure:
+
+VoiceInput.startListening();
+
+---
+
+If already running:
+
+Restart it:
+
+VoiceInput.stopListening();
+VoiceInput.startListening();
+
+---
+
+## STEP 5 — PREVENT OLD NARRATION
+
+Add guard:
+
+IF gameState.mode === "death":
+
+BLOCK any narration from:
+
+* logs
+* combat updates
+* system messages
+
+---
+
+## STEP 6 — APP LOAD SAFETY
+
+On app init:
+
+Ensure:
+
+AudioManager.stopAll();
+
+VoiceInput.startListening();
+
+---
+
+## STEP 7 — HANDLE EDGE CASE
+
+If TTS is mid-speaking during death:
+
+speechSynthesis.cancel() MUST execute BEFORE new speak()
+
+---
+
+## STEP 8 — VALIDATION
+
+Test:
+
+1. Trigger death during narration
+   → narration stops instantly
+
+2. Only death message plays
+
+3. Mic is active immediately
+
+4. Saying "yes" or "no" works
+
+---
+
+## EXPECTED RESULT
+
+* Clean audio interruption
+* No overlapping speech
+* Immediate voice control after death
+
+---
+
+## OUTPUT
+
+* Updated AudioManager
+* Death-safe voice system
+* Reliable voice input activation
+
+---
+
+## STOP AFTER THIS STEP
+
+Do NOT modify other gameplay systems

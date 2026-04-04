@@ -178,11 +178,28 @@ export function GameScreen({
     if (deathTtsSpokenRef.current) return;
     deathTtsSpokenRef.current = true;
     setShowRestartModal(true);
-    if (isMutedRef.current) return;
-    AudioManager.speak(
-      "You have fallen. Your quest ends here — for now. Say yes to restart the dungeon from the beginning, keeping all your weapons, armor, and gold. Say no to exit.",
-      { interrupt: true }
-    );
+
+    // Hard-stop everything in progress, then speak the death message at
+    // critical priority so it always wins over any in-flight narration.
+    AudioManager.stopAll();
+
+    if (!isMutedRef.current) {
+      AudioManager.speak(
+        "You have fallen. Your quest ends here — for now. Say yes to restart the dungeon from the beginning, keeping all your weapons, armor, and gold. Say no to exit.",
+        { priority: "critical" }
+      );
+      // Once the death message finishes, force the mic active so the player
+      // can immediately say "yes" or "no" without any extra tap.
+      AudioManager.onQueueDrained(() => {
+        stopListeningRef.current?.();       // stop any stale session first
+        setTimeout(() => startListening(), 120); // restart fresh
+      });
+    } else {
+      // Muted — no TTS, but still activate the mic immediately.
+      stopListeningRef.current?.();
+      setTimeout(() => startListening(), 120);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isGameOver]);
 
   // ── Mutation ────────────────────────────────────────────────────────────────
@@ -206,7 +223,11 @@ export function GameScreen({
 
         console.log("[GameScreen] New lines for TTS:", newLines);
 
-        if (!isMutedRef.current && newLines.length > 0) {
+        // ── Death guard: block ALL narration when transitioning into GAME_OVER ──
+        // The death TTS useEffect handles the only speech in this state.
+        // Allowing combat/log narration here would overlap with the death message.
+        const transitioningToDeath = newData.gameStatus === "GAME_OVER";
+        if (!transitioningToDeath && !isMutedRef.current && newLines.length > 0) {
           // When the engine returns an "Unknown command" response, replace the
           // verbose hint text with a single accessible prompt instead of reading
           // out the raw developer-facing command syntax.
@@ -226,14 +247,17 @@ export function GameScreen({
           }
           // Always queue exits after narration so visually impaired users
           // always know where they can go, regardless of which command fired.
-          if (!exitsAlreadySpoken(newLines) && newData.gameStatus !== "GAME_OVER") {
+          if (!exitsAlreadySpoken(newLines)) {
             AudioManager.speak(
               buildExitsAnnouncement(newData.currentRoom.exits),
               { interrupt: false }
             );
           }
+        } else if (transitioningToDeath) {
+          // Reset the unknown-command flag so it doesn't leak into the restart
+          unknownHandledLocallyRef.current = false;
         }
-        if (!isMutedRef.current) {
+        if (!transitioningToDeath && !isMutedRef.current) {
           if (newData.gameStatus === "IN_COMBAT" && gameStateRef.current.gameStatus !== "IN_COMBAT") {
             AudioManager.playCombatAlert();
           }

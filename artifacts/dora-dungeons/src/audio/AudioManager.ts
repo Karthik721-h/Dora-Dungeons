@@ -288,14 +288,48 @@ class AudioManagerClass {
     this.queueDrainedCallback = cb;
   }
 
-  /** Speak a line of text. interrupt=true cancels current speech immediately. */
-  speak(text: string, options: { interrupt?: boolean; pan?: number } = {}) {
+  /**
+   * Hard-stop all current and queued narration.
+   *
+   * Unlike `stop()`, this intentionally does NOT release the speak-lock or
+   * fire `onSpeakingChange(false)` — the caller is expected to immediately
+   * queue a new critical utterance, so the lock should remain held until
+   * that utterance completes.
+   *
+   * Also clears `queueDrainedCallback` to prevent stale one-shot callbacks
+   * from firing in the middle of the new utterance.
+   */
+  stopAll() {
+    if (!("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
+    this.utteranceSeq++;          // mark all in-flight onend/onerror events as stale
+    this.narrationQueue = [];
+    this.isSpeaking = false;
+    this.queueDrainedCallback = undefined;
+  }
+
+  /**
+   * Speak a line of text.
+   *
+   * Options:
+   *   interrupt  — cancels the current utterance and clears the queue first.
+   *   priority   — "critical" performs a hard stopAll() before speaking,
+   *                then waits 80 ms (vs the normal 50 ms) to let Chrome
+   *                fully process the cancel before the new utterance starts.
+   *   pan        — stereo pan value (-1 left … +1 right).
+   */
+  speak(text: string, options: { interrupt?: boolean; priority?: "normal" | "critical"; pan?: number } = {}) {
     if (!("speechSynthesis" in window)) return;
     if (!text?.trim()) return;
 
     this.lastText = text;
 
-    if (options.interrupt) {
+    const isCritical = options.priority === "critical";
+
+    if (isCritical) {
+      // Hard-stop without releasing the speak-lock (new utterance is coming)
+      this.stopAll();
+    } else if (options.interrupt) {
       window.speechSynthesis.cancel();
       this.utteranceSeq++;    // mark any pending onend/onerror from the cancelled utterance as stale
       this.narrationQueue = [];
@@ -312,10 +346,11 @@ class AudioManagerClass {
       }
     };
 
-    // Chrome needs ~50 ms to process cancel() before a new speak() call is safe.
-    // Without this delay, the new utterance is queued before the engine has reset
-    // and onstart never fires.
-    if (options.interrupt) {
+    // Chrome needs time to process cancel() before a new speak() call is safe.
+    // Critical utterances get 80 ms to ensure the engine fully resets.
+    if (isCritical) {
+      setTimeout(startSpeaking, 80);
+    } else if (options.interrupt) {
       setTimeout(startSpeaking, 50);
     } else {
       startSpeaking();
