@@ -297,17 +297,28 @@ class AudioManagerClass {
 
     if (options.interrupt) {
       window.speechSynthesis.cancel();
+      this.utteranceSeq++;    // mark any pending onend/onerror from the cancelled utterance as stale
       this.narrationQueue = [];
       this.isSpeaking = false;
     }
 
     this.narrationQueue.push({ text: text.trim(), pan: options.pan });
 
-    // If voices haven't loaded yet, defer until they do
-    if (!this.voicesLoaded) {
-      this._deferUntilVoicesReady();
+    const startSpeaking = () => {
+      if (!this.voicesLoaded) {
+        this._deferUntilVoicesReady();
+      } else {
+        this._flush();
+      }
+    };
+
+    // Chrome needs ~50 ms to process cancel() before a new speak() call is safe.
+    // Without this delay, the new utterance is queued before the engine has reset
+    // and onstart never fires.
+    if (options.interrupt) {
+      setTimeout(startSpeaking, 50);
     } else {
-      this._flush();
+      startSpeaking();
     }
   }
 
@@ -316,6 +327,7 @@ class AudioManagerClass {
     if (!lines.length) return;
     if (options.interrupt) {
       window.speechSynthesis.cancel();
+      this.utteranceSeq++;    // mark any pending onend/onerror from the cancelled utterance as stale
       this.narrationQueue = [];
       this.isSpeaking = false;
     }
@@ -324,10 +336,20 @@ class AudioManagerClass {
         this.narrationQueue.push({ text: line.trim() });
       }
     }
-    if (!this.voicesLoaded) {
-      this._deferUntilVoicesReady();
+
+    const startSpeaking = () => {
+      if (!this.voicesLoaded) {
+        this._deferUntilVoicesReady();
+      } else {
+        this._flush();
+      }
+    };
+
+    // Give Chrome 50 ms to process cancel() before the new utterance queue starts.
+    if (options.interrupt) {
+      setTimeout(startSpeaking, 50);
     } else {
-      this._flush();
+      startSpeaking();
     }
   }
 
@@ -469,23 +491,6 @@ class AudioManagerClass {
     // belongs to a cancelled/stale utterance and is silently ignored.
     const mySeq = ++this.utteranceSeq;
 
-    // ── onstart watchdog ─────────────────────────────────────────────────────
-    // Chrome occasionally calls speechSynthesis.speak() but never fires onstart
-    // (happens after tab-backgrounding or rapid cancel/speak cycles).  If onstart
-    // hasn't fired within 2.5 s we assume the engine is stuck, cancel, and push
-    // the item back to the front of the queue for a fresh attempt.
-    let hasStarted = false;
-    const startWatchdog = setTimeout(() => {
-      if (hasStarted || mySeq !== this.utteranceSeq) return; // already running or stale
-      console.warn("[AudioManager] onstart timed out — restarting synthesis");
-      window.speechSynthesis.cancel();
-      this.isSpeaking = false;
-      this.narrationQueue.unshift(entry); // put it back at the front
-      setTimeout(() => {
-        if (!this.isSpeaking && mySeq === this.utteranceSeq) this._flush();
-      }, 400);
-    }, 2500);
-
     const utterance = new SpeechSynthesisUtterance(entry.text);
 
     // Apply selected voice — always re-resolve in case voices changed
@@ -498,8 +503,6 @@ class AudioManagerClass {
     utterance.lang   = voice?.lang ?? "en-US";
 
     utterance.onstart = () => {
-      hasStarted = true;
-      clearTimeout(startWatchdog); // utterance is alive — cancel the retry timer
       console.log("[AudioManager] TTS started:", entry.text.slice(0, 60));
       this.isSpeaking = true;
       // Speak-lock fires FIRST so the hook stops recognition before UI repaints
@@ -508,7 +511,6 @@ class AudioManagerClass {
     };
 
     utterance.onend = () => {
-      clearTimeout(startWatchdog);
       // Drop stale events from utterances cancelled by speak({ interrupt: true }).
       // Chrome fires onend asynchronously even for cancelled utterances; without
       // this guard the callback would incorrectly release the speak-lock while
@@ -541,11 +543,16 @@ class AudioManagerClass {
       }
     };
 
-    utterance.onerror = () => {
-      clearTimeout(startWatchdog);
-      // Also guard stale error events from cancelled utterances.
+    utterance.onerror = (event: SpeechSynthesisErrorEvent) => {
+      // 'interrupted' fires when we explicitly called cancel() — this is intentional
+      // and does NOT mean playback failed.  The new utterance is already queued;
+      // releasing the speak-lock here would incorrectly re-enable the mic early.
+      const errCode = event.error as string;
+      if (errCode === "interrupted" || errCode === "canceled" || errCode === "cancelled") return;
+
+      // Also guard stale error events from old utterances.
       if (mySeq !== this.utteranceSeq) return;
-      console.log("[AudioManager] TTS error — releasing speak-lock");
+      console.log("[AudioManager] TTS error —", event.error, "— releasing speak-lock");
       this.isSpeaking = false;
       this.speakLockCallback?.(false);
       this.onSpeakingChange?.(false);
