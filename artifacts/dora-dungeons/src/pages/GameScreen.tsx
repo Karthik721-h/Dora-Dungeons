@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useProcessAction, GameStateResponse, customFetch, type ArmorState } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
@@ -119,6 +120,9 @@ export function GameScreen({
   const onLogoutRef = useRef(onLogout);
   const voiceGenderRef = useRef(voiceGender);
   const voiceDropdownRef = useRef<HTMLDivElement>(null);
+  const voiceButtonRef  = useRef<HTMLButtonElement>(null);
+  const voiceMenuRef    = useRef<HTMLDivElement>(null);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, right: 0 });
 
   useEffect(() => {
     AudioManager.onStateChange(setAudioSpeaking);
@@ -445,10 +449,14 @@ export function GameScreen({
   shopItemsRef.current   = shopItems;
 
   // ── Click-outside: close voice dropdown ──────────────────────────────────────
+  // Check both the trigger container AND the portaled menu (rendered in document.body).
   useEffect(() => {
     if (!voiceDropdownOpen) return;
     const handler = (e: MouseEvent) => {
-      if (voiceDropdownRef.current && !voiceDropdownRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      const insideTrigger = voiceDropdownRef.current?.contains(target) ?? false;
+      const insideMenu    = voiceMenuRef.current?.contains(target) ?? false;
+      if (!insideTrigger && !insideMenu) {
         setVoiceDropdownOpen(false);
       }
     };
@@ -666,9 +674,16 @@ export function GameScreen({
           </span>
 
           {/* Voice gender switcher */}
-          <div className="relative" ref={voiceDropdownRef}>
+          <div ref={voiceDropdownRef}>
             <button
-              onClick={() => setVoiceDropdownOpen(v => !v)}
+              ref={voiceButtonRef}
+              onClick={() => {
+                if (!voiceDropdownOpen && voiceButtonRef.current) {
+                  const r = voiceButtonRef.current.getBoundingClientRect();
+                  setDropdownPos({ top: r.bottom + 6, right: window.innerWidth - r.right });
+                }
+                setVoiceDropdownOpen(v => !v);
+              }}
               className="flex items-center gap-1 px-2 py-0.5 rounded transition-colors hover:text-white"
               style={{
                 fontSize: "10px",
@@ -686,9 +701,11 @@ export function GameScreen({
               <span className="hidden sm:inline">Voice</span>
               <ChevronDown size={9} />
             </button>
+            {/* Portal: renders directly into document.body, above all stacking contexts */}
             <AnimatePresence>
-              {voiceDropdownOpen && (
+              {voiceDropdownOpen && createPortal(
                 <motion.div
+                  ref={voiceMenuRef}
                   initial={{ opacity: 0, y: -4, scale: 0.96 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -4, scale: 0.96 }}
@@ -696,15 +713,15 @@ export function GameScreen({
                   role="listbox"
                   aria-label="Narrator voice"
                   style={{
-                    position: "absolute",
-                    right: 0,
-                    top: "calc(100% + 6px)",
+                    position: "fixed",
+                    top: dropdownPos.top,
+                    right: dropdownPos.right,
                     minWidth: "120px",
                     background: "#1a1f29",
                     border: "1px solid rgba(200,155,60,0.25)",
                     borderRadius: "6px",
                     boxShadow: "0 8px 24px rgba(0,0,0,0.55)",
-                    zIndex: 100,
+                    zIndex: 9999,
                     overflow: "hidden",
                   }}
                 >
@@ -736,7 +753,8 @@ export function GameScreen({
                       {voiceGender === g && <span style={{ marginLeft: "auto", fontSize: "10px" }}>✓</span>}
                     </button>
                   ))}
-                </motion.div>
+                </motion.div>,
+                document.body
               )}
             </AnimatePresence>
           </div>
