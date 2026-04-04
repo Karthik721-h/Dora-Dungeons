@@ -707,62 +707,65 @@ export function GameScreen({
               <span className="hidden sm:inline">Voice</span>
               <ChevronDown size={9} />
             </button>
-            {/* Portal: renders directly into document.body, above all stacking contexts */}
-            <AnimatePresence>
-              {voiceDropdownOpen && portalContainer && createPortal(
-                <motion.div
-                  ref={voiceMenuRef}
-                  initial={{ opacity: 0, y: -4, scale: 0.96 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -4, scale: 0.96 }}
-                  transition={{ duration: 0.12 }}
-                  role="listbox"
-                  aria-label="Narrator voice"
-                  style={{
-                    position: "fixed",
-                    top: dropdownPos.top,
-                    right: dropdownPos.right,
-                    minWidth: "120px",
-                    background: "#1a1f29",
-                    border: "1px solid rgba(200,155,60,0.25)",
-                    borderRadius: "6px",
-                    boxShadow: "0 8px 24px rgba(0,0,0,0.55)",
-                    zIndex: 9999,
-                    overflow: "hidden",
-                  }}
-                >
-                  {(["female", "male"] as const).map((g) => (
-                    <button
-                      key={g}
-                      role="option"
-                      aria-selected={voiceGender === g}
-                      onClick={() => handleVoiceSelect(g)}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                        width: "100%",
-                        padding: "9px 14px",
-                        fontSize: "12px",
-                        textAlign: "left",
-                        background: voiceGender === g ? "rgba(200,155,60,0.1)" : "transparent",
-                        color: voiceGender === g ? "#c89b3c" : "rgba(200,190,180,0.7)",
-                        letterSpacing: "0.06em",
-                        cursor: "pointer",
-                        transition: "background 0.12s",
-                      }}
-                      onMouseEnter={e => { if (voiceGender !== g) (e.currentTarget as HTMLButtonElement).style.background = "rgba(200,190,180,0.06)"; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = voiceGender === g ? "rgba(200,155,60,0.1)" : "transparent"; }}
-                    >
-                      <span style={{ fontSize: "13px" }}>{g === "female" ? "♀" : "♂"}</span>
-                      <span style={{ textTransform: "capitalize" }}>{g}</span>
-                      {voiceGender === g && <span style={{ marginLeft: "auto", fontSize: "10px" }}>✓</span>}
-                    </button>
-                  ))}
-                </motion.div>,
-                portalContainer
-              )}
-            </AnimatePresence>
+            {/* Portal: outside AnimatePresence so createPortal target is always document.body */}
+            {portalContainer && createPortal(
+              <AnimatePresence>
+                {voiceDropdownOpen && (
+                  <motion.div
+                    ref={voiceMenuRef}
+                    key="voice-dropdown"
+                    initial={{ opacity: 0, y: -4, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -4, scale: 0.96 }}
+                    transition={{ duration: 0.12 }}
+                    role="listbox"
+                    aria-label="Narrator voice"
+                    style={{
+                      position: "fixed",
+                      top: dropdownPos.top,
+                      right: dropdownPos.right,
+                      minWidth: "120px",
+                      background: "#1a1f29",
+                      border: "1px solid rgba(200,155,60,0.25)",
+                      borderRadius: "6px",
+                      boxShadow: "0 8px 24px rgba(0,0,0,0.55)",
+                      zIndex: 9999,
+                      overflow: "hidden",
+                    }}
+                  >
+                    {(["female", "male"] as const).map((g) => (
+                      <button
+                        key={g}
+                        role="option"
+                        aria-selected={voiceGender === g}
+                        onClick={() => handleVoiceSelect(g)}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          width: "100%",
+                          padding: "9px 14px",
+                          fontSize: "12px",
+                          textAlign: "left",
+                          background: voiceGender === g ? "rgba(200,155,60,0.1)" : "transparent",
+                          color: voiceGender === g ? "#c89b3c" : "rgba(200,190,180,0.7)",
+                          letterSpacing: "0.06em",
+                          cursor: "pointer",
+                          transition: "background 0.12s",
+                        }}
+                        onMouseEnter={e => { if (voiceGender !== g) (e.currentTarget as HTMLButtonElement).style.background = "rgba(200,190,180,0.06)"; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = voiceGender === g ? "rgba(200,155,60,0.1)" : "transparent"; }}
+                      >
+                        <span style={{ fontSize: "13px" }}>{g === "female" ? "♀" : "♂"}</span>
+                        <span style={{ textTransform: "capitalize" }}>{g}</span>
+                        {voiceGender === g && <span style={{ marginLeft: "auto", fontSize: "10px" }}>✓</span>}
+                      </button>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>,
+              portalContainer
+            )}
           </div>
 
           {/* Rate control */}

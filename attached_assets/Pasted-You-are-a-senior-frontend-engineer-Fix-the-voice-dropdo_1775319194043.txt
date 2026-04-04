@@ -1,0 +1,148 @@
+You are a senior frontend engineer.
+
+Fix the voice dropdown in "Dora Dungeons" so it always appears and is fully visible.
+
+---
+
+## PROBLEM
+
+* Clicking the "VOICE" button does not reliably show dropdown
+* When it shows, it is hidden or clipped
+
+---
+
+## GOAL
+
+* Dropdown always opens
+* Dropdown always appears ABOVE all UI
+* No clipping or invisibility
+
+---
+
+## STEP 1 — FIX TOGGLE LOGIC
+
+Ensure dropdown state is controlled:
+
+const [isOpen, setIsOpen] = useState(false);
+
+Button:
+
+onClick={() => setIsOpen(prev => !prev)}
+
+---
+
+## STEP 2 — USE PORTAL (CRITICAL)
+
+Render dropdown using React Portal:
+
+import { createPortal } from "react-dom";
+
+{isOpen && createPortal( <Dropdown />,
+document.body
+)}
+
+---
+
+## STEP 3 — POSITION DROPDOWN
+
+Attach ref to button:
+
+const buttonRef = useRef(null);
+
+Get position:
+
+const rect = buttonRef.current.getBoundingClientRect();
+
+Pass to dropdown:
+
+top: rect.bottom + 8
+left: rect.left
+
+---
+
+## STEP 4 — STYLE DROPDOWN
+
+.dropdown {
+position: fixed;
+z-index: 9999;
+background: #0b0f1a;
+border: 1px solid rgba(255,255,255,0.1);
+border-radius: 8px;
+padding: 8px;
+min-width: 160px;
+}
+
+---
+
+## STEP 5 — REMOVE CLIPPING
+
+Ensure navbar DOES NOT have:
+
+overflow: hidden;
+
+If present:
+→ change to overflow: visible;
+
+---
+
+## STEP 6 — CLICK OUTSIDE TO CLOSE
+
+useEffect(() => {
+const handleClick = (e) => {
+if (!dropdownRef.current?.contains(e.target)) {
+setIsOpen(false);
+}
+};
+
+document.addEventListener("click", handleClick);
+return () => document.removeEventListener("click", handleClick);
+}, []);
+
+---
+
+## STEP 7 — DEBUG (IMPORTANT)
+
+Add:
+
+console.log("Dropdown open:", isOpen);
+
+---
+
+## STEP 8 — VALIDATION
+
+Test:
+
+1. Click VOICE button
+   → Dropdown appears
+
+2. Resize screen
+   → Dropdown still visible
+
+3. Scroll
+   → Dropdown stays positioned
+
+4. Click outside
+   → Dropdown closes
+
+---
+
+## EXPECTED RESULT
+
+* Dropdown always appears
+* No clipping
+* No hidden UI
+* Smooth interaction
+
+---
+
+## OUTPUT
+
+* Fixed dropdown rendering
+* Portal-based UI
+* Clean toggle behavior
+
+---
+
+## STOP AFTER THIS STEP
+
+Do NOT modify other components
