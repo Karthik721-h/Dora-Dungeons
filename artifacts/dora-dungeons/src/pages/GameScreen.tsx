@@ -152,7 +152,15 @@ export function GameScreen({
         setNewFromIndex(prevLen);
 
         if (!isMuted && newLines.length > 0) {
-          AudioManager.speakLines(newLines, { interrupt: true });
+          // When the engine returns an "Unknown command" response, replace the
+          // verbose hint text with a single accessible prompt instead of reading
+          // out the raw developer-facing command syntax.
+          const isUnknownCommand = newLines.some(l => /^Unknown command:/i.test(l));
+          const linesToSpeak = isUnknownCommand
+            ? ["Say help to hear the available voice commands."]
+            : newLines;
+
+          AudioManager.speakLines(linesToSpeak, { interrupt: true });
           // Always queue exits after narration so visually impaired users
           // always know where they can go, regardless of which command fired.
           if (!exitsAlreadySpoken(newLines) && newData.gameStatus !== "GAME_OVER") {
