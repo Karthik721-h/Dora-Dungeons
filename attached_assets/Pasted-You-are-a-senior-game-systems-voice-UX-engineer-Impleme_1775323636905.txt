@@ -1,0 +1,213 @@
+You are a senior game systems + voice UX engineer.
+
+Implement a death/restart system in "Dora Dungeons" with full voice + UI support.
+
+---
+
+## GOAL
+
+When player dies:
+
+* Trigger TTS prompt
+* Allow voice decision (yes/no)
+* Provide UI restart button with modal in the The page (check image uploaded)
+
+---
+
+## STRICT RULES
+
+* DO NOT break game engine
+* DO NOT reset to previous level
+* ONLY restart current level
+* Keep logic centralized
+
+---
+
+## STEP 1 — DETECT PLAYER DEATH
+
+In GameEngine:
+
+IF player.hp <= 0:
+
+return {
+event: "PLAYER_DEAD"
+}
+
+---
+
+## STEP 2 — HANDLE DEATH IN UI
+
+In GameScreen:
+
+IF event === "PLAYER_DEAD":
+
+1. Set:
+
+gameState.mode = "death"
+
+2. Trigger TTS:
+
+AudioManager.speak(
+"You have fallen. Would you like to restart from the beginning of this level?",
+NarrationPriority.CRITICAL
+)
+
+---
+
+## STEP 3 — VOICE RESPONSE HANDLING
+
+Extend IntentProcessor:
+
+IF gameState.mode === "death":
+
+Normalize input:
+
+IF input === "yes":
+return { intent: "RESTART_LEVEL" }
+
+IF input === "no":
+return { intent: "EXIT_TO_LOGIN" }
+
+---
+
+## STEP 4 — HANDLE ACTIONS
+
+IF intent === "RESTART_LEVEL":
+
+Call:
+
+GameEngine.restartLevel(playerId)
+
+---
+
+IMPLEMENT restartLevel:
+
+* Restore player HP to max
+* Reset player position to level start
+* Reset enemies in current level
+* KEEP:
+
+  * weapons
+  * armor
+  * gold
+  * inventory
+
+---
+
+TTS:
+
+"You rise again at the beginning of the level. Stay vigilant."
+
+---
+
+IF intent === "EXIT_TO_LOGIN":
+
+* Clear session
+* Navigate to login page
+
+TTS:
+
+"You have exited the dungeon. Return when you are ready."
+
+---
+
+## STEP 5 — ADD RESTART BUTTON in the page (check image above)
+
+Add button:
+
+[ Restart ]
+
+---
+
+On click:
+
+Open modal
+
+---
+
+## STEP 6 — CREATE MODAL
+
+Modal text:
+
+"Do you wish to restart all over?"
+
+Buttons:
+
+[ No ]   [ Yes ]
+
+---
+
+IF user clicks YES:
+
+→ restartLevel()
+
+---
+
+IF user clicks NO:
+
+→ navigate to login
+
+---
+
+## STEP 7 — ACCESSIBILITY (IMPORTANT)
+
+When modal opens:
+
+TTS:
+
+"Do you wish to restart? Say yes to restart or no to exit."
+
+---
+
+## STEP 8 — PREVENT INPUT CONFLICT
+
+While in death mode:
+
+* Disable normal commands
+* Only accept:
+
+  * yes
+  * no
+
+---
+
+## STEP 9 — VALIDATION
+
+Test:
+
+1. Player dies
+   → TTS prompt plays
+
+2. Say "yes"
+   → restart level
+
+3. Say "no"
+   → go to login
+
+4. Click Restart button
+   → modal appears
+
+5. Modal buttons work correctly
+
+---
+
+## EXPECTED RESULT
+
+* Clean death flow
+* Full voice + UI control
+* No state corruption
+
+---
+
+## OUTPUT
+
+* Death mode system
+* Voice decision handling
+* Restart + exit logic
+* Modal UI
+
+---
+
+## STOP AFTER THIS STEP
+
+Do NOT modify combat system

@@ -498,6 +498,74 @@ export class GameEngine {
     }
   }
 
+  // ── Restart ─────────────────────────────────────────────────────────────────
+
+  /**
+   * Restart the current dungeon run after a GAME_OVER.
+   *
+   * - Player HP and MP are fully restored.
+   * - Status effects and defending flag are cleared.
+   * - Player is moved back to the dungeon start room.
+   * - All enemies in every room are restored to full HP and un-defeated.
+   * - Room events are reset (triggered = false) and rooms are marked unexplored.
+   * - Combat state is cleared.
+   * - Weapons, armors, gold and inventory are preserved.
+   */
+  restartLevel(): GameState {
+    if (!this.state) throw new Error("No active game session");
+    const state = this.state;
+
+    // Restore player vitals — keep all gear and gold
+    state.player = {
+      ...state.player,
+      hp: state.player.maxHp,
+      mp: state.player.maxMp,
+      statusEffects: [],
+      isDefending: false,
+    };
+
+    // Return to the dungeon entrance
+    state.currentRoomId = state.dungeon.startRoomId;
+
+    // Restore every enemy in every room
+    for (const room of state.dungeon.rooms.values()) {
+      if (room.event.enemies) {
+        for (const enemy of room.event.enemies) {
+          enemy.hp = enemy.maxHp;
+          enemy.isDefeated = false;
+          enemy.statusEffects = [];
+        }
+      }
+      room.event.triggered = false;
+      room.isExplored = false;
+    }
+
+    // Clear combat state
+    state.combat = {
+      active: false,
+      enemies: [],
+      turnOrder: [],
+      currentTurnIndex: 0,
+      round: 1,
+      log: [],
+    };
+
+    state.gameStatus = GameStatus.EXPLORING;
+    state.turnCount = 0;
+
+    state.logs.push(
+      "══════════════════════════════",
+      "   YOU RISE AGAIN",
+      "══════════════════════════════",
+      `${state.player.name} rises from the shadows at the dungeon entrance.`,
+      "Weapons, armor, and gold intact. The dungeon awaits once more.",
+      "——————————————————————————————",
+      ...this.describeCurrentRoom(false),
+    );
+
+    return state;
+  }
+
   // ── Shop methods ────────────────────────────────────────────────────────────
   // Each method syncs state.gold ↔ player.gold (combat rewards accumulate in
   // state.gold; ShopService reads/writes player.gold) before and after the

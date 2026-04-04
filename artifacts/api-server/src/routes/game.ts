@@ -286,4 +286,32 @@ router.post("/shop/upgrade", async (req: Request, res: Response) => {
   res.json(response);
 });
 
+/**
+ * POST /game/restart
+ * Restart the current dungeon run after a GAME_OVER.
+ * Restores player HP/MP/status and resets all enemies.
+ * Keeps weapons, armors, gold and inventory.
+ */
+router.post("/restart", async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  const session = await loadSessionOrFail(userId, res);
+  if (!session) return;
+
+  const { engine, state } = session;
+
+  if (state.gameStatus !== GameStatus.GAME_OVER) {
+    res.status(400).json({
+      error: "NOT_GAME_OVER",
+      message: "Can only restart after a GAME_OVER.",
+    });
+    return;
+  }
+
+  const updatedState = engine.restartLevel();
+  await saveSession(userId, updatedState);
+
+  const response = GetGameStateResponse.parse(serializeGameState(updatedState));
+  res.json(response);
+});
+
 export default router;

@@ -86,6 +86,12 @@ export function GameScreen({
   // ── Shop state — backed by server state (player.weapons / player.inventoryItems) ──
   const [shopOpen, setShopOpen] = useState(false);
   const [shopMode, setShopMode] = useState<"main" | "buy" | "sell" | "upgrade">("main");
+
+  // ── Death / restart state ────────────────────────────────────────────────────
+  const [showRestartModal, setShowRestartModal] = useState(false);
+  const [restartPending, setRestartPending]     = useState(false);
+  // Guards against re-speaking the death TTS on subsequent renders.
+  const deathTtsSpokenRef = useRef(false);
   // Gold comes directly from gameState.gold — no separate shopGold state.
   const [shopWeapons, setShopWeapons] = useState<ShopWeapon[]>(() =>
     (gameState.player.weapons ?? []) as ShopWeapon[]
@@ -161,6 +167,23 @@ export function GameScreen({
     return () => clearTimeout(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ── Death TTS — fire once when GAME_OVER is detected ────────────────────────
+  const isGameOver = gameState.gameStatus === "GAME_OVER";
+  useEffect(() => {
+    if (!isGameOver) {
+      deathTtsSpokenRef.current = false;
+      return;
+    }
+    if (deathTtsSpokenRef.current) return;
+    deathTtsSpokenRef.current = true;
+    setShowRestartModal(true);
+    if (isMutedRef.current) return;
+    AudioManager.speak(
+      "You have fallen. Your quest ends here — for now. Say yes to restart the dungeon from the beginning, keeping all your weapons, armor, and gold. Say no to exit.",
+      { interrupt: true }
+    );
+  }, [isGameOver]);
 
   // ── Mutation ────────────────────────────────────────────────────────────────
   const { mutate: sendAction, isPending } = useProcessAction({
@@ -251,6 +274,22 @@ export function GameScreen({
         AudioManager.onQueueDrained(() => {
           onLogoutRef.current?.();
         });
+        return;
+      }
+
+      // ── Death mode: only yes/no accepted ────────────────────────────────────
+      if (trimmed === "restart_level") {
+        restartApi();
+        return;
+      }
+
+      if (trimmed === "exit_to_login") {
+        stopListeningRef.current();
+        AudioManager.speak(
+          "You have exited the dungeon. Return when you are ready.",
+          { interrupt: true }
+        );
+        AudioManager.onQueueDrained(() => { onLogoutRef.current?.(); });
         return;
       }
 
@@ -403,6 +442,21 @@ export function GameScreen({
   } = useVoiceInput({
     onFinalTranscript: (raw) => {
       if (/^(skip intro|skip|enter)$/i.test(raw.trim())) return;
+
+      // ── Death mode: only yes/no are valid; all else is silently dropped ──────
+      if (gameStateRef.current.gameStatus === "GAME_OVER") {
+        const { canonical } = processIntent(raw);
+        if (canonical === "restart_level" || canonical === "exit_to_login") {
+          submitCommand(canonical);
+        } else if (!isMutedRef.current) {
+          AudioManager.speak(
+            "Say yes to restart or no to exit.",
+            { interrupt: false }
+          );
+        }
+        return;
+      }
+
       const { canonical, wasNormalized, matched, suggestion } = processIntent(raw);
       setCommand(canonical);
       if (wasNormalized) setIntentHint(`"${raw}" → "${canonical}"`);
@@ -518,7 +572,6 @@ export function GameScreen({
   // ── Derived state ──────────────────────────────────────────────────────────
   const { player, currentRoom, logs, gameStatus, parsedCommand } = gameState;
   const isCombat = gameStatus === "IN_COMBAT";
-  const isGameOver = gameStatus === "GAME_OVER";
 
   // Merge server logs with any shop action messages AND client-side feedback
   // (e.g. unknown command notices) so they all appear in the terminal.
@@ -559,6 +612,34 @@ export function GameScreen({
     setShopWeapons((resp.player.weapons ?? []) as ShopWeapon[]);
     setShopArmors((resp.player.armors ?? []) as ShopArmor[]);
     setShopItems((resp.player.inventoryItems ?? []) as ShopInventoryItem[]);
+  };
+
+  // ── Restart API ────────────────────────────────────────────────────────────
+  const restartApi = async () => {
+    if (restartPending) return;
+    setRestartPending(true);
+    try {
+      const data = await customFetch<GameStateResponse>(
+        `${import.meta.env.BASE_URL}api/game/restart`,
+        { method: "POST" }
+      );
+      // Flush local log buffers and sync cache with fresh server state
+      setShopExtraLogs([]);
+      setLocalExtraLogs([]);
+      deathTtsSpokenRef.current = false;
+      setShowRestartModal(false);
+      setShopOpen(false);
+      setShopMode("main");
+      queryClient.setQueryData(getGetGameStateQueryKey(), data);
+      AudioManager.speak(
+        "You rise again at the beginning of the dungeon. Your weapons, armor, and gold are intact. Stay vigilant.",
+        { interrupt: true }
+      );
+    } catch {
+      AudioManager.speak("Something went wrong. Please try again.", { interrupt: true });
+    } finally {
+      setRestartPending(false);
+    }
   };
 
   // ── Shop API handlers ─────────────────────────────────────────────────────
@@ -1044,32 +1125,96 @@ export function GameScreen({
 
       {/* ── Game Over overlay ── */}
       <AnimatePresence>
-        {isGameOver && (
+        {isGameOver && showRestartModal && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             className="absolute inset-0 z-30 flex flex-col items-center justify-center"
-            style={{ background: "rgba(5,3,8,0.92)", backdropFilter: "blur(6px)" }}
+            style={{ background: "rgba(5,3,8,0.93)", backdropFilter: "blur(6px)" }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="You have fallen"
           >
             <motion.div
               initial={{ scale: 0.85, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.2, type: "spring" }}
-              className="text-center space-y-5"
+              transition={{ delay: 0.15, type: "spring", stiffness: 180 }}
+              className="text-center space-y-6 px-6"
+              style={{ maxWidth: 480 }}
             >
+              {/* Blood rune divider */}
               <div className="rune-divider w-52 mx-auto">✦</div>
+
+              {/* Title */}
               <h2
-                className="font-display text-5xl font-black tracking-widest"
+                className="font-display text-6xl font-black tracking-widest"
                 style={{
                   color: "#8b1e1e",
-                  textShadow: "0 0 40px rgba(139,30,30,0.7), 0 0 80px rgba(139,30,30,0.25)",
+                  textShadow: "0 0 40px rgba(139,30,30,0.8), 0 0 80px rgba(139,30,30,0.3)",
                 }}
               >
                 FALLEN
               </h2>
-              <p className="font-narration italic text-xl" style={{ color: "rgba(200,155,60,0.7)" }}>
-                The dungeon claims another soul.
+
+              {/* Flavour */}
+              <p className="font-narration italic text-xl" style={{ color: "rgba(200,155,60,0.75)" }}>
+                The dungeon claims another soul — but the story is not yet over.
               </p>
+
+              <p className="text-sm" style={{ color: "rgba(255,255,255,0.45)", letterSpacing: "0.05em" }}>
+                Weapons, armor &amp; gold are preserved.
+              </p>
+
+              {/* Yes / No buttons */}
+              <div className="flex gap-4 justify-center pt-2">
+                <motion.button
+                  whileHover={{ scale: restartPending ? 1 : 1.06 }}
+                  whileTap={{ scale: restartPending ? 1 : 0.95 }}
+                  onClick={restartApi}
+                  disabled={restartPending}
+                  aria-label="Yes, restart the dungeon"
+                  className="px-7 py-3 rounded-lg font-display text-lg font-bold tracking-wider"
+                  style={{
+                    background: restartPending ? "rgba(139,30,30,0.4)" : "rgba(139,30,30,0.85)",
+                    border: "1px solid rgba(139,30,30,0.9)",
+                    color: restartPending ? "rgba(255,255,255,0.4)" : "#fff",
+                    boxShadow: "0 0 18px rgba(139,30,30,0.4)",
+                    cursor: restartPending ? "not-allowed" : "pointer",
+                    minWidth: 130,
+                  }}
+                >
+                  {restartPending ? "Restarting…" : "Yes — Restart"}
+                </motion.button>
+
+                <motion.button
+                  whileHover={{ scale: restartPending ? 1 : 1.06 }}
+                  whileTap={{ scale: restartPending ? 1 : 0.95 }}
+                  onClick={() => {
+                    stopListeningRef.current();
+                    AudioManager.speak("You have exited the dungeon. Return when you are ready.", { interrupt: true });
+                    AudioManager.onQueueDrained(() => { onLogoutRef.current?.(); });
+                  }}
+                  disabled={restartPending}
+                  aria-label="No, exit the dungeon"
+                  className="px-7 py-3 rounded-lg font-display text-lg font-bold tracking-wider"
+                  style={{
+                    background: "rgba(26,31,41,0.8)",
+                    border: "1px solid rgba(200,155,60,0.4)",
+                    color: restartPending ? "rgba(200,155,60,0.3)" : "rgba(200,155,60,0.85)",
+                    boxShadow: "0 0 10px rgba(200,155,60,0.12)",
+                    cursor: restartPending ? "not-allowed" : "pointer",
+                    minWidth: 130,
+                  }}
+                >
+                  No — Exit
+                </motion.button>
+              </div>
+
+              {/* Voice hint */}
+              <p className="text-xs" style={{ color: "rgba(255,255,255,0.28)", letterSpacing: "0.06em" }}>
+                Say <strong style={{ color: "rgba(255,255,255,0.55)" }}>"yes"</strong> or <strong style={{ color: "rgba(255,255,255,0.55)" }}>"no"</strong>
+              </p>
+
               <div className="rune-divider w-52 mx-auto">✦</div>
             </motion.div>
           </motion.div>

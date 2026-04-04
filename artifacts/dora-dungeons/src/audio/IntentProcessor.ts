@@ -206,6 +206,16 @@ const PHRASE_PATTERNS: PhrasePair[] = [
     pattern: /^(?:exit|leave|close|quit|stop|done\s+(?:with|shopping)|back)\s+(?:(?:the\s+)?shop|shopping)?$|^(?:exit|leave)\s+(?:the\s+)?shop$/,
     canonical: () => "exit_shop",
   },
+
+  // --- Death screen: yes → restart, no → exit ---
+  {
+    pattern: /^(?:yes|yeah|yep|yup|sure|restart|try again|play again|start over|begin again)$/,
+    canonical: () => "restart_level",
+  },
+  {
+    pattern: /^(?:no|nope|nah|exit|quit|leave|give up|stop playing)$/,
+    canonical: () => "exit_to_login",
+  },
 ];
 
 // ── Fuzzy suggestion helpers ──────────────────────────────────────────────────
