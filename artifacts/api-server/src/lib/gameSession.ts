@@ -51,6 +51,9 @@ function fromStorable(stored: StoredState): GameState {
     },
   } as GameState;
   state.player = migratePlayer(state.player);
+  // Events are one-shot signals — they must not persist across requests.
+  // Clear any event that was saved with the state (e.g. LEVEL_COMPLETED).
+  delete state.event;
   return state;
 }
 

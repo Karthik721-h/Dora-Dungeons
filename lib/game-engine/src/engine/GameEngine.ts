@@ -53,8 +53,10 @@ export class GameEngine {
     player.dungeonLevel = player.dungeonLevel || 1;
     player.dungeonLevelCompleted = false;
 
-    // Mix the dungeon level into the seed so each level generates a different layout.
-    const effectiveSeed = dungeonSeed ?? `level-${player.dungeonLevel}-${uuid()}`;
+    // Stable seed: same player + same dungeon level → same layout every time.
+    // A random uuid() fallback is intentionally NOT used — we want repeatability
+    // so the player gets a consistent dungeon if they restart at the same level.
+    const effectiveSeed = dungeonSeed ?? `level-${player.dungeonLevel}-${player.id.slice(0, 8)}`;
     const dungeon = generateDungeon(effectiveSeed);
 
     this.state = {
@@ -497,7 +499,6 @@ export class GameEngine {
         "   VICTORY! THE DUNGEON FALLS",
         "══════════════════════════════",
         `The boss is slain. ${state.player.name} stands victorious in the silence.`,
-        "You have defeated the boss of this dungeon.",
         `Final Level: ${state.player.level} | Dungeon: ${state.player.dungeonLevel} | Gold: ${state.gold} | Turns: ${state.turnCount}`
       );
       return;
