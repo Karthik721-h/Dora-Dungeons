@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { getGetGameStateQueryKey } from "@workspace/api-client-react";
 import {
   Map, Skull, TerminalSquare, Volume2, VolumeX, Plus, Minus,
-  Eye, Info, LogOut, Swords, ChevronDown,
+  Eye, Info, LogOut, Swords, ChevronDown, ShoppingBag,
 } from "lucide-react";
 
 import { AudioManager } from "@/audio/AudioManager";
@@ -14,6 +14,8 @@ import { useVoiceInput } from "@/hooks/useVoiceInput";
 import { NarrationFeed } from "@/components/NarrationFeed";
 import { PlayerHUD } from "@/components/PlayerHUD";
 import { VoiceControl } from "@/components/VoiceControl";
+import { ShopPanel } from "@/components/ShopPanel";
+import { ShopWeapon, ShopArmor, ShopInventoryItem } from "@/shop";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -63,6 +65,14 @@ export function GameScreen({
   const [newFromIndex, setNewFromIndex] = useState(gameState.logs.length);
   const [voiceGender, setVoiceGender] = useState<"female" | "male">(() => AudioManager.getVoiceGender());
   const [voiceDropdownOpen, setVoiceDropdownOpen] = useState(false);
+
+  // ── Shop state (fully client-side; server doesn't track gold/weapons/armors yet) ──
+  const [shopOpen, setShopOpen] = useState(false);
+  const [shopGold, setShopGold] = useState(0);
+  const [shopWeapons, setShopWeapons] = useState<ShopWeapon[]>([]);
+  const [shopArmors, setShopArmors] = useState<ShopArmor[]>([]);
+  const [shopItems, setShopItems] = useState<ShopInventoryItem[]>([]);
+  const [shopExtraLogs, setShopExtraLogs] = useState<string[]>([]);
 
   const prevLogsRef = useRef<string[]>(gameState.logs);
   const queryClient = useQueryClient();
@@ -294,6 +304,24 @@ export function GameScreen({
   const { player, currentRoom, logs, gameStatus, parsedCommand } = gameState;
   const isCombat = gameStatus === "IN_COMBAT";
   const isGameOver = gameStatus === "GAME_OVER";
+
+  // Merge server logs with any shop action messages so they appear in the terminal
+  const displayLogs = shopExtraLogs.length > 0 ? [...logs, ...shopExtraLogs] : logs;
+
+  /** Append a shop action result to the terminal log feed. */
+  const addShopLog = (msg: string) => {
+    setShopExtraLogs(prev => {
+      setNewFromIndex(logs.length + prev.length);
+      return [...prev, `[SHOP] ${msg}`];
+    });
+  };
+
+  const handleShopUpdate = (next: { gold: number; weapons: ShopWeapon[]; armors: ShopArmor[]; items?: ShopInventoryItem[] }) => {
+    setShopGold(next.gold);
+    setShopWeapons(next.weapons);
+    setShopArmors(next.armors);
+    if (next.items !== undefined) setShopItems(next.items);
+  };
 
   const audioState: "idle" | "listening" | "speaking" | "processing" =
     voiceState === "speaking" || audioSpeaking ? "speaking"
@@ -596,6 +624,30 @@ export function GameScreen({
           >
             <Info size={12} />
           </button>
+
+          {/* ── Shop button ── */}
+          <motion.button
+            whileHover={{ scale: 1.06 }}
+            whileTap={{ scale: 0.94 }}
+            onClick={() => setShopOpen(v => !v)}
+            className="flex items-center gap-1 font-code text-xs uppercase px-2.5 py-1 transition-all"
+            style={{
+              border: shopOpen
+                ? "1px solid rgba(200,155,60,0.55)"
+                : "1px solid rgba(200,155,60,0.22)",
+              color: shopOpen ? "#c89b3c" : "rgba(200,155,60,0.5)",
+              background: shopOpen ? "rgba(200,155,60,0.12)" : "rgba(200,155,60,0.04)",
+              borderRadius: 4,
+              fontSize: "10px",
+              letterSpacing: "0.15em",
+              cursor: "pointer",
+            }}
+            aria-label={shopOpen ? "Close shop" : "Open shop"}
+            title="Shop"
+          >
+            <ShoppingBag size={10} />
+            <span className="hidden sm:inline">Shop</span>
+          </motion.button>
         </div>
       </div>
 
@@ -628,8 +680,23 @@ export function GameScreen({
           </div>
 
           {/* Scrollable log area */}
-          <div className="flex-1 overflow-hidden">
-            <NarrationFeed logs={logs} newFromIndex={newFromIndex} />
+          <div className="flex-1 overflow-hidden relative">
+            <NarrationFeed logs={displayLogs} newFromIndex={newFromIndex} />
+
+            {/* ── Shop overlay (covers terminal area) ── */}
+            <AnimatePresence>
+              {shopOpen && (
+                <ShopPanel
+                  gold={shopGold}
+                  ownedWeapons={shopWeapons}
+                  ownedArmors={shopArmors}
+                  sellableItems={shopItems}
+                  onUpdate={handleShopUpdate}
+                  onLogMessage={addShopLog}
+                  onClose={() => setShopOpen(false)}
+                />
+              )}
+            </AnimatePresence>
           </div>
         </div>
 
