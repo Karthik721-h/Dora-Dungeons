@@ -101,6 +101,30 @@ export interface Item {
   type: ItemType;
   effect?: ItemEffect;
   equipped?: boolean;
+  /** Optional shop/drop value in gold. */
+  value?: number;
+}
+
+/** Shop weapon that the player can own or purchase. */
+export interface Weapon {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+}
+
+/** Shop armor that the player can own or purchase. */
+export interface Armor {
+  id: string;
+  name: string;
+  level: 1 | 2 | 3;
+}
+
+/** Simple inventory/shop item tracked in the player's bag. */
+export interface ShopItem {
+  id: string;
+  name: string;
+  value: number;
 }
 
 /**
@@ -156,6 +180,12 @@ export interface Player extends StatBlock {
   isDefending: boolean;
   baseAttack: number;
   baseDefense: number;
+  /** Gold coins carried by the player (for future shop system). */
+  gold: number;
+  /** Weapons owned by the player (for future shop/equipment system). */
+  weapons: Weapon[];
+  /** Armors owned by the player (for future shop/equipment system). */
+  armors: Armor[];
 }
 
 export interface Enemy extends StatBlock {

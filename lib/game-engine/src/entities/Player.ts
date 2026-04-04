@@ -22,6 +22,9 @@ export function createPlayer(name: string): Player {
     isDefending: false,
     baseAttack: 12,
     baseDefense: 8,
+    gold: 0,
+    weapons: [],
+    armors: [],
   };
 }
 

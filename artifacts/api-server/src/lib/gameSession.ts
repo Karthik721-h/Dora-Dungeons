@@ -27,14 +27,29 @@ function toStorable(state: GameState): StoredState {
   };
 }
 
-function fromStorable(stored: StoredState): GameState {
+/**
+ * Fill in any Player fields that may be missing in sessions persisted before
+ * the current schema version.  Safe to call on both old and new sessions.
+ */
+function migratePlayer(player: GameState["player"]): GameState["player"] {
   return {
+    ...player,
+    gold:    player.gold    ?? 0,
+    weapons: player.weapons ?? [],
+    armors:  player.armors  ?? [],
+  };
+}
+
+function fromStorable(stored: StoredState): GameState {
+  const state = {
     ...stored,
     dungeon: {
       ...stored.dungeon,
       rooms: new Map(stored.dungeon.rooms),
     },
   } as GameState;
+  state.player = migratePlayer(state.player);
+  return state;
 }
 
 // ── Engine hydration ──────────────────────────────────────────────────────────
