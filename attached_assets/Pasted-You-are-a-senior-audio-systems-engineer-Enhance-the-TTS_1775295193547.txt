@@ -1,0 +1,157 @@
+You are a senior audio systems engineer.
+
+Enhance the TTS narration system for "Dora Dungeons" to provide rich, dynamic, and immersive voice feedback for all Shop interactions.
+
+---
+
+## GOAL
+
+Upgrade narration quality without changing business logic.
+
+---
+
+## STRICT RULES
+
+* DO NOT modify ShopService logic
+* DO NOT change voice recognition logic
+* ONLY enhance AudioManager and narration output
+* Replace generic messages with immersive, dynamic narration
+
+---
+
+## STEP 1 — CENTRALIZE NARRATION
+
+Create a NarrationHelper (or extend existing system):
+
+Functions:
+
+* speakShopOpen()
+* speakWeaponList(weapons)
+* speakPurchaseSuccess(weaponName)
+* speakPurchaseFail()
+* speakSellSuccess(itemName, gold)
+* speakSellEmpty()
+* speakUpgradeSuccess(armorName, level, gold)
+* speakUpgradeFail()
+* speakNoArmor()
+
+---
+
+STEP 2 — REFINED NARRATION (IMPORTANT)
+
+Replace generic lines with:
+
+SHOP OPEN:
+"The blacksmith greets you. You may purchase weapons, sell items, or reinforce your armor. What would you like to do?"
+
+---
+
+WEAPON LIST:
+"Available weapons are as follows:"
+
+Then loop naturally:
+"Ashbringer, a legendary blade, costs 10 gold."
+(continue for all weapons)
+
+---
+
+PURCHASE SUCCESS:
+"Your purchase is complete. The weapon has been added to your equipment."
+
+---
+
+PURCHASE FAILURE:
+"You do not have enough gold for that purchase. Continue your journey to earn more."
+
+---
+
+SELL SUCCESS:
+"The item has been sold. Your gold reserves have increased."
+
+---
+
+EMPTY INVENTORY:
+"Your inventory is empty. Explore the dungeon to gather items."
+
+---
+
+UPGRADE SUCCESS:
+"Your armor has been reinforced successfully. Your defenses have improved."
+
+---
+
+UPGRADE FAILURE:
+"You do not have enough gold to reinforce this armor."
+
+---
+
+NO ARMOR:
+"You currently possess no armor to upgrade. Venture further into the dungeon to acquire gear."
+
+---
+
+---
+
+## STEP 3 — DYNAMIC DATA INSERTION
+
+Where appropriate, include:
+
+* weapon name
+* armor name
+* gold balance (optional)
+
+Example:
+"You now have 45 gold remaining."
+
+---
+
+## STEP 4 — SPEECH CONTROL
+
+* Interrupt previous speech before new narration
+* Ensure queue system prevents overlap
+* Maintain consistent speech rate and clarity
+
+---
+
+## STEP 5 — INTEGRATION
+
+Replace all shop-related TTS calls with NarrationHelper functions.
+
+Do NOT leave any generic strings.
+
+---
+
+## STEP 6 — OPTIONAL ATMOSPHERE
+
+Add slight pauses between sentences for realism.
+
+---
+
+## VALIDATION
+
+Test full flow:
+
+* Open shop
+* Buy weapon
+* Sell item
+* Upgrade armor
+
+Ensure:
+
+* Speech is clear
+* No overlap
+* Natural pacing
+
+---
+
+## OUTPUT
+
+* NarrationHelper (or equivalent)
+* Updated AudioManager usage
+* Replaced shop narration with immersive lines
+
+---
+
+## STOP AFTER THIS STEP
+
+Do NOT modify combat yet

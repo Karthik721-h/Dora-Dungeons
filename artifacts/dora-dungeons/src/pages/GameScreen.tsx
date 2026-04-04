@@ -16,6 +16,22 @@ import { PlayerHUD } from "@/components/PlayerHUD";
 import { VoiceControl } from "@/components/VoiceControl";
 import { ShopPanel, ShopView } from "@/components/ShopPanel";
 import { ShopWeapon, ShopArmor, ShopInventoryItem, SHOP_WEAPONS, buyWeapon, sellItem, upgradeArmor } from "@/shop";
+import {
+  speakShopOpen,
+  speakShopExit,
+  speakWeaponList,
+  speakPurchaseSuccess,
+  speakPurchaseFail,
+  speakSellList,
+  speakSellSuccess,
+  speakSellEmpty,
+  speakArmorList,
+  speakUpgradeSuccess,
+  speakUpgradeFail,
+  speakUpgradeMax,
+  speakNoArmor,
+  speakShopNoMatch,
+} from "@/audio/ShopNarration";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -212,28 +228,21 @@ export function GameScreen({
       if (trimmed === "open_shop") {
         setShopOpen(true);
         setShopMode("main");
-        AudioManager.speak(
-          "The shop is open. You may purchase weapons, sell items, or upgrade your armor. What would you like to do?",
-          { interrupt: true }
-        );
+        speakShopOpen();
         return;
       }
 
       if (trimmed === "exit_shop") {
         setShopOpen(false);
         setShopMode("main");
-        AudioManager.speak("You have exited the shop.", { interrupt: true });
+        speakShopExit();
         return;
       }
 
       if (trimmed === "shop_buy") {
         if (!shopOpenRef.current) { setShopOpen(true); }
         setShopMode("buy");
-        const lines = [
-          "These are the weapons available for purchase.",
-          ...SHOP_WEAPONS.map((w) => `${w.name}, ${w.price} gold.`),
-        ];
-        AudioManager.speakLines(lines, { interrupt: true });
+        speakWeaponList(SHOP_WEAPONS);
         return;
       }
 
@@ -241,15 +250,9 @@ export function GameScreen({
         if (!shopOpenRef.current) { setShopOpen(true); }
         setShopMode("sell");
         if (shopItemsRef.current.length === 0) {
-          AudioManager.speak("Your inventory is empty.", { interrupt: true });
+          speakSellEmpty();
         } else {
-          AudioManager.speakLines(
-            [
-              "You have the following items available for sale.",
-              ...shopItemsRef.current.map((i) => `${i.name}, worth ${i.value} gold.`),
-            ],
-            { interrupt: true }
-          );
+          speakSellList(shopItemsRef.current);
         }
         return;
       }
@@ -258,19 +261,9 @@ export function GameScreen({
         if (!shopOpenRef.current) { setShopOpen(true); }
         setShopMode("upgrade");
         if (shopArmorsRef.current.length === 0) {
-          AudioManager.speak("You do not have any armor to upgrade.", { interrupt: true });
+          speakNoArmor();
         } else {
-          AudioManager.speakLines(
-            [
-              "These are your available armors for upgrade.",
-              ...shopArmorsRef.current.map((a) =>
-                a.level === 3
-                  ? `${a.name}, level three, already at maximum.`
-                  : `${a.name}, level ${a.level}, upgrade costs ${a.level === 1 ? 20 : 30} gold.`
-              ),
-            ],
-            { interrupt: true }
-          );
+          speakArmorList(shopArmorsRef.current);
         }
         return;
       }
@@ -286,10 +279,10 @@ export function GameScreen({
             if (result.success) {
               setShopGold(result.data.gold);
               setShopWeapons(result.data.weapons);
-              AudioManager.speak(`${match.name} purchased. You have ${result.data.gold} gold remaining.`, { interrupt: true });
+              speakPurchaseSuccess(match.name, result.data.gold);
               addShopLog(`✓ ${match.name} purchased successfully.`);
             } else {
-              AudioManager.speak("You do not have sufficient gold for this action.", { interrupt: true });
+              speakPurchaseFail();
             }
             return;
           }
@@ -302,10 +295,10 @@ export function GameScreen({
             if (result.success) {
               setShopGold(result.data.gold);
               setShopItems(result.data.inventory);
-              AudioManager.speak(`${match.name} sold for ${match.value} gold. You now have ${result.data.gold} gold.`, { interrupt: true });
+              speakSellSuccess(match.name, result.data.gold);
               addShopLog(`✓ ${match.name} sold successfully.`);
             } else {
-              AudioManager.speak("That item could not be found.", { interrupt: true });
+              speakShopNoMatch();
             }
             return;
           }
@@ -319,22 +312,19 @@ export function GameScreen({
               setShopGold(result.data.gold);
               setShopArmors(result.data.armors);
               const upgraded = result.data.armors.find((a) => a.id === match.id);
-              AudioManager.speak(
-                `${match.name} upgraded to level ${upgraded?.level}. You have ${result.data.gold} gold remaining.`,
-                { interrupt: true }
-              );
+              speakUpgradeSuccess(match.name, upgraded?.level ?? 0, result.data.gold);
               addShopLog(`✓ ${match.name} upgraded to level ${upgraded?.level}.`);
             } else if (result.message === "ARMOR_MAX_LEVEL") {
-              AudioManager.speak("This armor is already at maximum level.", { interrupt: true });
+              speakUpgradeMax();
             } else {
-              AudioManager.speak("You do not have sufficient gold for this action.", { interrupt: true });
+              speakUpgradeFail();
             }
             return;
           }
         }
 
         // In shop but no name matched
-        AudioManager.speak("I did not recognize that. Please try again.", { interrupt: true });
+        speakShopNoMatch();
         return;
       }
 
