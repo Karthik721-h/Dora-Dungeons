@@ -30,6 +30,19 @@ export interface ParsedCommand {
   raw: string;
 }
 
+export interface WeaponState {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+}
+
+export interface ArmorState {
+  id: string;
+  name: string;
+  level: 1 | 2 | 3;
+}
+
 export interface PlayerState {
   id: string;
   name: string;
@@ -44,6 +57,12 @@ export interface PlayerState {
   defense: number;
   abilities: string[];
   inventory: string[];
+  /** Weapons purchased from the shop */
+  weapons: WeaponState[];
+  /** Armors owned by the player */
+  armors: ArmorState[];
+  /** Full inventory details (id + value) for the shop sell view */
+  inventoryItems: { id: string; name: string; value: number }[];
 }
 
 export interface EnemyState {
@@ -73,10 +92,14 @@ export interface GameStateResponse {
   sessionId: string;
   /** IDLE, IN_COMBAT, EXPLORING, GAME_OVER, VICTORY */
   gameStatus: string;
+  /** Current gold amount (combat earned + shop balance) */
+  gold: number;
   player: PlayerState;
   currentRoom: RoomState;
   /** Narrative messages describing what happened */
   logs: string[];
+  /** New logs appended since last action (only present on action responses) */
+  newLogs?: string[];
   /** The command that was parsed (only present on action responses) */
   parsedCommand?: ParsedCommand;
   turnCount: number;

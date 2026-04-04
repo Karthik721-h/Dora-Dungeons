@@ -7,6 +7,8 @@ import {
   Enemy,
   Item,
   Ability,
+  Weapon,
+  Armor,
 } from "@workspace/game-engine";
 import {
   StartGameBody,
@@ -14,6 +16,10 @@ import {
   StartGameResponse,
   ProcessActionResponse,
   GetGameStateResponse,
+  ShopBuyBody,
+  ShopSellBody,
+  ShopUpgradeBody,
+  ShopActionResponse,
 } from "@workspace/api-zod";
 import { loadSession, saveSession, deleteSession } from "../lib/gameSession.js";
 
@@ -36,6 +42,17 @@ function serializePlayer(p: Player) {
     defense: p.defense,
     abilities: p.abilities.map((a: Ability) => a.name),
     inventory: p.inventory.map((i: Item) => i.name),
+    weapons: (p.weapons ?? []).map((w: Weapon) => ({
+      id: w.id, name: w.name, description: w.description, price: w.price,
+    })),
+    armors: (p.armors ?? []).map((a: Armor) => ({
+      id: a.id, name: a.name, level: a.level,
+    })),
+    // Full inventory details (id + name + value) so the shop sell view can
+    // display real items with their correct IDs for server-side selling.
+    inventoryItems: (p.inventory ?? []).map((i: Item) => ({
+      id: i.id, name: i.name, value: i.value ?? 0,
+    })),
   };
 }
 
@@ -186,6 +203,86 @@ router.get("/state", async (req: Request, res: Response) => {
   }
 
   const response = GetGameStateResponse.parse(serializeGameState(session.state));
+  res.json(response);
+});
+
+// ── Shop routes ───────────────────────────────────────────────────────────────
+
+async function loadSessionOrFail(userId: string, res: Response): Promise<{ engine: GameEngine; state: GameState } | null> {
+  const session = await loadSession(userId);
+  if (!session) {
+    res.status(404).json({ error: "NOT_FOUND", message: "No active game session." });
+    return null;
+  }
+  return session;
+}
+
+/**
+ * POST /game/shop/buy
+ * Purchase a weapon. Deducts gold and adds weapon to player.weapons.
+ */
+router.post("/shop/buy", async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  const session = await loadSessionOrFail(userId, res);
+  if (!session) return;
+
+  const { weaponId } = ShopBuyBody.parse(req.body);
+  const { engine, state } = session;
+  const { success, message } = engine.buyWeaponShop(weaponId);
+
+  await saveSession(userId, state);
+  const response = ShopActionResponse.parse({
+    success,
+    message,
+    gold: state.gold,
+    player: serializePlayer(state.player),
+  });
+  res.json(response);
+});
+
+/**
+ * POST /game/shop/sell
+ * Sell an inventory item. Adds its value to player.gold.
+ */
+router.post("/shop/sell", async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  const session = await loadSessionOrFail(userId, res);
+  if (!session) return;
+
+  const { itemId } = ShopSellBody.parse(req.body);
+  const { engine, state } = session;
+  const { success, message } = engine.sellItemShop(itemId);
+
+  await saveSession(userId, state);
+  const response = ShopActionResponse.parse({
+    success,
+    message,
+    gold: state.gold,
+    player: serializePlayer(state.player),
+  });
+  res.json(response);
+});
+
+/**
+ * POST /game/shop/upgrade
+ * Upgrade an armor piece by one level. Deducts gold.
+ */
+router.post("/shop/upgrade", async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  const session = await loadSessionOrFail(userId, res);
+  if (!session) return;
+
+  const { armorId } = ShopUpgradeBody.parse(req.body);
+  const { engine, state } = session;
+  const { success, message } = engine.upgradeArmorShop(armorId);
+
+  await saveSession(userId, state);
+  const response = ShopActionResponse.parse({
+    success,
+    message,
+    gold: state.gold,
+    player: serializePlayer(state.player),
+  });
   res.json(response);
 });
 

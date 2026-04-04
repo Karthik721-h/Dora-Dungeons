@@ -6,15 +6,16 @@ import {
   ARMOR_UPGRADE_COSTS,
   ShopWeapon,
   ShopArmor,
-  buyWeapon,
-  sellItem,
-  upgradeArmor,
   ShopInventoryItem,
 } from "@/shop";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type ShopView = "main" | "buy" | "sell" | "upgrade";
+
+export interface ShopBuyResult   { success: boolean; message: string; gold: number; weapons: ShopWeapon[] }
+export interface ShopSellResult  { success: boolean; message: string; gold: number; items: ShopInventoryItem[] }
+export interface ShopUpgradeResult { success: boolean; message: string; gold: number; armors: ShopArmor[] }
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -27,7 +28,10 @@ interface ShopPanelProps {
   /** Controlled view — managed by the parent so voice commands can drive navigation. */
   view: ShopView;
   onViewChange: (v: ShopView) => void;
-  onUpdate: (next: { gold: number; weapons: ShopWeapon[]; armors: ShopArmor[]; items?: ShopInventoryItem[] }) => void;
+  /** Async API handlers — parent calls server, returns updated state. */
+  onBuy: (weaponId: string) => Promise<ShopBuyResult>;
+  onSell: (itemId: string) => Promise<ShopSellResult>;
+  onUpgrade: (armorId: string) => Promise<ShopUpgradeResult>;
   onLogMessage: (msg: string) => void;
   onClose: () => void;
 }
@@ -135,15 +139,14 @@ export function ShopPanel({
   sellableItems,
   view,
   onViewChange,
-  onUpdate,
+  onBuy,
+  onSell,
+  onUpgrade,
   onLogMessage,
   onClose,
 }: ShopPanelProps) {
   const [feedback, setFeedback] = useState<string | null>(null);
-  // gold prop is the single source of truth (gameState.player.gold from parent)
-  const [localWeapons, setLocalWeapons] = useState<ShopWeapon[]>(ownedWeapons);
-  const [localArmors, setLocalArmors] = useState<ShopArmor[]>(ownedArmors);
-  const [localItems, setLocalItems] = useState<ShopInventoryItem[]>(sellableItems);
+  const [busy, setBusy] = useState(false);
 
   function flash(msg: string) {
     setFeedback(msg);
@@ -151,51 +154,68 @@ export function ShopPanel({
     setTimeout(() => setFeedback(null), 3200);
   }
 
-  function handleBuy(weaponId: string) {
-    console.log("Shop gold prop:", gold);
-    const result = buyWeapon(gold, localWeapons, weaponId);
-    if (result.success) {
-      setLocalWeapons(result.data.weapons);
-      onUpdate({ gold: result.data.gold, weapons: result.data.weapons, armors: localArmors });
-      flash("✓ Weapon purchased successfully.");
-    } else {
-      flash(result.message === "NOT_ENOUGH_GOLD"
-        ? "✗ You do not have enough gold."
-        : "✗ That weapon could not be found.");
+  async function handleBuy(weaponId: string) {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const result = await onBuy(weaponId);
+      if (result.success) {
+        flash("✓ Weapon purchased successfully.");
+      } else {
+        flash(result.message === "NOT_ENOUGH_GOLD"
+          ? "✗ You do not have enough gold."
+          : result.message === "ALREADY_OWNED"
+          ? "✗ You already own that weapon."
+          : `✗ ${result.message || "Purchase failed."}`);
+      }
+    } catch {
+      flash("✗ Could not reach the shop. Try again.");
+    } finally {
+      setBusy(false);
     }
   }
 
-  function handleSell(itemId: string) {
-    console.log("Shop gold prop:", gold);
-    const result = sellItem(gold, localItems, itemId);
-    if (result.success) {
-      setLocalItems(result.data.inventory);
-      onUpdate({ gold: result.data.gold, weapons: localWeapons, armors: localArmors, items: result.data.inventory });
-      flash("✓ Item sold successfully.");
-    } else {
-      flash("✗ That item could not be found.");
+  async function handleSell(itemId: string) {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const result = await onSell(itemId);
+      if (result.success) {
+        flash("✓ Item sold successfully.");
+      } else {
+        flash(`✗ ${result.message || "Could not sell that item."}`);
+      }
+    } catch {
+      flash("✗ Could not reach the shop. Try again.");
+    } finally {
+      setBusy(false);
     }
   }
 
-  function handleUpgrade(armorId: string) {
-    console.log("Shop gold prop:", gold);
-    const result = upgradeArmor(gold, localArmors, armorId);
-    if (result.success) {
-      setLocalArmors(result.data.armors);
-      onUpdate({ gold: result.data.gold, weapons: localWeapons, armors: result.data.armors });
-      flash("✓ Armor upgraded successfully.");
-    } else {
-      const msg =
-        result.message === "ARMOR_MAX_LEVEL" ? "✗ This armor is already at maximum level."
-        : result.message === "NOT_ENOUGH_GOLD" ? "✗ You do not have enough gold."
-        : "✗ Upgrade failed.";
-      flash(msg);
+  async function handleUpgrade(armorId: string) {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const result = await onUpgrade(armorId);
+      if (result.success) {
+        flash("✓ Armor upgraded successfully.");
+      } else {
+        const msg =
+          result.message === "ARMOR_MAX_LEVEL" ? "✗ This armor is already at maximum level."
+          : result.message === "NOT_ENOUGH_GOLD" ? "✗ You do not have enough gold."
+          : `✗ ${result.message || "Upgrade failed."}`;
+        flash(msg);
+      }
+    } catch {
+      flash("✗ Could not reach the shop. Try again.");
+    } finally {
+      setBusy(false);
     }
   }
 
   // ── Weapon list (with purchased indicator) ──────────────────────────────────
 
-  const ownedIds = new Set(localWeapons.map((w) => w.id));
+  const ownedIds = new Set(ownedWeapons.map((w) => w.id));
 
   const renderBuyView = () => (
     <>
@@ -230,13 +250,13 @@ export function ShopPanel({
   const renderSellView = () => (
     <>
       <SectionHeader icon={<Package size={12} />} title="Sell Items" onBack={() => { onViewChange("main"); setFeedback(null); }} />
-      {localItems.length === 0 ? (
+      {sellableItems.length === 0 ? (
         <p style={{ fontFamily: "'Crimson Text', serif", fontStyle: "italic", color: "rgba(200,185,150,0.4)", fontSize: "0.85rem", padding: "0.5rem 0" }}>
           Your inventory is empty.
         </p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", overflowY: "auto", maxHeight: "clamp(160px, 28vh, 340px)" }}>
-          {localItems.map((item) => (
+          {sellableItems.map((item) => (
             <ShopBtn key={item.id} onClick={() => handleSell(item.id)} variant="gold">
               <span style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span>{item.name}</span>
@@ -252,13 +272,13 @@ export function ShopPanel({
   const renderUpgradeView = () => (
     <>
       <SectionHeader icon={<Shield size={12} />} title="Upgrade Armor" onBack={() => { onViewChange("main"); setFeedback(null); }} />
-      {localArmors.length === 0 ? (
+      {ownedArmors.length === 0 ? (
         <p style={{ fontFamily: "'Crimson Text', serif", fontStyle: "italic", color: "rgba(200,185,150,0.4)", fontSize: "0.85rem", padding: "0.5rem 0" }}>
           No armor available to upgrade.
         </p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", overflowY: "auto", maxHeight: "clamp(160px, 28vh, 340px)" }}>
-          {localArmors.map((armor) => {
+          {ownedArmors.map((armor) => {
             const cost = armor.level < 3 ? ARMOR_UPGRADE_COSTS[armor.level as 1 | 2] : null;
             const isMax = armor.level === 3;
             const canAfford = cost !== null && gold >= cost;

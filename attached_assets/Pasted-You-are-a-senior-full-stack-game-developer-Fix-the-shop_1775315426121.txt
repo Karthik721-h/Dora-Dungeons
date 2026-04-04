@@ -1,0 +1,176 @@
+You are a senior full-stack game developer.
+
+Fix the shop purchase system in "Dora Dungeons".
+
+---
+
+## PROBLEM
+
+* Buying a weapon does NOT:
+
+  * deduct gold
+  * add weapon to player status
+
+---
+
+## GOAL
+
+Make shop purchases correctly update:
+
+* player.gold
+* player.weapons
+* game state (frontend + backend)
+
+---
+
+## STRICT RULES
+
+* DO NOT create duplicate state
+* Use existing GameEngine as source of truth
+* Keep logic inside engine, NOT UI
+* Ensure frontend syncs after update
+
+---
+
+## STEP 1 — LOCATE PURCHASE FLOW
+
+Find where "Buy Weapon" is handled:
+
+* UI button click OR
+* voice command ("buy weapon")
+
+---
+
+## STEP 2 — MOVE LOGIC INTO GAME ENGINE
+
+Create or fix function:
+
+GameEngine.buyWeapon(playerId, weaponId)
+
+---
+
+IMPLEMENT:
+
+1. Get player
+
+2. Get weapon data
+
+3. CHECK gold:
+   IF player.gold < weapon.price:
+   RETURN failure
+
+4. ELSE:
+
+* player.gold -= weapon.price
+* player.weapons.push(weapon)
+
+5. RETURN updated player state
+
+---
+
+## STEP 3 — UPDATE BACKEND ROUTE
+
+In API:
+
+POST /shop/buy
+
+Call:
+
+const updatedState = GameEngine.buyWeapon(...)
+
+Return updatedState
+
+---
+
+## STEP 4 — FIX FRONTEND SYNC
+
+After purchase:
+
+setGameState(response.updatedState)
+
+---
+
+Ensure:
+
+* player.gold updates
+* player.weapons updates
+
+---
+
+## STEP 5 — UPDATE STATUS DISPLAY
+
+In Status UI:
+
+Replace:
+
+Weapon: None
+
+With:
+
+Weapon: {player.weapons.length > 0 ? player.weapons[0].name : "None"}
+
+---
+
+## STEP 6 — TTS FEEDBACK
+
+On success:
+
+AudioManager.speak(
+"You have purchased a new weapon. It has been added to your inventory.",
+NarrationPriority.MEDIUM
+)
+
+On failure:
+
+AudioManager.speak(
+"You do not have enough gold to purchase this weapon.",
+NarrationPriority.MEDIUM
+)
+
+---
+
+## STEP 7 — DEBUG LOGGING
+
+Add:
+
+console.log("Before purchase:", player.gold, player.weapons)
+console.log("After purchase:", player.gold, player.weapons)
+
+---
+
+## STEP 8 — VALIDATION
+
+Test:
+
+1. Buy weapon with enough gold:
+   → Gold decreases
+   → Weapon appears in status
+
+2. Buy without enough gold:
+   → No change
+
+3. Refresh UI:
+   → State persists
+
+---
+
+## EXPECTED RESULT
+
+* Weapons are added correctly
+* Gold is deducted correctly
+* UI updates instantly
+* No desync between shop and status
+
+---
+
+## OUTPUT
+
+* Fixed GameEngine purchase logic
+* Synced frontend state
+* Working shop system
+
+---
+
+## STOP AFTER THIS STEP
+
+Do NOT modify combat system

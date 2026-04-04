@@ -16,6 +16,12 @@ import { NarrationEngine } from "../narration/NarrationEngine.js";
 import { triggerRoomEvent } from "../systems/EventSystem.js";
 import { findItemByName, useConsumable, applyEquipment } from "../systems/ItemSystem.js";
 import { createPlayer, calculateXpToNextLevel } from "../entities/Player.js";
+import {
+  buyWeapon as shopBuyWeapon,
+  sellItem as shopSellItem,
+  upgradeArmor as shopUpgradeArmor,
+  findWeaponById,
+} from "../services/ShopService.js";
 
 function uuid(): string {
   return crypto.randomUUID();
@@ -411,7 +417,12 @@ export class GameEngine {
 
   private describePlayerStatus(): string[] {
     const p = this.state!.player;
-    const weapon = p.equippedWeapon ? `Weapon: ${p.equippedWeapon.name}` : "Weapon: None";
+    const weaponDisplay = p.equippedWeapon
+      ? p.equippedWeapon.name
+      : p.weapons.length > 0
+        ? p.weapons.map((w) => w.name).join(", ")
+        : "None";
+    const weapon = `Weapon: ${weaponDisplay}`;
     const armor = p.equippedArmor ? `Armor: ${p.equippedArmor.name}` : "Armor: None";
     const effects =
       p.statusEffects.length > 0
@@ -485,5 +496,55 @@ export class GameEngine {
       state.combat.active = false;
       state.gameStatus = GameStatus.EXPLORING;
     }
+  }
+
+  // ── Shop methods ────────────────────────────────────────────────────────────
+  // Each method syncs state.gold ↔ player.gold (combat rewards accumulate in
+  // state.gold; ShopService reads/writes player.gold) before and after the
+  // transaction, then persists the result back into engine state.
+
+  buyWeaponShop(weaponId: string): { success: boolean; message: string } {
+    if (!this.state) throw new Error("No active game session");
+    const state = this.state;
+    // Sync combat gold into player before the shop reads player.gold
+    state.player = { ...state.player, gold: state.gold };
+    console.log("Before purchase: gold =", state.gold, "weapons =", state.player.weapons.map(w => w.name));
+    const result = shopBuyWeapon(state.player, weaponId);
+    if (result.success) {
+      state.player = result.updatedPlayer;
+      state.gold = result.updatedPlayer.gold;
+      const bought = findWeaponById(weaponId)!;
+      state.logs.push(`You purchased ${bought.name} for ${bought.price} gold.`);
+      console.log("After purchase: gold =", state.gold, "weapons =", state.player.weapons.map(w => w.name));
+    }
+    return { success: result.success, message: result.message };
+  }
+
+  sellItemShop(itemId: string): { success: boolean; message: string } {
+    if (!this.state) throw new Error("No active game session");
+    const state = this.state;
+    state.player = { ...state.player, gold: state.gold };
+    const itemName = state.player.inventory.find((i) => i.id === itemId)?.name ?? itemId;
+    const result = shopSellItem(state.player, itemId);
+    if (result.success) {
+      state.player = result.updatedPlayer;
+      state.gold = result.updatedPlayer.gold;
+      state.logs.push(`You sold ${itemName}.`);
+    }
+    return { success: result.success, message: result.message };
+  }
+
+  upgradeArmorShop(armorId: string): { success: boolean; message: string } {
+    if (!this.state) throw new Error("No active game session");
+    const state = this.state;
+    state.player = { ...state.player, gold: state.gold };
+    const result = shopUpgradeArmor(state.player, armorId);
+    if (result.success) {
+      state.player = result.updatedPlayer;
+      state.gold = result.updatedPlayer.gold;
+      const upgraded = result.updatedPlayer.armors.find((a) => a.id === armorId);
+      state.logs.push(`Armor upgraded to level ${upgraded?.level ?? "?"}.`);
+    }
+    return { success: result.success, message: result.message };
   }
 }

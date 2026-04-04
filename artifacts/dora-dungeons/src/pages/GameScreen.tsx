@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useProcessAction, GameStateResponse } from "@workspace/api-client-react";
+import { useProcessAction, GameStateResponse, customFetch, type ArmorState } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { getGetGameStateQueryKey } from "@workspace/api-client-react";
@@ -14,8 +14,8 @@ import { useVoiceInput } from "@/hooks/useVoiceInput";
 import { NarrationFeed } from "@/components/NarrationFeed";
 import { PlayerHUD } from "@/components/PlayerHUD";
 import { VoiceControl } from "@/components/VoiceControl";
-import { ShopPanel, ShopView } from "@/components/ShopPanel";
-import { ShopWeapon, ShopArmor, ShopInventoryItem, SHOP_WEAPONS, buyWeapon, sellItem, upgradeArmor } from "@/shop";
+import { ShopPanel, ShopView, ShopBuyResult, ShopSellResult, ShopUpgradeResult } from "@/components/ShopPanel";
+import { ShopWeapon, ShopArmor, ShopInventoryItem, SHOP_WEAPONS } from "@/shop";
 import {
   speakShopOpen,
   speakShopExit,
@@ -82,13 +82,19 @@ export function GameScreen({
   const [voiceGender, setVoiceGender] = useState<"female" | "male">(() => AudioManager.getVoiceGender());
   const [voiceDropdownOpen, setVoiceDropdownOpen] = useState(false);
 
-  // ── Shop state (fully client-side; server doesn't track weapons/armors yet) ──
+  // ── Shop state — backed by server state (player.weapons / player.inventoryItems) ──
   const [shopOpen, setShopOpen] = useState(false);
   const [shopMode, setShopMode] = useState<"main" | "buy" | "sell" | "upgrade">("main");
   // Gold comes directly from gameState.gold — no separate shopGold state.
-  const [shopWeapons, setShopWeapons] = useState<ShopWeapon[]>([]);
-  const [shopArmors, setShopArmors] = useState<ShopArmor[]>([]);
-  const [shopItems, setShopItems] = useState<ShopInventoryItem[]>([]);
+  const [shopWeapons, setShopWeapons] = useState<ShopWeapon[]>(() =>
+    (gameState.player.weapons ?? []) as ShopWeapon[]
+  );
+  const [shopArmors, setShopArmors] = useState<ShopArmor[]>(() =>
+    (gameState.player.armors ?? []) as ShopArmor[]
+  );
+  const [shopItems, setShopItems] = useState<ShopInventoryItem[]>(() =>
+    (gameState.player.inventoryItems ?? []) as ShopInventoryItem[]
+  );
   const [shopExtraLogs, setShopExtraLogs] = useState<string[]>([]);
   // Client-side messages (unknown command feedback) shown in the terminal
   // without requiring a backend round-trip.
@@ -307,15 +313,7 @@ export function GameScreen({
         if (mode === "buy") {
           const match = SHOP_WEAPONS.find((w) => fuzzyMatch(trimmed, w.name));
           if (match) {
-            const result = buyWeapon(gameStateRef.current.gold, shopWeaponsRef.current, match.id);
-            if (result.success) {
-              patchPlayerGold(result.data.gold);
-              setShopWeapons(result.data.weapons);
-              speakPurchaseSuccess(match.name, result.data.gold);
-              addShopLog(`✓ ${match.name} purchased successfully.`);
-            } else {
-              speakPurchaseFail();
-            }
+            shopBuyApi(match.id).catch(() => speakPurchaseFail());
             return;
           }
         }
@@ -323,15 +321,7 @@ export function GameScreen({
         if (mode === "sell") {
           const match = shopItemsRef.current.find((i) => fuzzyMatch(trimmed, i.name));
           if (match) {
-            const result = sellItem(gameStateRef.current.gold, shopItemsRef.current, match.id);
-            if (result.success) {
-              patchPlayerGold(result.data.gold);
-              setShopItems(result.data.inventory);
-              speakSellSuccess(match.name, result.data.gold);
-              addShopLog(`✓ ${match.name} sold successfully.`);
-            } else {
-              speakShopNoMatch();
-            }
+            shopSellApi(match.id).catch(() => speakShopNoMatch());
             return;
           }
         }
@@ -339,18 +329,10 @@ export function GameScreen({
         if (mode === "upgrade") {
           const match = shopArmorsRef.current.find((a) => fuzzyMatch(trimmed, a.name));
           if (match) {
-            const result = upgradeArmor(gameStateRef.current.gold, shopArmorsRef.current, match.id);
-            if (result.success) {
-              patchPlayerGold(result.data.gold);
-              setShopArmors(result.data.armors);
-              const upgraded = result.data.armors.find((a) => a.id === match.id);
-              speakUpgradeSuccess(match.name, upgraded?.level ?? 0, result.data.gold);
-              addShopLog(`✓ ${match.name} upgraded to level ${upgraded?.level}.`);
-            } else if (result.message === "ARMOR_MAX_LEVEL") {
-              speakUpgradeMax();
-            } else {
-              speakUpgradeFail();
-            }
+            shopUpgradeApi(match.id).catch((e) => {
+              if (e?.message === "ARMOR_MAX_LEVEL") speakUpgradeMax();
+              else speakUpgradeFail();
+            });
             return;
           }
         }
@@ -535,19 +517,77 @@ export function GameScreen({
    * updated value immediately without a full refetch.
    */
   const patchPlayerGold = (gold: number) => {
-    console.log("Player gold updated:", gold);
     queryClient.setQueryData(
       getGetGameStateQueryKey(),
       (old: typeof gameState | undefined) =>
-        old ? { ...old, player: { ...old.player, gold } } : old
+        old ? { ...old, gold, player: { ...old.player, gold } } : old
     );
   };
 
-  const handleShopUpdate = (next: { gold: number; weapons: ShopWeapon[]; armors: ShopArmor[]; items?: ShopInventoryItem[] }) => {
-    patchPlayerGold(next.gold);
-    setShopWeapons(next.weapons);
-    setShopArmors(next.armors);
-    if (next.items !== undefined) setShopItems(next.items);
+  /** Patch the full player shape in the cache after a shop operation. */
+  const patchPlayerFromShopResponse = (resp: { gold: number; player: GameStateResponse["player"] }) => {
+    queryClient.setQueryData(
+      getGetGameStateQueryKey(),
+      (old: typeof gameState | undefined) =>
+        old ? { ...old, gold: resp.gold, player: resp.player } : old
+    );
+    setShopWeapons((resp.player.weapons ?? []) as ShopWeapon[]);
+    setShopArmors((resp.player.armors ?? []) as ShopArmor[]);
+    setShopItems((resp.player.inventoryItems ?? []) as ShopInventoryItem[]);
+  };
+
+  // ── Shop API handlers ─────────────────────────────────────────────────────
+
+  const shopBuyApi = async (weaponId: string): Promise<ShopBuyResult> => {
+    const resp = await customFetch<{ success: boolean; message: string; gold: number; player: GameStateResponse["player"] }>(
+      "/api/game/shop/buy",
+      { method: "POST", body: JSON.stringify({ weaponId }), headers: { "Content-Type": "application/json" } }
+    );
+    patchPlayerFromShopResponse(resp);
+    const weaponName = SHOP_WEAPONS.find(w => w.id === weaponId)?.name ?? weaponId;
+    if (resp.success) {
+      speakPurchaseSuccess(weaponName, resp.gold);
+      addShopLog(`✓ ${weaponName} purchased.`);
+    } else {
+      speakPurchaseFail();
+      addShopLog(`✗ ${resp.message}`);
+    }
+    return { success: resp.success, message: resp.message, gold: resp.gold, weapons: (resp.player.weapons ?? []) as ShopWeapon[] };
+  };
+
+  const shopSellApi = async (itemId: string): Promise<ShopSellResult> => {
+    const resp = await customFetch<{ success: boolean; message: string; gold: number; player: GameStateResponse["player"] }>(
+      "/api/game/shop/sell",
+      { method: "POST", body: JSON.stringify({ itemId }), headers: { "Content-Type": "application/json" } }
+    );
+    patchPlayerFromShopResponse(resp);
+    const itemName = shopItemsRef.current.find(i => i.id === itemId)?.name ?? itemId;
+    if (resp.success) {
+      speakSellSuccess(itemName, resp.gold);
+      addShopLog(`✓ ${itemName} sold.`);
+    } else {
+      speakShopNoMatch();
+      addShopLog(`✗ ${resp.message}`);
+    }
+    return { success: resp.success, message: resp.message, gold: resp.gold, items: (resp.player.inventoryItems ?? []) as ShopInventoryItem[] };
+  };
+
+  const shopUpgradeApi = async (armorId: string): Promise<ShopUpgradeResult> => {
+    const resp = await customFetch<{ success: boolean; message: string; gold: number; player: GameStateResponse["player"] }>(
+      "/api/game/shop/upgrade",
+      { method: "POST", body: JSON.stringify({ armorId }), headers: { "Content-Type": "application/json" } }
+    );
+    patchPlayerFromShopResponse(resp);
+    const armor = (resp.player.armors ?? []).find((a: ArmorState) => a.id === armorId);
+    if (resp.success) {
+      speakUpgradeSuccess(armor?.name ?? armorId, armor?.level ?? 0, resp.gold);
+      addShopLog(`✓ ${armor?.name ?? armorId} upgraded to level ${armor?.level}.`);
+    } else {
+      if (resp.message === "ARMOR_MAX_LEVEL") speakUpgradeMax();
+      else speakUpgradeFail();
+      addShopLog(`✗ ${resp.message}`);
+    }
+    return { success: resp.success, message: resp.message, gold: resp.gold, armors: (resp.player.armors ?? []) as ShopArmor[] };
   };
 
   const audioState: "idle" | "listening" | "speaking" | "processing" =
@@ -920,7 +960,9 @@ export function GameScreen({
                   sellableItems={shopItems}
                   view={shopMode}
                   onViewChange={(v: ShopView) => setShopMode(v)}
-                  onUpdate={handleShopUpdate}
+                  onBuy={shopBuyApi}
+                  onSell={shopSellApi}
+                  onUpgrade={shopUpgradeApi}
                   onLogMessage={addShopLog}
                   onClose={() => { setShopOpen(false); setShopMode("main"); }}
                 />

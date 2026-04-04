@@ -43,6 +43,9 @@ export const StartGameResponse = zod.object({
     defense: zod.number(),
     abilities: zod.array(zod.string()),
     inventory: zod.array(zod.string()),
+    weapons: zod.array(zod.object({ id: zod.string(), name: zod.string(), description: zod.string(), price: zod.number() })),
+    armors: zod.array(zod.object({ id: zod.string(), name: zod.string(), level: zod.union([zod.literal(1), zod.literal(2), zod.literal(3)]) })),
+    inventoryItems: zod.array(zod.object({ id: zod.string(), name: zod.string(), value: zod.number() })),
   }),
   currentRoom: zod.object({
     id: zod.string(),
@@ -118,6 +121,9 @@ export const ProcessActionResponse = zod.object({
     defense: zod.number(),
     abilities: zod.array(zod.string()),
     inventory: zod.array(zod.string()),
+    weapons: zod.array(zod.object({ id: zod.string(), name: zod.string(), description: zod.string(), price: zod.number() })),
+    armors: zod.array(zod.object({ id: zod.string(), name: zod.string(), level: zod.union([zod.literal(1), zod.literal(2), zod.literal(3)]) })),
+    inventoryItems: zod.array(zod.object({ id: zod.string(), name: zod.string(), value: zod.number() })),
   }),
   currentRoom: zod.object({
     id: zod.string(),
@@ -189,6 +195,9 @@ export const GetGameStateResponse = zod.object({
     defense: zod.number(),
     abilities: zod.array(zod.string()),
     inventory: zod.array(zod.string()),
+    weapons: zod.array(zod.object({ id: zod.string(), name: zod.string(), description: zod.string(), price: zod.number() })),
+    armors: zod.array(zod.object({ id: zod.string(), name: zod.string(), level: zod.union([zod.literal(1), zod.literal(2), zod.literal(3)]) })),
+    inventoryItems: zod.array(zod.object({ id: zod.string(), name: zod.string(), value: zod.number() })),
   }),
   currentRoom: zod.object({
     id: zod.string(),
@@ -230,6 +239,44 @@ export const GetGameStateResponse = zod.object({
     .optional()
     .describe("The command that was parsed (only present on action responses)"),
   turnCount: zod.number(),
+});
+
+/**
+ * Shop endpoints — buy a weapon, sell an item, upgrade armor
+ */
+export const ShopBuyBody = zod.object({
+  weaponId: zod.string().describe("ID of the weapon to purchase"),
+});
+export const ShopSellBody = zod.object({
+  itemId: zod.string().describe("ID of the inventory item to sell"),
+});
+export const ShopUpgradeBody = zod.object({
+  armorId: zod.string().describe("ID of the armor piece to upgrade"),
+});
+
+/** Response shared by all three shop operations: full game state + outcome flag */
+export const ShopActionResponse = zod.object({
+  success: zod.boolean(),
+  message: zod.string(),
+  gold: zod.number(),
+  player: zod.object({
+    id: zod.string(),
+    name: zod.string(),
+    hp: zod.number(),
+    maxHp: zod.number(),
+    mp: zod.number(),
+    maxMp: zod.number(),
+    level: zod.number(),
+    xp: zod.number(),
+    xpToNextLevel: zod.number(),
+    attack: zod.number(),
+    defense: zod.number(),
+    abilities: zod.array(zod.string()),
+    inventory: zod.array(zod.string()),
+    weapons: zod.array(zod.object({ id: zod.string(), name: zod.string(), description: zod.string(), price: zod.number() })),
+    armors: zod.array(zod.object({ id: zod.string(), name: zod.string(), level: zod.union([zod.literal(1), zod.literal(2), zod.literal(3)]) })),
+    inventoryItems: zod.array(zod.object({ id: zod.string(), name: zod.string(), value: zod.number() })),
+  }),
 });
 
 /**

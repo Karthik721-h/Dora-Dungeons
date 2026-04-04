@@ -6,6 +6,19 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export interface WeaponState {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+}
+
+export interface ArmorState {
+  id: string;
+  name: string;
+  level: 1 | 2 | 3;
+}
+
 export interface PlayerState {
   id: string;
   name: string;
@@ -20,4 +33,10 @@ export interface PlayerState {
   defense: number;
   abilities: string[];
   inventory: string[];
+  /** Weapons purchased from the shop */
+  weapons: WeaponState[];
+  /** Armors owned by the player */
+  armors: ArmorState[];
+  /** Inventory items with full details (id + value) for the sell view */
+  inventoryItems: { id: string; name: string; value: number }[];
 }
