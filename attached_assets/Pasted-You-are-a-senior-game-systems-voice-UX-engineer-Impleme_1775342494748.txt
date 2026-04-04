@@ -1,0 +1,228 @@
+You are a senior game systems + voice UX engineer.
+
+Implement Level Progression Flow in "Dora Dungeons" using a controlled, voice-first decision system.
+
+---
+
+## GOAL
+
+After a player completes a level:
+
+* Ask if they want to continue
+* Allow voice + UI decisions
+* Control progression safely (NO auto progression)
+
+---
+
+## STRICT RULES
+
+* DO NOT modify combat system
+* DO NOT modify dungeon generation
+* DO NOT increment level inside GameEngine
+* ALL progression must be handled in API layer
+
+---
+
+## STEP 1 — ADD GAME MODE STATE
+
+In frontend state:
+
+Add:
+
+gameMode: "explore" | "decision"
+
+---
+
+## STEP 2 — HANDLE LEVEL COMPLETION EVENT
+
+In GameScreen:
+
+IF response.event === "LEVEL_COMPLETED":
+
+1. Set:
+
+gameMode = "decision"
+
+2. Trigger TTS:
+
+"Congratulations. You have completed this level. Would you like to continue to the next level?"
+
+---
+
+## STEP 3 — LOCK GAMEPLAY INPUT
+
+When:
+
+gameMode === "decision"
+
+ONLY allow:
+
+* "yes"
+* "no"
+
+Block:
+
+* movement
+* combat
+* shop
+* any other commands
+
+---
+
+## STEP 4 — VOICE INTENT HANDLING
+
+Extend IntentProcessor:
+
+IF gameMode === "decision":
+
+IF user says "yes":
+return { intent: "NEXT_LEVEL" }
+
+IF user says "no":
+return { intent: "REPLAY_PROMPT" }
+
+---
+
+## STEP 5 — HANDLE "NEXT LEVEL"
+
+In API route (/game/action):
+
+IF intent === "NEXT_LEVEL":
+
+1. Increment level:
+
+player.currentLevel += 1
+
+2. Reset completion:
+
+player.levelCompleted = false
+
+3. Call:
+
+GameEngine.restartLevel(playerId, player.currentLevel)
+
+4. Return:
+
+{
+narration: "Entering Level {level}. Prepare yourself.",
+level: player.currentLevel
+}
+
+---
+
+## STEP 6 — HANDLE "REPLAY PROMPT"
+
+TTS:
+
+"Would you like to explore this level again?"
+
+---
+
+Update IntentProcessor:
+
+IF user says "yes":
+return { intent: "RESTART_LEVEL" }
+
+IF user says "no":
+return { intent: "EXIT_GAME" }
+
+---
+
+## STEP 7 — HANDLE RESTART LEVEL
+
+IF intent === "RESTART_LEVEL":
+
+Call:
+
+GameEngine.restartLevel(playerId, player.currentLevel)
+
+Return:
+
+"You are back at the start of this level."
+
+---
+
+## STEP 8 — HANDLE EXIT
+
+IF intent === "EXIT_GAME":
+
+* Clear session
+* Redirect to login
+
+TTS:
+
+"You have left the dungeon. Your progress is safe."
+
+---
+
+## STEP 9 — UI MODAL
+
+Show modal when in decision mode:
+
+Question:
+"Proceed to next level?"
+
+Buttons:
+[ No ]   [ Yes ]
+
+---
+
+IF Yes:
+→ trigger NEXT_LEVEL
+
+IF No:
+→ trigger REPLAY_PROMPT
+
+---
+
+## STEP 10 — RESET GAME MODE
+
+After any action (next level / restart / exit):
+
+Set:
+
+gameMode = "explore"
+
+---
+
+## STEP 11 — VALIDATION
+
+Test:
+
+1. Kill boss
+   → decision prompt plays
+
+2. Say "yes"
+   → next level starts
+
+3. Say "no"
+   → replay prompt appears
+
+4. Say "yes" again
+   → level restarts
+
+5. Say "no"
+   → logout
+
+---
+
+## EXPECTED RESULT
+
+* Player controls progression
+* Voice-first decision flow works
+* No auto level skipping
+* Clean UX
+
+---
+
+## OUTPUT
+
+* Decision mode system
+* Voice-controlled progression
+* Safe level transition
+
+---
+
+## STOP AFTER THIS STEP
+
+Do NOT implement payment yet

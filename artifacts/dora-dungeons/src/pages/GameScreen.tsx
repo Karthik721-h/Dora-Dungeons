@@ -92,6 +92,13 @@ export function GameScreen({
   const [restartPending, setRestartPending]     = useState(false);
   // Guards against re-speaking the death TTS on subsequent renders.
   const deathTtsSpokenRef = useRef(false);
+
+  // ── Level progression decision state ─────────────────────────────────────────
+  // "explore"       → normal gameplay
+  // "levelDecision" → boss defeated, asking "next level or replay?"
+  // "replayPrompt"  → player chose no, asking "replay or exit?"
+  const [gameMode, setGameMode] = useState<"explore" | "levelDecision" | "replayPrompt">("explore");
+  const [progressionPending, setProgressionPending] = useState(false);
   // Gold comes directly from gameState.gold — no separate shopGold state.
   const [shopWeapons, setShopWeapons] = useState<ShopWeapon[]>(() =>
     (gameState.player.weapons ?? []) as ShopWeapon[]
@@ -122,7 +129,9 @@ export function GameScreen({
   // knows to skip the backend's "Unknown command:" narration (already spoken).
   const unknownHandledLocallyRef = useRef(false);
   const queryClient = useQueryClient();
-  const stopListeningRef = useRef<() => void>(() => {});
+  const stopListeningRef    = useRef<() => void>(() => {});
+  const startListeningRef   = useRef<() => void>(() => {});
+  const gameModeRef         = useRef<"explore" | "levelDecision" | "replayPrompt">("explore");
   const onLogoutRef = useRef(onLogout);
   const voiceGenderRef = useRef(voiceGender);
   const voiceDropdownRef = useRef<HTMLDivElement>(null);
@@ -268,12 +277,21 @@ export function GameScreen({
           if (newLines.some(l => l.toLowerCase().includes("experience"))) {
             AudioManager.playRewardChime();
           }
-          // ── Dungeon level completion ──────────────────────────────────────────
+          // ── Dungeon level completion → progression decision ───────────────────
+          // Set mode first so the modal appears immediately, then speak the
+          // prompt and activate the mic so the player can answer by voice.
           if (newData.event === "LEVEL_COMPLETED") {
-            AudioManager.speak(
-              `Dungeon level ${newData.player.dungeonLevel} complete. You have defeated the boss of this level.`,
-              { interrupt: false }
-            );
+            setGameMode("levelDecision");
+            if (!isMutedRef.current) {
+              AudioManager.speak(
+                `Congratulations! Dungeon level ${newData.player.dungeonLevel} complete. You defeated the boss. Would you like to advance to the next level? Say yes to continue, or say no to replay this level.`,
+                { interrupt: false }
+              );
+              AudioManager.onQueueDrained(() => {
+                stopListeningRef.current?.();
+                setTimeout(() => startListeningRef.current(), 120);
+              });
+            }
           }
         }
       },
@@ -309,6 +327,30 @@ export function GameScreen({
         AudioManager.onQueueDrained(() => {
           onLogoutRef.current?.();
         });
+        return;
+      }
+
+      // ── Level progression decision handlers ──────────────────────────────────
+      if (trimmed === "next_level") {
+        nextLevelApi();
+        return;
+      }
+
+      if (trimmed === "replay_prompt") {
+        // Transition to the second decision sub-state.
+        gameModeRef.current = "replayPrompt";
+        setGameMode("replayPrompt");
+        if (!isMutedRef.current) {
+          AudioManager.speak(
+            "Would you like to explore this level again? Say yes to restart from the beginning, or no to exit the dungeon.",
+            { interrupt: true }
+          );
+        }
+        return;
+      }
+
+      if (trimmed === "replay_level") {
+        replayLevelApi();
         return;
       }
 
@@ -478,6 +520,40 @@ export function GameScreen({
     onFinalTranscript: (raw) => {
       if (/^(skip intro|skip|enter)$/i.test(raw.trim())) return;
 
+      // ── Level progression decision mode: intercept before all other handlers ──
+      // When the player has beaten the boss, only yes/no are valid inputs.
+      // Route them based on which sub-state we're in (levelDecision / replayPrompt).
+      if (gameModeRef.current !== "explore") {
+        const normalized = raw.trim().toLowerCase();
+        const isYes = /^(?:yes|yeah|yep|yup|sure|proceed|continue|advance|next|ok|okay|affirm|go|accept)$/.test(normalized);
+        const isNo  = /^(?:no|nope|nah|cancel|decline|negative|stay|back|return|stop)$/.test(normalized);
+
+        if (gameModeRef.current === "levelDecision") {
+          if (isYes) {
+            submitCommand("next_level");
+          } else if (isNo) {
+            submitCommand("replay_prompt");
+          } else if (!isMutedRef.current) {
+            AudioManager.speak(
+              "Say yes to advance to the next level, or no to replay this level.",
+              { interrupt: false }
+            );
+          }
+        } else if (gameModeRef.current === "replayPrompt") {
+          if (isYes) {
+            submitCommand("replay_level");
+          } else if (isNo) {
+            submitCommand("exit_to_login");
+          } else if (!isMutedRef.current) {
+            AudioManager.speak(
+              "Say yes to replay this level, or no to exit the dungeon.",
+              { interrupt: false }
+            );
+          }
+        }
+        return;
+      }
+
       // ── Death mode: only yes/no are valid; all else is silently dropped ──────
       if (gameStateRef.current.gameStatus === "GAME_OVER") {
         const { canonical } = processIntent(raw);
@@ -573,6 +649,8 @@ export function GameScreen({
   shopWeaponsRef.current = shopWeapons;
   shopArmorsRef.current  = shopArmors;
   shopItemsRef.current   = shopItems;
+  gameModeRef.current    = gameMode;
+  startListeningRef.current = startListening;
 
   // ── Click-outside: close voice dropdown ──────────────────────────────────────
   // Check both the trigger container AND the portaled menu (rendered in document.body).
@@ -669,7 +747,7 @@ export function GameScreen({
     setShopItems((resp.player.inventoryItems ?? []) as ShopInventoryItem[]);
   };
 
-  // ── Restart API ────────────────────────────────────────────────────────────
+  // ── Restart API (death → same level) ──────────────────────────────────────
   const restartApi = async () => {
     if (restartPending) return;
     setRestartPending(true);
@@ -685,6 +763,7 @@ export function GameScreen({
       setShowRestartModal(false);
       setShopOpen(false);
       setShopMode("main");
+      setGameMode("explore");
       queryClient.setQueryData(getGetGameStateQueryKey(), data);
       AudioManager.speak(
         "You rise again at the beginning of the dungeon. Your weapons, armor, and gold are intact. Stay vigilant.",
@@ -694,6 +773,68 @@ export function GameScreen({
       AudioManager.speak("Something went wrong. Please try again.", { interrupt: true });
     } finally {
       setRestartPending(false);
+    }
+  };
+
+  // ── Next Level API (VICTORY → advance to next dungeon) ────────────────────
+  const nextLevelApi = async () => {
+    if (progressionPending) return;
+    setProgressionPending(true);
+    try {
+      const data = await customFetch<GameStateResponse>(
+        `${import.meta.env.BASE_URL}api/game/next-level`,
+        { method: "POST" }
+      );
+      setShopExtraLogs([]);
+      setLocalExtraLogs([]);
+      setShopOpen(false);
+      setShopMode("main");
+      gameModeRef.current = "explore";
+      setGameMode("explore");
+      queryClient.setQueryData(getGetGameStateQueryKey(), data);
+      AudioManager.speak(
+        `Entering dungeon level ${data.player.dungeonLevel}. A new dungeon awaits. Prepare yourself.`,
+        { interrupt: true }
+      );
+      AudioManager.onQueueDrained(() => {
+        stopListeningRef.current?.();
+        setTimeout(() => startListeningRef.current(), 120);
+      });
+    } catch {
+      AudioManager.speak("Something went wrong entering the next level. Please try again.", { interrupt: true });
+    } finally {
+      setProgressionPending(false);
+    }
+  };
+
+  // ── Replay Level API (VICTORY → restart same dungeon) ─────────────────────
+  const replayLevelApi = async () => {
+    if (progressionPending) return;
+    setProgressionPending(true);
+    try {
+      const data = await customFetch<GameStateResponse>(
+        `${import.meta.env.BASE_URL}api/game/replay-level`,
+        { method: "POST" }
+      );
+      setShopExtraLogs([]);
+      setLocalExtraLogs([]);
+      setShopOpen(false);
+      setShopMode("main");
+      gameModeRef.current = "explore";
+      setGameMode("explore");
+      queryClient.setQueryData(getGetGameStateQueryKey(), data);
+      AudioManager.speak(
+        "You return to the start of this level. The dungeon awaits. Good luck.",
+        { interrupt: true }
+      );
+      AudioManager.onQueueDrained(() => {
+        stopListeningRef.current?.();
+        setTimeout(() => startListeningRef.current(), 120);
+      });
+    } catch {
+      AudioManager.speak("Something went wrong. Please try again.", { interrupt: true });
+    } finally {
+      setProgressionPending(false);
     }
   };
 
@@ -1178,6 +1319,131 @@ export function GameScreen({
           />
         </div>
       </div>
+
+      {/* ── Level Progression overlay ── */}
+      {/* Shown after boss defeat — routes the player to next level, replay, or exit */}
+      <AnimatePresence>
+        {gameMode !== "explore" && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-30 flex flex-col items-center justify-center"
+            style={{ background: "rgba(5,3,8,0.93)", backdropFilter: "blur(6px)" }}
+            role="dialog"
+            aria-modal="true"
+            aria-label={gameMode === "levelDecision" ? "Level complete — proceed?" : "Replay this level?"}
+          >
+            <motion.div
+              initial={{ scale: 0.85, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.15, type: "spring", stiffness: 180 }}
+              className="text-center space-y-6 px-6"
+              style={{ maxWidth: 480 }}
+            >
+              <div className="rune-divider w-52 mx-auto">✦</div>
+
+              <h2
+                className="font-display text-5xl font-black tracking-widest"
+                style={{
+                  color: "#c89b3c",
+                  textShadow: "0 0 40px rgba(200,155,60,0.8), 0 0 80px rgba(200,155,60,0.3)",
+                }}
+              >
+                VICTORIOUS
+              </h2>
+
+              <p className="font-narration italic text-xl" style={{ color: "rgba(200,155,60,0.75)" }}>
+                {gameMode === "levelDecision"
+                  ? "The boss has fallen. The path forward is open."
+                  : "Do you wish to face this dungeon once more?"}
+              </p>
+
+              <p
+                className="text-base font-bold"
+                style={{ color: "rgba(255,255,255,0.9)", letterSpacing: "0.04em" }}
+              >
+                {gameMode === "levelDecision"
+                  ? "Proceed to the next level?"
+                  : "Replay this level?"}
+              </p>
+
+              <div className="flex gap-4 justify-center pt-2">
+                {/* No */}
+                <motion.button
+                  whileHover={{ scale: progressionPending ? 1 : 1.06 }}
+                  whileTap={{ scale: progressionPending ? 1 : 0.95 }}
+                  onClick={() => {
+                    if (progressionPending) return;
+                    if (gameMode === "levelDecision") {
+                      submitCommand("replay_prompt");
+                    } else {
+                      stopListeningRef.current();
+                      AudioManager.speak(
+                        "You have left the dungeon. Your progress is safe.",
+                        { interrupt: true }
+                      );
+                      AudioManager.onQueueDrained(() => { onLogoutRef.current?.(); });
+                    }
+                  }}
+                  disabled={progressionPending}
+                  aria-label={gameMode === "levelDecision" ? "No, replay this level" : "No, exit the dungeon"}
+                  className="px-7 py-3 rounded-lg font-display text-lg font-bold tracking-wider"
+                  style={{
+                    background: "rgba(26,31,41,0.8)",
+                    border: "1px solid rgba(200,155,60,0.4)",
+                    color: progressionPending ? "rgba(200,155,60,0.3)" : "rgba(200,155,60,0.85)",
+                    boxShadow: "0 0 10px rgba(200,155,60,0.12)",
+                    cursor: progressionPending ? "not-allowed" : "pointer",
+                    minWidth: 130,
+                  }}
+                >
+                  {gameMode === "levelDecision" ? "No — Replay" : "No — Exit"}
+                </motion.button>
+
+                {/* Yes */}
+                <motion.button
+                  whileHover={{ scale: progressionPending ? 1 : 1.06 }}
+                  whileTap={{ scale: progressionPending ? 1 : 0.95 }}
+                  onClick={() => {
+                    if (progressionPending) return;
+                    if (gameMode === "levelDecision") nextLevelApi();
+                    else replayLevelApi();
+                  }}
+                  disabled={progressionPending}
+                  aria-label={gameMode === "levelDecision" ? "Yes, advance to next level" : "Yes, replay this level"}
+                  className="px-7 py-3 rounded-lg font-display text-lg font-bold tracking-wider"
+                  style={{
+                    background: progressionPending
+                      ? "rgba(200,155,60,0.3)"
+                      : "rgba(200,155,60,0.88)",
+                    border: "1px solid rgba(200,155,60,0.9)",
+                    color: progressionPending ? "rgba(0,0,0,0.3)" : "#060810",
+                    boxShadow: "0 0 18px rgba(200,155,60,0.4)",
+                    cursor: progressionPending ? "not-allowed" : "pointer",
+                    minWidth: 130,
+                  }}
+                >
+                  {progressionPending
+                    ? "Loading…"
+                    : gameMode === "levelDecision"
+                    ? "Yes — Next Level"
+                    : "Yes — Replay"}
+                </motion.button>
+              </div>
+
+              <p className="text-xs" style={{ color: "rgba(255,255,255,0.28)", letterSpacing: "0.06em" }}>
+                Say{" "}
+                <strong style={{ color: "rgba(255,255,255,0.55)" }}>"yes"</strong>
+                {" "}or{" "}
+                <strong style={{ color: "rgba(255,255,255,0.55)" }}>"no"</strong>
+              </p>
+
+              <div className="rune-divider w-52 mx-auto">✦</div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Game Over overlay ── */}
       <AnimatePresence>

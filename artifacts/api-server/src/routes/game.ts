@@ -290,6 +290,99 @@ router.post("/shop/upgrade", async (req: Request, res: Response) => {
 });
 
 /**
+ * POST /game/next-level
+ * Advance to the next dungeon level after a VICTORY.
+ *
+ * - Increments player.dungeonLevel
+ * - Generates a brand-new dungeon using the stable seed for the new level
+ * - Preserves all gear, gold, XP, and abilities — only the dungeon changes
+ */
+router.post("/next-level", async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  const session = await loadSessionOrFail(userId, res);
+  if (!session) return;
+
+  const { state } = session;
+
+  if (state.gameStatus !== GameStatus.VICTORY) {
+    res.status(400).json({
+      error: "NOT_VICTORY",
+      message: "Can only advance to the next level after defeating the dungeon boss.",
+    });
+    return;
+  }
+
+  const oldPlayer = state.player;
+  const oldGold   = state.gold;
+  const newLevel  = oldPlayer.dungeonLevel + 1;
+
+  // Stable seed — mirrors the formula in GameEngine.startGame().
+  // level-2 for the same player will always produce the same dungeon.
+  const newSeed = `level-${newLevel}-${oldPlayer.id.slice(0, 8)}`;
+
+  // Generate a fresh dungeon under the new seed.
+  // startGame() creates a throwaway player; we replace it immediately.
+  const tempEngine = new GameEngine();
+  tempEngine.startGame(oldPlayer.name, newSeed);
+  const newState = tempEngine.getState()!;
+
+  // Overwrite the auto-created player with the player's real preserved state.
+  // Restore HP/MP fully; clear transient combat state.
+  newState.player = {
+    ...oldPlayer,
+    hp:                   oldPlayer.maxHp,
+    mp:                   oldPlayer.maxMp,
+    statusEffects:        [],
+    isDefending:          false,
+    dungeonLevel:         newLevel,
+    dungeonLevelCompleted: false,
+  };
+  newState.gold = oldGold;
+
+  // Append a level-transition banner so the terminal shows the new context.
+  newState.logs.push(
+    "══════════════════════════════",
+    `   DUNGEON LEVEL ${newLevel}`,
+    "══════════════════════════════",
+    `${newState.player.name} descends deeper into the dark.`,
+    `Dungeon ${newLevel} awaits. Your gear and gold remain.`,
+  );
+
+  await saveSession(userId, newState);
+  const response = GetGameStateResponse.parse(serializeGameState(newState));
+  res.json(response);
+});
+
+/**
+ * POST /game/replay-level
+ * Replay the current dungeon level after a VICTORY without advancing.
+ *
+ * Calls restartLevel() which resets enemies and returns to the dungeon
+ * entrance — but keeps the same dungeon layout, gear, and gold.
+ */
+router.post("/replay-level", async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  const session = await loadSessionOrFail(userId, res);
+  if (!session) return;
+
+  const { engine, state } = session;
+
+  if (state.gameStatus !== GameStatus.VICTORY) {
+    res.status(400).json({
+      error: "NOT_VICTORY",
+      message: "Can only replay a level after defeating the dungeon boss.",
+    });
+    return;
+  }
+
+  const updatedState = engine.restartLevel();
+  await saveSession(userId, updatedState);
+
+  const response = GetGameStateResponse.parse(serializeGameState(updatedState));
+  res.json(response);
+});
+
+/**
  * POST /game/restart
  * Restart the current dungeon run after a GAME_OVER.
  * Restores player HP/MP/status and resets all enemies.
