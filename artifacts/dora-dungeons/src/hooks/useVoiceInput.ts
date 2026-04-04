@@ -256,11 +256,14 @@ export function useVoiceInput({
       isSpeakingRef.current = speaking;
 
       if (speaking) {
-        // TTS started — pause recognition immediately
+        // TTS started — pause recognition immediately.
+        // Only call .stop() when recognition is actually running; calling it on
+        // an already-ended session can trigger a spurious onend in Chrome which
+        // perturbs the lifecycle state.
         console.log("[useVoiceInput] Listening paused (TTS started)");
         setVoiceState("speaking");
         setInterimTranscript("");
-        if (recognitionRef.current) {
+        if (recognitionRef.current && isListeningRef.current) {
           try { recognitionRef.current.stop(); } catch { /* ok */ }
         }
       } else {

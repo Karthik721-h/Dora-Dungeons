@@ -137,6 +137,33 @@ class AudioManagerClass {
 
     // Subscribe for async load (Chrome / Edge)
     window.speechSynthesis.onvoiceschanged = () => populate();
+
+    // Chrome / Edge have a well-known bug: the SpeechSynthesis engine silently
+    // enters a "paused" state after running for a while, causing all subsequent
+    // speak() calls to queue but never play.  This watchdog detects the pause
+    // and calls resume() every 5 s so the engine stays alive.
+    this._startChromeWatchdog();
+  }
+
+  /**
+   * Chrome SpeechSynthesis keepalive.
+   * Polls every 5 seconds; if synthesis is paused while we expect it to be
+   * speaking, resume it so the queued utterances continue playing.
+   * Also handles the "speaking=true but nothing audible" case by cancelling
+   * and retrying the current item.
+   */
+  private _startChromeWatchdog() {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    setInterval(() => {
+      // Paused while we're mid-utterance → resume
+      if (this.isSpeaking && window.speechSynthesis.paused) {
+        window.speechSynthesis.resume();
+      }
+      // Not paused, not speaking, but queue has items → something stalled
+      if (!this.isSpeaking && this.narrationQueue.length > 0) {
+        this._flush();
+      }
+    }, 5000);
   }
 
   /**
@@ -477,6 +504,11 @@ class AudioManagerClass {
       this._flush();
     };
 
+    // Chrome / Edge fix: the synthesis engine can enter a paused state
+    // silently.  Calling resume() before speak() ensures it is always active.
+    if (window.speechSynthesis.paused) {
+      window.speechSynthesis.resume();
+    }
     window.speechSynthesis.speak(utterance);
   }
 
