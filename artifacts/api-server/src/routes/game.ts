@@ -54,6 +54,7 @@ function serializePlayer(p: Player) {
       id: i.id, name: i.name, value: i.value ?? 0,
     })),
     dungeonLevel: p.dungeonLevel ?? 1,
+    dungeonLevelCompleted: p.dungeonLevelCompleted ?? false,
   };
 }
 

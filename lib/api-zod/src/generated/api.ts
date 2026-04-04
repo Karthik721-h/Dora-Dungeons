@@ -47,6 +47,7 @@ export const StartGameResponse = zod.object({
     armors: zod.array(zod.object({ id: zod.string(), name: zod.string(), level: zod.union([zod.literal(1), zod.literal(2), zod.literal(3)]) })),
     inventoryItems: zod.array(zod.object({ id: zod.string(), name: zod.string(), value: zod.number() })),
     dungeonLevel: zod.number().describe("Current dungeon depth (1-indexed)"),
+    dungeonLevelCompleted: zod.boolean().describe("True when the boss of the current dungeon has been defeated"),
   }),
   currentRoom: zod.object({
     id: zod.string(),
@@ -126,6 +127,7 @@ export const ProcessActionResponse = zod.object({
     armors: zod.array(zod.object({ id: zod.string(), name: zod.string(), level: zod.union([zod.literal(1), zod.literal(2), zod.literal(3)]) })),
     inventoryItems: zod.array(zod.object({ id: zod.string(), name: zod.string(), value: zod.number() })),
     dungeonLevel: zod.number().describe("Current dungeon depth (1-indexed)"),
+    dungeonLevelCompleted: zod.boolean().describe("True when the boss of the current dungeon has been defeated"),
   }),
   currentRoom: zod.object({
     id: zod.string(),
@@ -202,6 +204,7 @@ export const GetGameStateResponse = zod.object({
     armors: zod.array(zod.object({ id: zod.string(), name: zod.string(), level: zod.union([zod.literal(1), zod.literal(2), zod.literal(3)]) })),
     inventoryItems: zod.array(zod.object({ id: zod.string(), name: zod.string(), value: zod.number() })),
     dungeonLevel: zod.number().describe("Current dungeon depth (1-indexed)"),
+    dungeonLevelCompleted: zod.boolean().describe("True when the boss of the current dungeon has been defeated"),
   }),
   currentRoom: zod.object({
     id: zod.string(),

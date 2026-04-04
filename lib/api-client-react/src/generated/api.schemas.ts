@@ -65,6 +65,8 @@ export interface PlayerState {
   inventoryItems: { id: string; name: string; value: number }[];
   /** Which dungeon depth the player is currently on (1-indexed) */
   dungeonLevel: number;
+  /** True when the boss of the current dungeon has been defeated */
+  dungeonLevelCompleted: boolean;
 }
 
 export interface EnemyState {

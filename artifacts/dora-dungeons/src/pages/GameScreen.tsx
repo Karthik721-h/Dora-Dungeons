@@ -245,9 +245,10 @@ export function GameScreen({
               : newLines;
             AudioManager.speakLines(linesToSpeak, { interrupt: true });
           }
-          // Always queue exits after narration so visually impaired users
-          // always know where they can go, regardless of which command fired.
-          if (!exitsAlreadySpoken(newLines)) {
+          // Queue exits after narration so visually impaired users always
+          // know where they can go. Skip on VICTORY — the dungeon is cleared
+          // and there are no meaningful exits to navigate at that point.
+          if (!exitsAlreadySpoken(newLines) && newData.gameStatus !== "VICTORY") {
             AudioManager.speak(
               buildExitsAnnouncement(newData.currentRoom.exits),
               { interrupt: false }
@@ -261,7 +262,10 @@ export function GameScreen({
           if (newData.gameStatus === "IN_COMBAT" && gameStateRef.current.gameStatus !== "IN_COMBAT") {
             AudioManager.playCombatAlert();
           }
-          if (newLines.some(l => l.toLowerCase().includes("experience") || l.toLowerCase().includes("level"))) {
+          // Fire chime only on genuine XP gain — "experience" appears in XP
+          // award log lines. The old "level" check was too broad and fired
+          // incorrectly on the boss-defeat stat summary ("Final Level: ...").
+          if (newLines.some(l => l.toLowerCase().includes("experience"))) {
             AudioManager.playRewardChime();
           }
           // ── Dungeon level completion ──────────────────────────────────────────
