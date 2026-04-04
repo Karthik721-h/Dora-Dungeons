@@ -154,6 +154,8 @@ class AudioManagerClass {
    */
   private _startChromeWatchdog() {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+
+    // ── Periodic heartbeat ────────────────────────────────────────────────────
     setInterval(() => {
       // Paused while we're mid-utterance → resume
       if (this.isSpeaking && window.speechSynthesis.paused) {
@@ -164,6 +166,32 @@ class AudioManagerClass {
         this._flush();
       }
     }, 5000);
+
+    // ── Tab-visibility recovery ───────────────────────────────────────────────
+    // When the browser tabs the page to the background, Chrome can collapse
+    // all queued utterances (firing onend instantly), then leave the synthesis
+    // engine in a broken state.  When the tab becomes visible again we do a
+    // full engine reset so the next speak() call works correctly.
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState !== "visible") return;
+
+        // Force-reset any stale state that Chrome left behind
+        window.speechSynthesis.cancel();
+        this.isSpeaking = false;
+
+        // If the queue still has items (was mid-narration when hidden), restart
+        if (this.narrationQueue.length > 0) {
+          setTimeout(() => this._flush(), 300);
+        }
+
+        // If the queue is empty but we're stuck in "speaking" → release lock
+        if (!this.narrationQueue.length) {
+          this.speakLockCallback?.(false);
+          this.onSpeakingChange?.(false);
+        }
+      });
+    }
   }
 
   /**
@@ -441,6 +469,23 @@ class AudioManagerClass {
     // belongs to a cancelled/stale utterance and is silently ignored.
     const mySeq = ++this.utteranceSeq;
 
+    // ── onstart watchdog ─────────────────────────────────────────────────────
+    // Chrome occasionally calls speechSynthesis.speak() but never fires onstart
+    // (happens after tab-backgrounding or rapid cancel/speak cycles).  If onstart
+    // hasn't fired within 2.5 s we assume the engine is stuck, cancel, and push
+    // the item back to the front of the queue for a fresh attempt.
+    let hasStarted = false;
+    const startWatchdog = setTimeout(() => {
+      if (hasStarted || mySeq !== this.utteranceSeq) return; // already running or stale
+      console.warn("[AudioManager] onstart timed out — restarting synthesis");
+      window.speechSynthesis.cancel();
+      this.isSpeaking = false;
+      this.narrationQueue.unshift(entry); // put it back at the front
+      setTimeout(() => {
+        if (!this.isSpeaking && mySeq === this.utteranceSeq) this._flush();
+      }, 400);
+    }, 2500);
+
     const utterance = new SpeechSynthesisUtterance(entry.text);
 
     // Apply selected voice — always re-resolve in case voices changed
@@ -453,6 +498,8 @@ class AudioManagerClass {
     utterance.lang   = voice?.lang ?? "en-US";
 
     utterance.onstart = () => {
+      hasStarted = true;
+      clearTimeout(startWatchdog); // utterance is alive — cancel the retry timer
       console.log("[AudioManager] TTS started:", entry.text.slice(0, 60));
       this.isSpeaking = true;
       // Speak-lock fires FIRST so the hook stops recognition before UI repaints
@@ -461,6 +508,7 @@ class AudioManagerClass {
     };
 
     utterance.onend = () => {
+      clearTimeout(startWatchdog);
       // Drop stale events from utterances cancelled by speak({ interrupt: true }).
       // Chrome fires onend asynchronously even for cancelled utterances; without
       // this guard the callback would incorrectly release the speak-lock while
@@ -494,6 +542,7 @@ class AudioManagerClass {
     };
 
     utterance.onerror = () => {
+      clearTimeout(startWatchdog);
       // Also guard stale error events from cancelled utterances.
       if (mySeq !== this.utteranceSeq) return;
       console.log("[AudioManager] TTS error — releasing speak-lock");
