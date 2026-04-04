@@ -1,0 +1,180 @@
+You are a senior frontend game UI engineer.
+
+Integrate the Shop UI into "Dora Dungeons" using the existing ShopService.
+
+---
+
+## GOAL
+
+Create a fully functional Shop interface using buttons and terminal output.
+
+---
+
+## STRICT RULES
+
+* DO NOT implement voice logic
+* DO NOT add business logic (use ShopService only)
+* DO NOT modify existing systems (combat, auth, voice)
+* UI must call ShopService functions only
+
+---
+
+## STEP 1 — ADD SHOP BUTTON
+
+* Add a bold "SHOP" button in the main game UI (visible and accessible)
+* Place it near other main controls (navbar or main panel)
+
+On click:
+
+* Set shop mode active
+* Render shop menu in terminal area
+
+---
+
+## STEP 2 — SHOP MENU (TERMINAL)
+
+When shop opens, display 3 options as buttons:
+
+* Buy Weapons
+* Sell Items
+* Upgrade Armor
+
+---
+
+## STEP 3 — BUY WEAPONS UI
+
+On click "Buy Weapons":
+
+* Call getAvailableWeapons() from ShopService
+* Render 6 buttons:
+  (Weapon Name + Price)
+
+On button click:
+
+* Call buyWeapon(player, weaponId)
+
+Handle response:
+IF success:
+
+* Update player state
+* Show terminal message:
+  "Weapon purchased successfully."
+
+IF failure:
+
+* Show:
+  "You do not have enough gold."
+
+---
+
+## STEP 4 — SELL ITEMS UI
+
+On click "Sell Items":
+
+IF inventory is empty:
+
+* Show:
+  "Your inventory is empty."
+
+ELSE:
+
+* Render each item as button:
+  (Item Name + Value)
+
+On click:
+
+* Call sellItem(player, itemId)
+
+IF success:
+
+* Update player state
+* Show:
+  "Item sold successfully."
+
+---
+
+## STEP 5 — UPGRADE ARMOR UI
+
+On click "Upgrade Armor":
+
+IF no armors:
+
+* Show:
+  "No armor available to upgrade."
+
+ELSE:
+
+* Render each armor:
+  (Name + Level + Upgrade Cost)
+
+On click:
+
+* Call upgradeArmor(player, armorId)
+
+IF success:
+
+* Update player state
+* Show:
+  "Armor upgraded successfully."
+
+IF failure:
+
+* Show:
+  "Upgrade failed."
+
+---
+
+## STATE MANAGEMENT
+
+* Use existing player state (React state or global store)
+* After every action:
+
+  * Update UI with new player data
+  * Re-render relevant sections
+
+---
+
+## TERMINAL DISPLAY
+
+* All shop interactions must appear inside the terminal/log system
+* Append messages, do not overwrite previous logs
+
+---
+
+## UI DESIGN NOTES
+
+* Buttons must be clearly visible and spaced
+* Use consistent styling with game theme
+* Avoid clutter
+
+---
+
+## VALIDATION
+
+Test all flows manually:
+
+* Open shop
+* Buy weapon
+* Sell item
+* Upgrade armor
+
+Ensure:
+
+* No crashes
+* State updates correctly
+* UI reflects changes immediately
+
+---
+
+## OUTPUT
+
+* Shop button
+* Shop menu UI
+* Dynamic rendering for weapons/items/armors
+* Integration with ShopService
+
+---
+
+## STOP AFTER THIS STEP
+
+Do NOT implement voice commands or TTS yet

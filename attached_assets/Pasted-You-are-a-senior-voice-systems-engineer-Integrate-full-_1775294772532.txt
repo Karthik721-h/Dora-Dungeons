@@ -1,0 +1,218 @@
+You are a senior voice systems engineer.
+
+Integrate full voice control for the Shop system in "Dora Dungeons" using the existing IntentProcessor and ShopService.
+
+---
+
+## GOAL
+
+Allow players to fully interact with the Shop using voice also.
+
+---
+
+## STRICT RULES
+
+* DO NOT modify ShopService logic
+* DO NOT break existing voice system
+* DO NOT change UI behavior
+* Only extend IntentProcessor + GameScreen logic
+
+---
+
+## STEP 1 — ADD NEW INTENTS
+
+Update IntentProcessor to recognize:
+
+* "open shop" → OPEN_SHOP
+
+* "enter shop" → OPEN_SHOP
+
+* "buy weapons" → SHOP_BUY
+
+* "purchase weapons" → SHOP_BUY
+
+* "sell items" → SHOP_SELL
+
+* "sell item" → SHOP_SELL
+
+* "upgrade armor" → SHOP_UPGRADE
+
+* "upgrade gear" → SHOP_UPGRADE
+
+---
+
+## STEP 2 — SHOP STATE MANAGEMENT
+
+In GameScreen (or controller layer):
+
+Add state:
+
+* isShopOpen: boolean
+* shopMode: "menu" | "buy" | "sell" | "upgrade"
+
+---
+
+## STEP 3 — OPEN SHOP (VOICE)
+
+When OPEN_SHOP detected:
+
+* Set isShopOpen = true
+* shopMode = "menu"
+
+Trigger TTS:
+
+"The shop is open. You may purchase weapons, sell items, or upgrade your armor. What would you like to do?"
+
+---
+
+## STEP 4 — NAVIGATE SHOP VIA VOICE
+
+When in shop:
+
+IF user says SHOP_BUY:
+→ shopMode = "buy"
+
+Speak:
+"These are the weapons available for purchase."
+
+Then list all weapons using AudioManager (loop through ShopService.getAvailableWeapons())
+
+---
+
+IF user says SHOP_SELL:
+→ shopMode = "sell"
+
+IF inventory empty:
+Speak:
+"Your inventory is empty."
+
+ELSE:
+Speak items dynamically:
+"You have the following items available for sale..."
+
+---
+
+IF user says SHOP_UPGRADE:
+→ shopMode = "upgrade"
+
+IF no armors:
+Speak:
+"You do not have any armor to upgrade."
+
+ELSE:
+Speak:
+"These are your available armors for upgrade..."
+
+---
+
+## STEP 5 — HANDLE ITEM/WEAPON/ARMOR SELECTION
+
+When user speaks:
+
+* Weapon name → attempt purchase
+* Item name → attempt sell
+* Armor name → attempt upgrade
+
+Use fuzzy matching:
+
+* Normalize speech (lowercase, remove filler words)
+* Match against names
+
+---
+
+## STEP 6 — EXECUTE ACTIONS
+
+Call:
+
+* buyWeapon()
+* sellItem()
+* upgradeArmor()
+
+Handle response:
+
+IF success:
+Speak:
+"Action completed successfully."
+
+IF failure:
+Speak:
+"You do not have sufficient gold for this action."
+
+---
+
+## STEP 7 — CONTEXT-AWARE LISTENING
+
+Only accept:
+
+* Weapon names when shopMode = "buy"
+* Item names when shopMode = "sell"
+* Armor names when shopMode = "upgrade"
+
+---
+
+## STEP 8 — EXIT SHOP
+
+Add intent:
+
+* "exit shop"
+* "leave shop"
+
+→ EXIT_SHOP
+
+Action:
+
+* isShopOpen = false
+* shopMode = null
+
+Speak:
+"You have exited the shop."
+
+---
+
+## ERROR HANDLING
+
+If no match found:
+Speak:
+"I did not recognize that. Please try again."
+
+---
+
+## VOICE UX RULES
+
+* Keep responses short and clear
+* Do not overlap speech
+* Interrupt previous speech when new command comes
+
+---
+
+## VALIDATION
+
+Test full voice flow:
+
+* "open shop"
+* "buy weapons"
+* "ashbringer"
+* "sell items"
+* "upgrade armor"
+* "exit shop"
+
+Ensure:
+
+* No crashes
+* Correct actions executed
+* Proper TTS responses
+
+---
+
+## OUTPUT
+
+* Updated IntentProcessor
+* Voice-controlled shop flow
+* Integration with ShopService
+* Context-aware voice handling
+
+---
+
+## STOP AFTER THIS STEP
+
+Do NOT modify combat system yet

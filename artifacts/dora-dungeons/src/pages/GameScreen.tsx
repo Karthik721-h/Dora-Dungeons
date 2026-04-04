@@ -14,8 +14,8 @@ import { useVoiceInput } from "@/hooks/useVoiceInput";
 import { NarrationFeed } from "@/components/NarrationFeed";
 import { PlayerHUD } from "@/components/PlayerHUD";
 import { VoiceControl } from "@/components/VoiceControl";
-import { ShopPanel } from "@/components/ShopPanel";
-import { ShopWeapon, ShopArmor, ShopInventoryItem } from "@/shop";
+import { ShopPanel, ShopView } from "@/components/ShopPanel";
+import { ShopWeapon, ShopArmor, ShopInventoryItem, SHOP_WEAPONS, buyWeapon, sellItem, upgradeArmor } from "@/shop";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -68,11 +68,20 @@ export function GameScreen({
 
   // ── Shop state (fully client-side; server doesn't track gold/weapons/armors yet) ──
   const [shopOpen, setShopOpen] = useState(false);
+  const [shopMode, setShopMode] = useState<"main" | "buy" | "sell" | "upgrade">("main");
   const [shopGold, setShopGold] = useState(0);
   const [shopWeapons, setShopWeapons] = useState<ShopWeapon[]>([]);
   const [shopArmors, setShopArmors] = useState<ShopArmor[]>([]);
   const [shopItems, setShopItems] = useState<ShopInventoryItem[]>([]);
   const [shopExtraLogs, setShopExtraLogs] = useState<string[]>([]);
+
+  // Refs so submitCommand (a useCallback) always sees fresh shop state
+  const shopOpenRef    = useRef(shopOpen);
+  const shopModeRef    = useRef(shopMode);
+  const shopGoldRef    = useRef(shopGold);
+  const shopWeaponsRef = useRef(shopWeapons);
+  const shopArmorsRef  = useRef(shopArmors);
+  const shopItemsRef   = useRef(shopItems);
 
   const prevLogsRef = useRef<string[]>(gameState.logs);
   const queryClient = useQueryClient();
@@ -188,6 +197,149 @@ export function GameScreen({
         return;
       }
 
+      // ── Shop voice commands ────────────────────────────────────────────────────
+
+      /** Normalize a string for fuzzy name matching. */
+      const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]/g, "").trim();
+
+      /** True if spoken overlaps weapon/item/armor name, or vice versa. */
+      const fuzzyMatch = (spoken: string, name: string) => {
+        const sp = norm(spoken);
+        const nm = norm(name);
+        return nm.includes(sp) || sp.includes(nm);
+      };
+
+      if (trimmed === "open_shop") {
+        setShopOpen(true);
+        setShopMode("main");
+        AudioManager.speak(
+          "The shop is open. You may purchase weapons, sell items, or upgrade your armor. What would you like to do?",
+          { interrupt: true }
+        );
+        return;
+      }
+
+      if (trimmed === "exit_shop") {
+        setShopOpen(false);
+        setShopMode("main");
+        AudioManager.speak("You have exited the shop.", { interrupt: true });
+        return;
+      }
+
+      if (trimmed === "shop_buy") {
+        if (!shopOpenRef.current) { setShopOpen(true); }
+        setShopMode("buy");
+        const lines = [
+          "These are the weapons available for purchase.",
+          ...SHOP_WEAPONS.map((w) => `${w.name}, ${w.price} gold.`),
+        ];
+        AudioManager.speakLines(lines, { interrupt: true });
+        return;
+      }
+
+      if (trimmed === "shop_sell") {
+        if (!shopOpenRef.current) { setShopOpen(true); }
+        setShopMode("sell");
+        if (shopItemsRef.current.length === 0) {
+          AudioManager.speak("Your inventory is empty.", { interrupt: true });
+        } else {
+          AudioManager.speakLines(
+            [
+              "You have the following items available for sale.",
+              ...shopItemsRef.current.map((i) => `${i.name}, worth ${i.value} gold.`),
+            ],
+            { interrupt: true }
+          );
+        }
+        return;
+      }
+
+      if (trimmed === "shop_upgrade") {
+        if (!shopOpenRef.current) { setShopOpen(true); }
+        setShopMode("upgrade");
+        if (shopArmorsRef.current.length === 0) {
+          AudioManager.speak("You do not have any armor to upgrade.", { interrupt: true });
+        } else {
+          AudioManager.speakLines(
+            [
+              "These are your available armors for upgrade.",
+              ...shopArmorsRef.current.map((a) =>
+                a.level === 3
+                  ? `${a.name}, level three, already at maximum.`
+                  : `${a.name}, level ${a.level}, upgrade costs ${a.level === 1 ? 20 : 30} gold.`
+              ),
+            ],
+            { interrupt: true }
+          );
+        }
+        return;
+      }
+
+      // ── Context-aware name selection while shop is open ──────────────────────
+      if (shopOpenRef.current && shopModeRef.current !== "main") {
+        const mode = shopModeRef.current;
+
+        if (mode === "buy") {
+          const match = SHOP_WEAPONS.find((w) => fuzzyMatch(trimmed, w.name));
+          if (match) {
+            const result = buyWeapon(shopGoldRef.current, shopWeaponsRef.current, match.id);
+            if (result.success) {
+              setShopGold(result.data.gold);
+              setShopWeapons(result.data.weapons);
+              AudioManager.speak(`${match.name} purchased. You have ${result.data.gold} gold remaining.`, { interrupt: true });
+              addShopLog(`✓ ${match.name} purchased successfully.`);
+            } else {
+              AudioManager.speak("You do not have sufficient gold for this action.", { interrupt: true });
+            }
+            return;
+          }
+        }
+
+        if (mode === "sell") {
+          const match = shopItemsRef.current.find((i) => fuzzyMatch(trimmed, i.name));
+          if (match) {
+            const result = sellItem(shopGoldRef.current, shopItemsRef.current, match.id);
+            if (result.success) {
+              setShopGold(result.data.gold);
+              setShopItems(result.data.inventory);
+              AudioManager.speak(`${match.name} sold for ${match.value} gold. You now have ${result.data.gold} gold.`, { interrupt: true });
+              addShopLog(`✓ ${match.name} sold successfully.`);
+            } else {
+              AudioManager.speak("That item could not be found.", { interrupt: true });
+            }
+            return;
+          }
+        }
+
+        if (mode === "upgrade") {
+          const match = shopArmorsRef.current.find((a) => fuzzyMatch(trimmed, a.name));
+          if (match) {
+            const result = upgradeArmor(shopGoldRef.current, shopArmorsRef.current, match.id);
+            if (result.success) {
+              setShopGold(result.data.gold);
+              setShopArmors(result.data.armors);
+              const upgraded = result.data.armors.find((a) => a.id === match.id);
+              AudioManager.speak(
+                `${match.name} upgraded to level ${upgraded?.level}. You have ${result.data.gold} gold remaining.`,
+                { interrupt: true }
+              );
+              addShopLog(`✓ ${match.name} upgraded to level ${upgraded?.level}.`);
+            } else if (result.message === "ARMOR_MAX_LEVEL") {
+              AudioManager.speak("This armor is already at maximum level.", { interrupt: true });
+            } else {
+              AudioManager.speak("You do not have sufficient gold for this action.", { interrupt: true });
+            }
+            return;
+          }
+        }
+
+        // In shop but no name matched
+        AudioManager.speak("I did not recognize that. Please try again.", { interrupt: true });
+        return;
+      }
+
+      // ── End shop commands ──────────────────────────────────────────────────────
+
       if (/^help$/i.test(trimmed)) {
         AudioManager.speakLines(
           [
@@ -200,6 +352,7 @@ export function GameScreen({
             "Say flee — to escape from combat and retreat.",
             "Say status — to hear your current health, mana, and level.",
             "Say repeat — to hear the last message again.",
+            "Say open shop — to visit the merchant's shop.",
             "Say change voice — to switch between female and male narrator.",
             "Say log out — to exit the game and return to the login screen.",
             "Say help — to hear these commands again at any time.",
@@ -253,6 +406,12 @@ export function GameScreen({
   stopListeningRef.current = stopListening;
   onLogoutRef.current = onLogout;
   voiceGenderRef.current = voiceGender;
+  shopOpenRef.current    = shopOpen;
+  shopModeRef.current    = shopMode;
+  shopGoldRef.current    = shopGold;
+  shopWeaponsRef.current = shopWeapons;
+  shopArmorsRef.current  = shopArmors;
+  shopItemsRef.current   = shopItems;
 
   // ── Click-outside: close voice dropdown ──────────────────────────────────────
   useEffect(() => {
@@ -691,9 +850,11 @@ export function GameScreen({
                   ownedWeapons={shopWeapons}
                   ownedArmors={shopArmors}
                   sellableItems={shopItems}
+                  view={shopMode}
+                  onViewChange={(v: ShopView) => setShopMode(v)}
                   onUpdate={handleShopUpdate}
                   onLogMessage={addShopLog}
-                  onClose={() => setShopOpen(false)}
+                  onClose={() => { setShopOpen(false); setShopMode("main"); }}
                 />
               )}
             </AnimatePresence>

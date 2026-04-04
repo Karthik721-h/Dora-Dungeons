@@ -12,6 +12,10 @@ import {
   ShopInventoryItem,
 } from "@/shop";
 
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export type ShopView = "main" | "buy" | "sell" | "upgrade";
+
 // ── Props ─────────────────────────────────────────────────────────────────────
 
 interface ShopPanelProps {
@@ -20,14 +24,13 @@ interface ShopPanelProps {
   ownedArmors: ShopArmor[];
   /** Server inventory items (real sellable items from the dungeon). */
   sellableItems: ShopInventoryItem[];
+  /** Controlled view — managed by the parent so voice commands can drive navigation. */
+  view: ShopView;
+  onViewChange: (v: ShopView) => void;
   onUpdate: (next: { gold: number; weapons: ShopWeapon[]; armors: ShopArmor[]; items?: ShopInventoryItem[] }) => void;
   onLogMessage: (msg: string) => void;
   onClose: () => void;
 }
-
-// ── Sub-view types ────────────────────────────────────────────────────────────
-
-type ShopView = "main" | "buy" | "sell" | "upgrade";
 
 // ── Shared button styles ──────────────────────────────────────────────────────
 
@@ -130,11 +133,12 @@ export function ShopPanel({
   ownedWeapons,
   ownedArmors,
   sellableItems,
+  view,
+  onViewChange,
   onUpdate,
   onLogMessage,
   onClose,
 }: ShopPanelProps) {
-  const [view, setView] = useState<ShopView>("main");
   const [feedback, setFeedback] = useState<string | null>(null);
   const [localGold, setLocalGold] = useState(gold);
   const [localWeapons, setLocalWeapons] = useState<ShopWeapon[]>(ownedWeapons);
@@ -195,7 +199,7 @@ export function ShopPanel({
 
   const renderBuyView = () => (
     <>
-      <SectionHeader icon={<Sword size={12} />} title="Buy Weapons" onBack={() => { setView("main"); setFeedback(null); }} />
+      <SectionHeader icon={<Sword size={12} />} title="Buy Weapons" onBack={() => { onViewChange("main"); setFeedback(null); }} />
       <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", overflowY: "auto", maxHeight: "clamp(160px, 28vh, 340px)" }}>
         {SHOP_WEAPONS.map((w) => {
           const owned = ownedIds.has(w.id);
@@ -225,7 +229,7 @@ export function ShopPanel({
 
   const renderSellView = () => (
     <>
-      <SectionHeader icon={<Package size={12} />} title="Sell Items" onBack={() => { setView("main"); setFeedback(null); }} />
+      <SectionHeader icon={<Package size={12} />} title="Sell Items" onBack={() => { onViewChange("main"); setFeedback(null); }} />
       {localItems.length === 0 ? (
         <p style={{ fontFamily: "'Crimson Text', serif", fontStyle: "italic", color: "rgba(200,185,150,0.4)", fontSize: "0.85rem", padding: "0.5rem 0" }}>
           Your inventory is empty.
@@ -247,7 +251,7 @@ export function ShopPanel({
 
   const renderUpgradeView = () => (
     <>
-      <SectionHeader icon={<Shield size={12} />} title="Upgrade Armor" onBack={() => { setView("main"); setFeedback(null); }} />
+      <SectionHeader icon={<Shield size={12} />} title="Upgrade Armor" onBack={() => { onViewChange("main"); setFeedback(null); }} />
       {localArmors.length === 0 ? (
         <p style={{ fontFamily: "'Crimson Text', serif", fontStyle: "italic", color: "rgba(200,185,150,0.4)", fontSize: "0.85rem", padding: "0.5rem 0" }}>
           No armor available to upgrade.
@@ -365,17 +369,17 @@ export function ShopPanel({
                 What seeks the wanderer?
               </p>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
-                <ShopBtn onClick={() => { setView("buy"); setFeedback(null); }} variant="gold">
+                <ShopBtn onClick={() => { onViewChange("buy"); setFeedback(null); }} variant="gold">
                   <span style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                     <Sword size={11} /> Buy Weapons
                   </span>
                 </ShopBtn>
-                <ShopBtn onClick={() => { setView("sell"); setFeedback(null); }} variant="default">
+                <ShopBtn onClick={() => { onViewChange("sell"); setFeedback(null); }} variant="default">
                   <span style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                     <Package size={11} /> Sell Items
                   </span>
                 </ShopBtn>
-                <ShopBtn onClick={() => { setView("upgrade"); setFeedback(null); }} variant="default">
+                <ShopBtn onClick={() => { onViewChange("upgrade"); setFeedback(null); }} variant="default">
                   <span style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                     <Shield size={11} /> Upgrade Armor
                   </span>

@@ -176,6 +176,36 @@ const PHRASE_PATTERNS: PhrasePair[] = [
     pattern: /^(?:use|drink|eat|consume|equip|wield|wear|apply)\s+(?:the\s+|a\s+)?(.+)$/,
     canonical: (m) => `use ${m[1]!.trim()}`,
   },
+
+  // --- Shop: open ---
+  {
+    pattern: /^(?:open|enter|go\s+to|visit|access)\s+(?:the\s+)?shop$/,
+    canonical: () => "open_shop",
+  },
+
+  // --- Shop: buy ---
+  {
+    pattern: /^(?:buy|purchase|get|browse)\s+(?:weapons?|arms?|gear|equipment|swords?|blades?|axes?)$/,
+    canonical: () => "shop_buy",
+  },
+
+  // --- Shop: sell ---
+  {
+    pattern: /^sell\s+(?:items?|stuff|things?|goods?|my\s+items?)$/,
+    canonical: () => "shop_sell",
+  },
+
+  // --- Shop: upgrade ---
+  {
+    pattern: /^upgrade\s+(?:armou?r|gear|equipment|protection|my\s+armou?r)$/,
+    canonical: () => "shop_upgrade",
+  },
+
+  // --- Shop: exit ---
+  {
+    pattern: /^(?:exit|leave|close|quit|stop|done\s+(?:with|shopping)|back)\s+(?:(?:the\s+)?shop|shopping)?$|^(?:exit|leave)\s+(?:the\s+)?shop$/,
+    canonical: () => "exit_shop",
+  },
 ];
 
 /**
