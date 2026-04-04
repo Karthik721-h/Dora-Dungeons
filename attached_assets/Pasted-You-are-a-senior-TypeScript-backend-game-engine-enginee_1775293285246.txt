@@ -1,0 +1,181 @@
+You are a senior TypeScript backend/game engine engineer.
+
+Implement the ShopService logic for "Dora Dungeons".
+
+---
+
+## GOAL
+
+Create a reusable, isolated ShopService that handles:
+
+* Buying weapons
+* Selling items
+* Upgrading armor
+
+---
+
+## STRICT RULES
+
+* NO UI changes
+* NO voice/TTS logic
+* NO direct state mutation outside functions
+* DO NOT modify existing combat or game flow
+* This must be a pure logic layer
+
+---
+
+## FILE STRUCTURE
+
+Create:
+game-engine/src/services/ShopService.ts
+
+---
+
+## FUNCTIONS TO IMPLEMENT
+
+1. getAvailableWeapons()
+
+Return a static list of 6 weapons:
+
+* Ashbringer (10 gold)
+* Keyblade (20 gold)
+* Leviathan Axe (45 gold)
+* Gjallarhorn (50 gold)
+* Buster Sword (60 gold)
+* Gunblade (100 gold)
+
+Each weapon must include:
+id, name, description, price
+
+---
+
+2. buyWeapon(player, weaponId)
+
+Logic:
+
+* Find weapon from list
+* If player.gold < price → return failure
+* Else:
+
+  * Deduct gold
+  * Add weapon to player.weapons
+
+Return:
+{
+success: boolean,
+message: string,
+updatedPlayer
+}
+
+---
+
+3. sellItem(player, itemId)
+
+Logic:
+
+* Find item in player.inventory
+* If not found → return failure
+* Else:
+
+  * Remove item
+  * Add item.value to player.gold
+
+Return same structure
+
+---
+
+4. upgradeArmor(player, armorId)
+
+Rules:
+
+* Max level = 3
+* If armor not found → fail
+* If already level 3 → fail
+
+Upgrade cost:
+
+* Level 1 → 2 = 20 gold
+* Level 2 → 3 = 30 gold
+
+Logic:
+
+* Check gold
+* Deduct gold
+* Increase armor level
+
+Return same structure
+
+---
+
+5. HELPER FUNCTIONS
+
+Create helpers:
+
+* findWeaponById()
+* findArmorById()
+* findItemById()
+
+---
+
+## IMMUTABILITY (IMPORTANT)
+
+* Do NOT mutate player directly
+* Return updated copy:
+
+Example:
+const updatedPlayer = { ...player, gold: newGold }
+
+---
+
+## ERROR MESSAGES (GENERIC)
+
+Keep messages simple for now:
+
+* "NOT_ENOUGH_GOLD"
+* "ITEM_NOT_FOUND"
+* "ARMOR_MAX_LEVEL"
+* "SUCCESS"
+
+(TTS will handle user-friendly text later)
+
+---
+
+## TYPE SAFETY
+
+* Use strict TypeScript typing
+* Import Weapon, Armor, Item types
+* Ensure no "any" types
+
+---
+
+## VALIDATION
+
+After implementation:
+
+1. Run typecheck → must pass
+
+2. Manually test:
+
+   * buyWeapon()
+   * sellItem()
+   * upgradeArmor()
+
+3. Ensure:
+
+   * gold updates correctly
+   * arrays update correctly
+   * no crashes
+
+---
+
+## OUTPUT
+
+* ShopService.ts with all functions
+* Fully typed logic
+* No side effects outside service
+
+---
+
+## STOP AFTER THIS STEP
+
+Do NOT implement UI or voice yet
