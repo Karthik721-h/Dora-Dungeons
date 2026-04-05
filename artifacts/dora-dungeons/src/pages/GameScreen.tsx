@@ -113,7 +113,11 @@ export function GameScreen({
   );
   // Prevents the payment-confirmed TTS from firing more than once even if the
   // component somehow re-mounts (e.g. strict mode double-invoke in dev).
-  const hasAnnouncedPaymentRef = useRef(false);
+  const hasAnnouncedPaymentRef  = useRef(false);
+  const hasAnnouncedWaitingRef  = useRef(false);
+  // When ?payment=success returns but the webhook hasn't fired yet, we poll
+  // /api/payment/status until hasPaid is confirmed, then auto-transition.
+  const [webhookWaiting, setWebhookWaiting] = useState(false);
 
   // Gold comes directly from gameState.gold — no separate shopGold state.
   const [shopWeapons, setShopWeapons] = useState<ShopWeapon[]>(() =>
@@ -301,7 +305,7 @@ export function GameScreen({
               setGameMode("paymentDecision");
               if (!isMutedRef.current) {
                 AudioManager.speak(
-                  "Congratulations! You have completed Level 1 and defeated the dungeon boss. To continue your adventure and unlock all levels beyond, a one-time payment of thirty dollars is required. Would you like to proceed to payment? Say yes to pay, or say no to replay this level.",
+                  "The path forward is sealed by ancient magic. Only those who pledge their commitment may enter the next dungeon. A one-time offering of 30 dollars unlocks all future adventures. Say yes to proceed, or no to replay the dungeon.",
                   { interrupt: true }
                 );
                 AudioManager.onQueueDrained(() => {
@@ -572,13 +576,13 @@ export function GameScreen({
             setGameMode("replayPrompt");
             if (!isMutedRef.current) {
               AudioManager.speak(
-                "Understood. Would you like to replay Level 1, or exit the dungeon? Say yes to replay, or no to exit.",
+                "You may continue exploring this dungeon, but greater challenges await beyond the sealed gate. Say yes whenever you are ready to proceed.",
                 { interrupt: true }
               );
             }
           } else if (!isMutedRef.current) {
             AudioManager.speak(
-              "Say yes to proceed to payment, or no to replay Level 1.",
+              "Say yes to proceed with payment, or no to replay the dungeon.",
               { interrupt: false }
             );
           }
@@ -736,19 +740,29 @@ export function GameScreen({
       gameModeRef.current = "paymentDecision";
       setGameMode("paymentDecision");
       if (!isMutedRef.current) {
-        let msg: string;
         if (paymentJustReturned) {
-          msg = "Your payment could not be confirmed yet. Please try again or contact support if you were charged.";
-        } else if (paymentJustCancelled) {
-          msg = "Payment was not completed. No charge was made. You must complete payment to access Level 2 and beyond. Say yes to try again, or no to replay Level 1.";
+          // Webhook hasn't fired yet — speak a holding message and start polling.
+          if (!hasAnnouncedWaitingRef.current) {
+            hasAnnouncedWaitingRef.current = true;
+            AudioManager.speak(
+              "Finalizing your access. This may take a few seconds. Please wait.",
+              { interrupt: true }
+            );
+          }
+          setWebhookWaiting(true);
         } else {
-          msg = "You have completed Level 1 and defeated the dungeon boss. To unlock all levels beyond, a one-time payment of thirty dollars is required. Say yes to pay, or no to replay Level 1.";
+          let msg: string;
+          if (paymentJustCancelled) {
+            msg = "Payment was not completed. No charge was made. You must complete payment to access Level 2 and beyond. Say yes to try again, or no to replay the dungeon.";
+          } else {
+            msg = "The path forward is sealed by ancient magic. Only those who pledge their commitment may enter the next dungeon. A one-time offering of 30 dollars unlocks all future adventures. Say yes to proceed, or no to replay the dungeon.";
+          }
+          AudioManager.speak(msg, { interrupt: true });
+          AudioManager.onQueueDrained(() => {
+            stopListeningRef.current?.();
+            setTimeout(() => startListeningRef.current(), 120);
+          });
         }
-        AudioManager.speak(msg, { interrupt: true });
-        AudioManager.onQueueDrained(() => {
-          stopListeningRef.current?.();
-          setTimeout(() => startListeningRef.current(), 120);
-        });
       }
     } else {
       // hasPaid is true — enter the normal level-decision flow.
@@ -761,7 +775,7 @@ export function GameScreen({
         if (paymentJustReturned && !hasAnnouncedPaymentRef.current) {
           hasAnnouncedPaymentRef.current = true;
           AudioManager.speak(
-            "Payment confirmed. You now have full access to all dungeon levels. Say next level to continue your adventure, or use the button below.",
+            "Payment confirmed. The ancient seal has been broken. A new dungeon awakens before you. Say next level to continue your adventure.",
             { interrupt: true }
           );
         } else if (!paymentJustReturned) {
@@ -778,6 +792,70 @@ export function GameScreen({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // intentional empty array — runs exactly once on mount
+
+  // ── Webhook-delay poller ─────────────────────────────────────────────────────
+  // When the player returned from Stripe but the webhook hasn't confirmed yet,
+  // we poll /api/payment/status every 2 s (up to 6 tries = 12 s). On success we
+  // transition to levelDecision and speak the reward TTS. On timeout we fall back
+  // to the standard paymentDecision gate so the player isn't stuck.
+  useEffect(() => {
+    if (!webhookWaiting) return;
+    const BASE = import.meta.env.BASE_URL as string;
+    const token = localStorage.getItem("dd_jwt");
+    let attempts = 0;
+    const MAX = 6;
+
+    const poll = async () => {
+      try {
+        const res = await fetch(`${BASE}api/payment/status`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (res.ok) {
+          const data = await res.json() as { hasPaid: boolean };
+          if (data.hasPaid) {
+            setWebhookWaiting(false);
+            gameModeRef.current = "levelDecision";
+            setGameMode("levelDecision");
+            if (!isMutedRef.current && !hasAnnouncedPaymentRef.current) {
+              hasAnnouncedPaymentRef.current = true;
+              AudioManager.speak(
+                "Payment confirmed. The ancient seal has been broken. A new dungeon awakens before you. Say next level to continue your adventure.",
+                { interrupt: true }
+              );
+              AudioManager.onQueueDrained(() => {
+                stopListeningRef.current?.();
+                setTimeout(() => startListeningRef.current(), 120);
+              });
+            }
+            return; // done — do not reschedule
+          }
+        }
+      } catch {
+        // network error — continue polling
+      }
+      attempts += 1;
+      if (attempts >= MAX) {
+        // Webhook took too long — drop into the normal payment gate.
+        setWebhookWaiting(false);
+        if (!isMutedRef.current) {
+          AudioManager.speak(
+            "Access could not be confirmed. If you completed payment, please refresh the page. Otherwise, say yes to try again.",
+            { interrupt: true }
+          );
+          AudioManager.onQueueDrained(() => {
+            stopListeningRef.current?.();
+            setTimeout(() => startListeningRef.current(), 120);
+          });
+        }
+      } else {
+        id = window.setTimeout(poll, 2000);
+      }
+    };
+
+    let id = window.setTimeout(poll, 2000);
+    return () => window.clearTimeout(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [webhookWaiting]);
 
   // ── Click-outside: close voice dropdown ──────────────────────────────────────
   // Check both the trigger container AND the portaled menu (rendered in document.body).

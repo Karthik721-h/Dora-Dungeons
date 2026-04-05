@@ -1,0 +1,167 @@
+You are a senior game designer and conversion optimization expert specializing in voice-first experiences and monetization.
+
+Upgrade Dora Dungeons to improve:
+
+* Payment conversion rate
+* Player immersion
+* Emotional engagement
+* Voice-first clarity
+
+DO NOT modify backend payment security or core gameplay systems.
+
+---
+
+## GOAL
+
+Make players MORE likely to:
+
+* Understand the paywall
+* Feel motivated to upgrade
+* Enjoy the post-payment experience
+* Continue playing long-term
+
+---
+
+## STEP 1 — UPGRADE PAYWALL TTS (IMMERSIVE + PERSUASIVE)
+
+Replace current generic payment prompt with:
+
+"The path forward is sealed by ancient magic. Only those who pledge their commitment may enter the next dungeon. A one-time offering of 30 dollars unlocks all future adventures. Do you wish to proceed?"
+
+---
+
+Ensure:
+
+* Spoken AFTER Level 1 boss victory
+* Uses existing TTS system
+* Does NOT duplicate narration
+
+---
+
+## STEP 2 — ADD SOFT URGENCY (WITHOUT FORCING)
+
+After user says "no" to payment:
+
+Replace current message with:
+
+"You may continue exploring this dungeon, but greater challenges await beyond the sealed gate. Say yes whenever you are ready to proceed."
+
+---
+
+Ensure:
+
+* User can still replay Level 1
+* No pressure loops or spam
+
+---
+
+## STEP 3 — UPGRADE POST-PAYMENT REWARD MOMENT
+
+Replace payment success narration with:
+
+"Payment confirmed. The ancient seal has been broken. A new dungeon awakens before you. Say 'Next Level' to continue your adventure."
+
+---
+
+Ensure:
+
+* Uses interrupt: true
+* Fires ONLY once
+* Does not overlap with other narration
+
+---
+
+## STEP 4 — IMPROVE WEBHOOK DELAY EXPERIENCE
+
+IF:
+
+User returns from Stripe
+AND player.hasPaid is still false (webhook delay)
+
+---
+
+Speak:
+
+"Finalizing your access. This may take a few seconds. Please wait."
+
+---
+
+Then:
+
+* Retry state fetch
+* Continue normal flow when hasPaid becomes true
+
+---
+
+## STEP 5 — IMPROVE VOICE CLARITY (IMPORTANT)
+
+Ensure ALL payment-related states clearly tell the user what to say:
+
+---
+
+IF not paid:
+
+Say:
+"Say yes to proceed with payment, or no to replay the dungeon."
+
+---
+
+IF paid:
+
+Say:
+"Say next level to continue, or no to replay."
+
+---
+
+---
+
+## STEP 6 — PREVENT NARRATION SPAM
+
+Add safeguards:
+
+* Use refs to prevent repeating the same payment messages
+* Do NOT repeat prompts unless user gives invalid input
+* Maintain clean audio flow
+
+---
+
+## STEP 7 — KEEP SYSTEM SAFE
+
+DO NOT:
+
+* Change Stripe logic
+* Modify webhook handler
+* Alter hasPaid logic
+* Break voice command system
+
+---
+
+ONLY improve messaging + UX
+
+---
+
+## STEP 8 — FINAL TEST
+
+Test full flow:
+
+1. Beat Level 1
+2. Hear immersive paywall message
+3. Say "no" → hear soft urgency
+4. Say "yes" → Stripe
+5. Return → hear reward message
+6. Say "Next Level" → proceed
+
+---
+
+## EXPECTED RESULT
+
+* More immersive storytelling
+* Higher payment conversion
+* Better emotional reward
+* Clean voice-first experience
+
+---
+
+## STOP AFTER THIS STEP
+
+Do NOT introduce new features
