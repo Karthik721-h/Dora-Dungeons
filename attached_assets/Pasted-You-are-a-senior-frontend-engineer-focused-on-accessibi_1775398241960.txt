@@ -1,0 +1,134 @@
+You are a senior frontend engineer focused on accessibility and game UI clarity.
+
+Add a persistent Dungeon Level indicator to the Dora Dungeons UI.
+
+---
+
+## GOAL
+
+Display the current dungeon level clearly in the UI so users always know their progression state.
+
+---
+
+## STRICT RULES
+
+* DO NOT modify backend or API
+* DO NOT change game logic
+* ONLY use existing gameState data
+* MUST be accessible (screen reader friendly)
+
+---
+
+## STEP 1 — GET LEVEL FROM STATE
+
+Use:
+
+gameState.dungeonLevel
+
+Ensure it updates reactively when level changes.
+
+---
+
+## STEP 2 — ADD TO NAVBAR (PRIMARY LOCATION)
+
+In the top navbar:
+
+Add a new element:
+
+Text:
+
+"Level {dungeonLevel}"
+
+---
+
+Placement:
+
+* Near "Dora Dungeons" title OR
+* Right side before control buttons
+
+---
+
+Style:
+
+* Font: bold
+* Slightly larger than normal text
+* Color: gold (#facc15 or similar)
+* Add subtle glow or highlight
+
+---
+
+Example:
+
+[Dora Dungeons]   [Level 2]   [Voice ▼] [Shop]
+
+---
+
+## STEP 3 — ACCESSIBILITY SUPPORT
+
+Add:
+
+aria-label={`Current dungeon level ${dungeonLevel}`}
+
+---
+
+Optional (recommended):
+
+Wrap in:
+
+<span role="status" aria-live="polite">
+
+So screen readers announce level changes.
+
+---
+
+## STEP 4 — OPTIONAL (ENHANCED FEEDBACK)
+
+When level changes:
+
+Trigger subtle animation:
+
+* Fade in
+* Scale slightly (1 → 1.1 → 1)
+
+---
+
+DO NOT over-animate — keep it subtle
+
+---
+
+## STEP 5 — OPTIONAL (SYNC WITH TTS)
+
+When level changes (nextLevelApi):
+
+Ensure TTS already says:
+
+"Entering Level X"
+
+DO NOT duplicate narration here
+
+---
+
+## VALIDATION
+
+Test:
+
+1. Start game → shows Level 1
+2. Progress to Level 2 → updates instantly
+3. Refresh page → still shows correct level
+4. Screen reader announces level correctly
+
+---
+
+## EXPECTED RESULT
+
+* Player always knows current level
+* UI matches TTS narration
+* No logic changes required
+* Clean, professional feel
+
+---
+
+## STOP AFTER THIS STEP
+
+Do NOT modify progression system
+Do NOT add new API fields

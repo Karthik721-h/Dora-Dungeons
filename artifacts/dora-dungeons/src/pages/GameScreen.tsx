@@ -972,7 +972,7 @@ export function GameScreen({
           <span className="dd-navbar-title hidden sm:block">Dora Dungeons</span>
         </div>
 
-        {/* Center: game status */}
+        {/* Center: game status + dungeon level */}
         <div className="dd-navbar-center">
           <span
             className="status-badge"
@@ -985,6 +985,34 @@ export function GameScreen({
           >
             {isCombat ? "⚔ In Combat" : isGameOver ? "☠ Fallen" : "◉ " + gameStatus.replace("_", " ")}
           </span>
+
+          {/* Dungeon level badge — re-mounts (via key) on level-up to replay entrance animation */}
+          <motion.span
+            key={player.dungeonLevel ?? 1}
+            initial={{ opacity: 0, scale: 0.82 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.35, ease: "easeOut" }}
+            role="status"
+            aria-live="polite"
+            aria-label={`Current dungeon level ${player.dungeonLevel ?? 1}`}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.25rem",
+              fontSize: "11px",
+              fontWeight: 700,
+              letterSpacing: "0.18em",
+              textTransform: "uppercase",
+              color: "#c89b3c",
+              textShadow: "0 0 10px rgba(200,155,60,0.6)",
+              border: "1px solid rgba(200,155,60,0.35)",
+              background: "rgba(200,155,60,0.08)",
+              borderRadius: 4,
+              padding: "2px 8px",
+            }}
+          >
+            ⬡ LVL {player.dungeonLevel ?? 1}
+          </motion.span>
         </div>
 
         {/* Right: controls */}
