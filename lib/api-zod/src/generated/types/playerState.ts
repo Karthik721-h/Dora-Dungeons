@@ -39,4 +39,8 @@ export interface PlayerState {
   armors: ArmorState[];
   /** Inventory items with full details (id + value) for the sell view */
   inventoryItems: { id: string; name: string; value: number }[];
+  /** Current dungeon depth (1-indexed) */
+  dungeonLevel: number;
+  /** True when the boss of the current dungeon has been defeated */
+  dungeonLevelCompleted: boolean;
 }

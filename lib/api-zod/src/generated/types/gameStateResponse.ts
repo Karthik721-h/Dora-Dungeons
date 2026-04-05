@@ -24,4 +24,6 @@ export interface GameStateResponse {
   /** The command that was parsed (only present on action responses) */
   parsedCommand?: ParsedCommand;
   turnCount: number;
+  /** One-shot event emitted this turn (e.g. LEVEL_COMPLETED) */
+  event?: string;
 }

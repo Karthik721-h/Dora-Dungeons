@@ -447,7 +447,26 @@ export function AuthScreen({ auth }: AuthScreenProps) {
                   textAlign: "center",
                 }}
               >
-                Tap or press Enter — voice narration starts immediately
+                Voice mode is ready. Press Enter or tap anywhere to begin your adventure.
+              </motion.p>
+
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 1.2, duration: 0.5 }}
+                style={{
+                  fontFamily: "'Fira Code', monospace",
+                  fontSize: "0.62rem",
+                  letterSpacing: "0.09em",
+                  color: "rgba(200,190,180,0.14)",
+                  textTransform: "uppercase",
+                  textAlign: "center",
+                  maxWidth: 280,
+                }}
+                aria-label="Your device requires a single interaction to activate voice. Once started, the game will be fully voice-controlled."
+              >
+                Your device requires a single interaction to activate voice.
+                Once started, the game is fully voice-controlled.
               </motion.p>
 
               {/* Silent muted audio — plays automatically to prime the AudioContext

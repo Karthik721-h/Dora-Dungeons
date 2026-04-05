@@ -606,16 +606,16 @@ export class GameEngine {
   buyWeaponShop(weaponId: string): { success: boolean; message: string } {
     if (!this.state) throw new Error("No active game session");
     const state = this.state;
-    // Sync combat gold into player before the shop reads player.gold
+    // IMPORTANT: Gold must be kept in sync between state.gold and player.gold.
+    // state.gold accumulates combat rewards; ShopService reads/writes player.gold.
+    // Always sync IN before the transaction and OUT after — both directions.
     state.player = { ...state.player, gold: state.gold };
-    console.log("Before purchase: gold =", state.gold, "weapons =", state.player.weapons.map(w => w.name));
     const result = shopBuyWeapon(state.player, weaponId);
     if (result.success) {
       state.player = result.updatedPlayer;
       state.gold = result.updatedPlayer.gold;
       const bought = findWeaponById(weaponId)!;
       state.logs.push(`You purchased ${bought.name} for ${bought.price} gold.`);
-      console.log("After purchase: gold =", state.gold, "weapons =", state.player.weapons.map(w => w.name));
     }
     return { success: result.success, message: result.message };
   }
@@ -623,6 +623,8 @@ export class GameEngine {
   sellItemShop(itemId: string): { success: boolean; message: string } {
     if (!this.state) throw new Error("No active game session");
     const state = this.state;
+    // IMPORTANT: Gold must be kept in sync between state.gold and player.gold.
+    // Always sync IN before the transaction and OUT after — both directions.
     state.player = { ...state.player, gold: state.gold };
     const itemName = state.player.inventory.find((i) => i.id === itemId)?.name ?? itemId;
     const result = shopSellItem(state.player, itemId);
@@ -637,6 +639,8 @@ export class GameEngine {
   upgradeArmorShop(armorId: string): { success: boolean; message: string } {
     if (!this.state) throw new Error("No active game session");
     const state = this.state;
+    // IMPORTANT: Gold must be kept in sync between state.gold and player.gold.
+    // Always sync IN before the transaction and OUT after — both directions.
     state.player = { ...state.player, gold: state.gold };
     const result = shopUpgradeArmor(state.player, armorId);
     if (result.success) {

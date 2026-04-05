@@ -1,0 +1,174 @@
+You are a senior frontend/backend engineer.
+
+Apply final production polish fixes to Dora Dungeons based on QA audit findings.
+
+---
+
+## GOAL
+
+Clean up minor issues before monetization without affecting any gameplay systems.
+
+---
+
+## STRICT RULES
+
+* DO NOT change game logic
+* DO NOT modify scaling, combat, or voice systems
+* ONLY implement the fixes below
+
+---
+
+## STEP 1 — REMOVE DEBUG LOGS (CRITICAL CLEANUP)
+
+PROBLEM:
+Debug logs are exposed in production.
+
+---
+
+REMOVE the following:
+
+1. GameScreen.tsx
+
+* Line with:
+  console.log("[GameScreen] New lines for TTS:", ...)
+
+2. GameEngine.ts
+
+* Lines with:
+  console.log("Before purchase: gold =", ...)
+  console.log("After purchase: gold =", ...)
+
+---
+
+VERIFY:
+
+* No console logs remain in production code
+* App behavior unchanged
+
+---
+
+## STEP 2 — ADD AUDIO GATE ONBOARDING MESSAGE
+
+PROBLEM:
+First-time users (especially visually impaired) may not know they must tap/press Enter to start voice.
+
+---
+
+SOLUTION:
+
+Update the audio gate overlay text to clearly instruct users.
+
+---
+
+REPLACE existing hint text with:
+
+"Voice mode is ready. Press Enter or tap anywhere to begin your adventure."
+
+---
+
+ADD additional accessibility line (important):
+
+"Your device requires a single interaction to activate voice. Once started, the game will be fully voice-controlled."
+
+---
+
+VERIFY:
+
+* Text is screen-reader friendly
+* Button still autoFocuses
+* No layout break
+
+---
+
+## STEP 3 — ADD DEV NOTE FOR GOLD SYNC (MAINTAINABILITY)
+
+PROBLEM:
+Gold is synced manually between state.gold and player.gold.
+
+---
+
+SOLUTION:
+
+In all shop-related methods (buy, sell, upgrade):
+
+ADD comment at top:
+
+// IMPORTANT:
+// Gold must be kept in sync between state.gold and player.gold.
+// Always update BOTH before saving session.
+
+---
+
+VERIFY:
+
+* No logic change
+* Only comment added
+
+---
+
+## STEP 4 — DOCUMENT HEAL ABILITY DESIGN (CLARITY)
+
+PROBLEM:
+Heal ability does not scale, but this is intentional.
+
+---
+
+SOLUTION:
+
+In AbilityEffectRegistry.ts (or wherever HEAL is defined):
+
+ADD comment above HEAL logic:
+
+// NOTE:
+// Heal abilities intentionally do NOT scale with dungeon level.
+// This keeps abilities distinct from consumables (which do scale).
+// Revisit if late-game balance requires stronger healing.
+
+---
+
+VERIFY:
+
+* No functional change
+
+---
+
+## STEP 5 — OPTIONAL: CLEAN CONSOLE WARNINGS (IF ANY)
+
+Check for:
+
+* Unused variables
+* Minor TypeScript warnings
+
+---
+
+Fix ONLY if:
+
+* It does not change logic
+* It is a one-line safe fix
+
+---
+
+## FINAL VALIDATION
+
+Verify:
+
+* No console logs in production
+* Audio gate message is clear and accessible
+* No TypeScript errors
+* No UI regressions
+* No gameplay changes
+
+---
+
+## EXPECTED RESULT
+
+* Cleaner production build
+* Better onboarding clarity
+* Safer future development
+* No impact on gameplay
+
+---
+
+## STOP AFTER THIS STEP
+
+Do NOT implement new features

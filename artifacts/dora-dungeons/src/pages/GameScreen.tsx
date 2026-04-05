@@ -230,8 +230,6 @@ export function GameScreen({
           l => l.trim() && !l.startsWith(">")
         );
 
-        console.log("[GameScreen] New lines for TTS:", newLines);
-
         // ── Death guard: block ALL narration when transitioning into GAME_OVER ──
         // The death TTS useEffect handles the only speech in this state.
         // Allowing combat/log narration here would overlap with the death message.

@@ -122,6 +122,9 @@ AbilityEffectRegistry.register(
   }
 );
 
+// NOTE: Heal abilities intentionally do NOT scale with dungeon level.
+// This keeps abilities distinct from consumable potions (which do scale via
+// scaleHealAmount()). Revisit if late-game balance requires stronger healing.
 AbilityEffectRegistry.register(
   "HEAL",
   (effect, player, _targets, messages): EffectResult => {
