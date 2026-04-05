@@ -1,0 +1,272 @@
+You are a senior QA engineer and game balance analyst.
+
+Audit the Level Scaling System implemented in Dora Dungeons.
+
+---
+
+## GOAL
+
+Verify that:
+
+* Difficulty increases correctly per level
+* Rewards scale fairly
+* System is deterministic
+* No regressions or balance-breaking issues exist
+
+---
+
+## STRICT RULES
+
+* DO NOT modify code
+* ONLY inspect, simulate, and report
+* Focus on correctness, balance, and edge cases
+
+---
+
+## SECTION 1 — MULTIPLIER LOGIC
+
+Inspect:
+
+getLevelMultiplier(level)
+
+Verify:
+
+* Level 1 = 1.0
+* Scaling increases progressively
+* No negative or zero values
+
+Test sample:
+
+Level 1 → 1.0
+Level 2 → ~1.2
+Level 3 → ~1.4
+Level 5 → ~1.8+
+
+---
+
+Check:
+
+* Formula correctness
+* No floating precision issues
+* Proper rounding where needed
+
+---
+
+## SECTION 2 — ENEMY STAT SCALING
+
+Verify:
+
+enemy.hp, attack, defense are scaled using multiplier
+
+Check:
+
+* Values are integers
+* No stat becomes 0 or negative
+* Scaling applies to ALL enemy types
+
+---
+
+Test:
+
+Compare same enemy at:
+
+* Level 1
+* Level 3
+* Level 5
+
+Confirm difficulty increases
+
+---
+
+## SECTION 3 — BOSS SCALING
+
+Verify:
+
+bossMultiplier = multiplier * 1.5
+
+Check:
+
+* Boss stats scale higher than normal enemies
+* Boss is noticeably harder
+
+---
+
+Test:
+
+* Boss HP/attack vs regular enemies at same level
+* Ensure boss difficulty spike is meaningful but not impossible
+
+---
+
+## SECTION 4 — REWARD SCALING
+
+Verify:
+
+XP and Gold scale with multiplier
+
+Check:
+
+* Rewards increase per level
+* Rewards are proportional to difficulty
+
+---
+
+Test:
+
+* Level 1 rewards vs Level 3 vs Level 5
+* Ensure rewards are not too low or excessively high
+
+---
+
+## SECTION 5 — DUNGEON VARIETY SCALING
+
+Verify:
+
+* Multi-enemy encounters increase with level
+* Trap difficulty increases
+* Rare rooms appear more frequently
+
+---
+
+Test:
+
+* Level 1 → mostly single enemies
+* Level 3+ → occasional multi-enemy fights
+* Level 5+ → consistent challenge variety
+
+---
+
+## SECTION 6 — STATUS EFFECT SCALING (IF IMPLEMENTED)
+
+Verify:
+
+* Effects like burn/poison scale slightly
+* No extreme or broken effects
+
+---
+
+Ensure:
+
+* Effects remain balanced
+* No infinite loops or excessive damage
+
+---
+
+## SECTION 7 — CAP SYSTEM
+
+Verify:
+
+* Multiplier is capped (e.g. max 3.0)
+
+---
+
+Test:
+
+* High levels (e.g. 10+)
+* Ensure stats do not explode
+
+---
+
+## SECTION 8 — DETERMINISM
+
+Verify:
+
+* Scaling depends ONLY on:
+
+  * dungeonLevel
+  * seed
+
+---
+
+Test:
+
+* Same player + same level → same enemy stats
+* No randomness outside seed
+
+---
+
+## SECTION 9 — NARRATION QUALITY
+
+Verify:
+
+* Level-based narration exists
+* Tone changes as level increases
+
+---
+
+Test:
+
+* Level 1 narration → calm
+* Level 3 narration → tense
+* Level 5 narration → dangerous
+
+---
+
+## SECTION 10 — GAME BALANCE
+
+Simulate gameplay:
+
+* Time to kill enemies
+* Player survivability
+* Resource usage (HP/MP)
+
+---
+
+Check:
+
+* Game is not too easy
+* Game is not impossible
+* Progression feels rewarding
+
+---
+
+## SECTION 11 — REGRESSION TESTING
+
+Ensure NOTHING is broken:
+
+* Combat system
+* Voice system
+* Level progression flow
+* Shop system
+* Inventory & equipment
+
+---
+
+## SECTION 12 — EDGE CASES
+
+Test:
+
+1. Very high level (10+)
+   → system remains stable
+
+2. Low HP player at higher level
+   → still survivable with strategy
+
+3. Restart level
+   → scaling remains correct
+
+---
+
+## FINAL REPORT FORMAT
+
+Return:
+
+1. ✅ What is working correctly
+2. ⚠️ Minor issues
+3. ❌ Critical bugs
+4. 🧠 Balance recommendations
+5. 🎯 Scaling improvements (optional)
+
+---
+
+## EXPECTED RESULT
+
+* Stable scaling system
+* Fair and progressive difficulty
+* No system-breaking issues
+
+---
+
+## STOP AFTER THIS STEP
+
+Do NOT fix anything yet
