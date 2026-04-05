@@ -1,0 +1,261 @@
+You are a senior full-stack engineer focused on voice-first UX and state consistency.
+
+Implement a seamless post-payment experience for Dora Dungeons after Stripe payment is completed.
+
+---
+
+## GOAL
+
+* Smooth return from Stripe to game
+* Detect payment automatically
+* Resume progression cleanly
+* Voice-first confirmation (no confusion)
+
+---
+
+## STRICT RULES
+
+* DO NOT trust frontend for payment state
+* ONLY rely on player.hasPaid from backend
+* DO NOT break existing level system or voice system
+* DO NOT duplicate narration
+
+---
+
+## STEP 1 — ADD PAYMENT RETURN DETECTION
+
+On frontend (GameScreen or root):
+
+Detect when user returns from Stripe:
+
+* Check URL for:
+  ?payment=success
+
+---
+
+IF present:
+
+* Store temporary flag:
+  paymentJustCompleted = true
+
+* Immediately clean URL (remove query param)
+
+---
+
+## STEP 2 — FETCH UPDATED GAME STATE
+
+After detecting return:
+
+* Refetch GET /game/state
+
+---
+
+Ensure:
+
+player.hasPaid === true (from webhook)
+
+---
+
+## STEP 3 — TRIGGER POST-PAYMENT FLOW
+
+IF:
+
+paymentJustCompleted === true
+AND player.hasPaid === true
+
+---
+
+THEN:
+
+1. Speak (interrupt: true):
+
+"Payment confirmed. You now have full access. Say 'Next Level' to continue your adventure."
+
+2. Set:
+
+gameMode = "levelDecision"
+
+3. Reset:
+
+paymentJustCompleted = false
+
+---
+
+## STEP 4 — HANDLE VOICE COMMAND AFTER PAYMENT
+
+Inside voice handler:
+
+IF:
+
+gameMode === "levelDecision"
+AND player.hasPaid === true
+
+---
+
+Add command:
+
+"next level"
+
+---
+
+WHEN triggered:
+
+→ call nextLevelApi()
+
+---
+
+TTS:
+
+"Entering the next dungeon..."
+
+---
+
+## STEP 5 — HANDLE RETURN WITHOUT PAYMENT
+
+IF:
+
+paymentJustCompleted === true
+AND player.hasPaid === false
+
+---
+
+Speak:
+
+"Payment was not completed. You must complete payment to proceed."
+
+---
+
+Keep:
+
+gameMode = "levelDecision"
+
+---
+
+## STEP 6 — AUTO-RECOVERY ON REFRESH
+
+On app load:
+
+IF:
+
+player.dungeonLevel === 1
+AND player.dungeonLevelCompleted === true
+AND player.hasPaid === true
+
+---
+
+THEN:
+
+Auto-set:
+
+gameMode = "levelDecision"
+
+---
+
+Speak:
+
+"Payment confirmed. Say 'Next Level' to proceed."
+
+---
+
+This ensures:
+
+No user gets stuck after refresh
+
+---
+
+## STEP 7 — UI SUPPORT (NON-VOICE FALLBACK)
+
+In modal (levelDecision):
+
+IF:
+
+player.hasPaid === true
+
+---
+
+Change button:
+
+YES → "Next Level"
+
+NO → "Replay Level"
+
+---
+
+Button actions:
+
+YES → nextLevelApi()
+NO → replayLevelApi()
+
+---
+
+## STEP 8 — PREVENT DUPLICATE TTS
+
+Ensure:
+
+* Post-payment message fires ONLY once
+* Use a ref:
+
+hasAnnouncedPaymentRef
+
+---
+
+IF already announced → skip
+
+---
+
+## STEP 9 — EDGE CASES
+
+Handle:
+
+1. User pays → closes tab → returns later
+   → hasPaid true → flow resumes
+
+2. Webhook delay
+   → show temporary message:
+
+"Finalizing your payment, please wait..."
+
+→ retry fetch
+
+3. Double return from Stripe
+   → no duplicate narration
+
+---
+
+## STEP 10 — FINAL FLOW TEST
+
+Test:
+
+1. Complete Level 1
+2. Say "Yes" → go to Stripe
+3. Complete payment
+4. Return to app
+5. Hear:
+
+"Payment confirmed..."
+
+6. Say "Next Level"
+7. Enter Level 2 successfully
+
+---
+
+Test failure:
+
+* Cancel payment → blocked
+* Refresh → still works
+* Voice-only → works fully
+
+---
+
+## EXPECTED RESULT
+
+* Smooth Stripe → Game transition
+* Zero confusion for blind users
+* Fully voice-driven progression
+* No stuck states
+
+---
+
+## STOP AFTER THIS STEP
+
+Do NOT modify Stripe webhook logic

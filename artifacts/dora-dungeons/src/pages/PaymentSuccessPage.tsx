@@ -45,7 +45,8 @@ export function PaymentSuccessPage() {
         "Your payment has been confirmed. All dungeon levels are now unlocked. Returning you to the game.",
         { interrupt: true }
       );
-      setTimeout(() => setLocation("/"), 3500);
+      // ?payment=success tells GameScreen to speak the in-game confirmation TTS
+      setTimeout(() => setLocation("/?payment=success"), 3500);
     };
 
     const timedOut = () => {
