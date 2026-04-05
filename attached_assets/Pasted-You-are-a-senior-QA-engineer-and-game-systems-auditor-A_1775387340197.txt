@@ -1,0 +1,220 @@
+You are a senior QA engineer and game systems auditor.
+
+Audit the Level Progression Flow in "Dora Dungeons".
+
+---
+
+## GOAL
+
+Verify that:
+
+* Level progression works correctly
+* Voice decision system is reliable
+* No regressions were introduced
+* Flow is stable and deterministic
+
+---
+
+## STRICT RULES
+
+* DO NOT modify code
+* ONLY inspect, simulate, and report
+* Identify bugs, edge cases, and risks
+
+---
+
+## SECTION 1 — EVENT FLOW
+
+Verify:
+
+* LEVEL_COMPLETED event is emitted once on boss defeat
+* Event reaches frontend correctly
+* No duplicate or missing events
+
+---
+
+## SECTION 2 — GAME MODE STATE
+
+Verify:
+
+* gameMode switches to "decision" after boss defeat
+* gameMode returns to "explore" after action
+
+Test:
+
+* No stuck states
+* No unintended mode switches
+
+---
+
+## SECTION 3 — VOICE CONTROL (DECISION MODE)
+
+Verify:
+
+When gameMode === "decision":
+
+Allowed:
+
+* "yes"
+* "no"
+
+Blocked:
+
+* movement commands
+* combat commands
+* shop commands
+
+Test:
+
+* Saying "attack" → should be ignored
+* Saying "move north" → should be ignored
+
+---
+
+## SECTION 4 — NEXT LEVEL FLOW
+
+Test:
+
+1. Kill boss
+2. Say "yes"
+
+Verify:
+
+* player.currentLevel increments by 1
+* levelCompleted resets to false
+* New dungeon is generated
+* Level narration plays:
+  "Entering Level X..."
+
+---
+
+## SECTION 5 — REPLAY FLOW
+
+Test:
+
+1. Kill boss
+2. Say "no"
+3. Then say "yes"
+
+Verify:
+
+* Current level restarts
+* Dungeon resets correctly
+* Player HP restored
+* Inventory/gold/weapons preserved
+
+---
+
+## SECTION 6 — EXIT FLOW
+
+Test:
+
+1. Kill boss
+2. Say "no"
+3. Then say "no"
+
+Verify:
+
+* Session clears
+* User is redirected to login
+* TTS plays logout message
+
+---
+
+## SECTION 7 — UI MODAL
+
+Verify:
+
+* Modal appears in decision mode
+* Displays correct question
+* Buttons trigger correct actions
+
+Test:
+
+* Click YES → next level
+* Click NO → replay prompt
+
+---
+
+## SECTION 8 — STATE CONSISTENCY
+
+Verify:
+
+* player.currentLevel is always correct
+* levelCompleted is reset properly
+* No stale flags remain after transitions
+
+---
+
+## SECTION 9 — TTS BEHAVIOR
+
+Verify:
+
+* Only ONE narration plays per event
+* No duplicate prompts
+* No overlapping speech
+
+Test:
+
+* Completion message plays once
+* Decision prompt is clear
+
+---
+
+## SECTION 10 — EDGE CASES
+
+Test:
+
+1. Say invalid command during decision mode
+   → should be ignored or handled safely
+
+2. Refresh page during decision mode
+   → state should remain stable
+
+3. Trigger multiple rapid inputs
+   → system should not break
+
+---
+
+## SECTION 11 — REGRESSION TESTING
+
+Ensure NOTHING is broken:
+
+* Combat still works
+* Voice input still works
+* Shop still works
+* Audio system stable
+
+---
+
+## SECTION 12 — API ARCHITECTURE
+
+Verify:
+
+* Level increment happens ONLY in API route
+* GameEngine does NOT modify level directly
+
+---
+
+## FINAL REPORT FORMAT
+
+Return:
+
+1. ✅ What is working correctly
+2. ⚠️ Minor issues
+3. ❌ Critical bugs
+4. 🧠 Recommendations before Phase 3 (Paywall)
+
+---
+
+## EXPECTED RESULT
+
+* Stable progression system
+* Clean voice decision flow
+* No regressions
+
+---
+
+## STOP AFTER THIS STEP
+
+Do NOT fix anything yet
