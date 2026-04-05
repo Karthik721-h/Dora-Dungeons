@@ -441,8 +441,9 @@ export function AuthScreen({ auth }: AuthScreenProps) {
                 style={{
                   fontFamily: "'Fira Code', monospace",
                   fontSize: "0.68rem",
+                  fontWeight: 700,
                   letterSpacing: "0.12em",
-                  color: "rgba(200,190,180,0.22)",
+                  color: "rgba(220,210,190,0.90)",
                   textTransform: "uppercase",
                   textAlign: "center",
                 }}
@@ -457,8 +458,9 @@ export function AuthScreen({ auth }: AuthScreenProps) {
                 style={{
                   fontFamily: "'Fira Code', monospace",
                   fontSize: "0.62rem",
+                  fontWeight: 600,
                   letterSpacing: "0.09em",
-                  color: "rgba(200,190,180,0.14)",
+                  color: "rgba(200,185,160,0.70)",
                   textTransform: "uppercase",
                   textAlign: "center",
                   maxWidth: 280,
