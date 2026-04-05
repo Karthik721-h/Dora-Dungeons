@@ -1,0 +1,234 @@
+You are a senior game systems engineer.
+
+Implement a Level Scaling System in Dora Dungeons that makes each dungeon level progressively harder and more engaging.
+
+---
+
+## GOAL
+
+Each new level should:
+
+* Increase enemy difficulty
+* Improve boss strength
+* Increase rewards (XP, Gold)
+* Keep gameplay balanced and fair
+
+---
+
+## STRICT RULES
+
+* DO NOT modify API routes
+* DO NOT break existing combat system
+* EXTEND logic inside GameEngine only
+* MUST be deterministic per level
+
+---
+
+## STEP 1 — CREATE SCALING CONFIG
+
+Create a new module:
+
+LevelScaling.ts
+
+---
+
+Define:
+
+getLevelMultiplier(level: number)
+
+Example:
+
+return 1 + (level - 1) * 0.2
+
+---
+
+Meaning:
+Level 1 → 1.0x
+Level 2 → 1.2x
+Level 3 → 1.4x
+Level 5 → 1.8x
+
+---
+
+## STEP 2 — SCALE ENEMY STATS
+
+When enemies are generated:
+
+Apply multiplier:
+
+enemy.hp *= multiplier
+enemy.attack *= multiplier
+enemy.defense *= multiplier
+
+---
+
+Round values to integers
+
+---
+
+Ensure:
+
+* No stat becomes 0 or negative
+
+---
+
+## STEP 3 — SCALE BOSS SEPARATELY
+
+Boss multiplier:
+
+bossMultiplier = multiplier * 1.5
+
+---
+
+Apply to:
+
+* HP
+* Attack
+* Defense
+
+---
+
+Boss should feel significantly harder than normal enemies
+
+---
+
+## STEP 4 — SCALE REWARDS
+
+Increase rewards based on level:
+
+XP:
+
+xp = baseXp * multiplier
+
+Gold:
+
+gold = baseGold * multiplier
+
+---
+
+Ensure:
+
+* Rewards feel meaningful
+* Not overpowered
+
+---
+
+## STEP 5 — SCALE STATUS EFFECT INTENSITY (OPTIONAL SAFE)
+
+Example:
+
+* Burn damage increases slightly
+* Poison duration increases slightly
+
+---
+
+DO NOT create new effects
+ONLY scale existing ones
+
+---
+
+## STEP 6 — SCALE DUNGEON VARIETY
+
+As level increases:
+
+* Increase chance of multi-enemy encounters
+* Increase trap difficulty
+* Increase rare room frequency
+
+---
+
+Example:
+
+if (level > 3):
+allow 2–3 enemies per encounter
+
+---
+
+## STEP 7 — BALANCE CAP (IMPORTANT)
+
+Add soft cap:
+
+IF multiplier > 3.0:
+multiplier = 3.0
+
+---
+
+Prevents game from becoming impossible
+
+---
+
+## STEP 8 — ENSURE DETERMINISM
+
+Scaling must depend ONLY on:
+
+* dungeonLevel
+* existing seed
+
+---
+
+NO randomness outside seed
+
+---
+
+## STEP 9 — ADD LEVEL CONTEXT TO NARRATION
+
+Enhance narration:
+
+Examples:
+
+Level 1:
+"A quiet dungeon… something feels weak."
+
+Level 3:
+"The air grows heavier. Enemies feel stronger."
+
+Level 5+:
+"A deadly aura fills the dungeon. Only the strong survive."
+
+---
+
+Inject this into dungeon start narration
+
+---
+
+## STEP 10 — VALIDATION
+
+Test:
+
+Level 1:
+
+* Easy enemies
+* Low rewards
+
+Level 3:
+
+* Noticeably harder enemies
+* Better rewards
+
+Level 5:
+
+* Strong enemies
+* Boss is challenging
+
+---
+
+Verify:
+
+* No stat overflow
+* Combat still works
+* No crashes
+
+---
+
+## EXPECTED RESULT
+
+* Smooth difficulty curve
+* Better progression feeling
+* Increased player engagement
+
+---
+
+## STOP AFTER THIS STEP
+
+Do NOT implement payment yet
+Do NOT change frontend

@@ -2,6 +2,7 @@ import { Dungeon, Room, Direction, EventType, RoomEvent, Item } from "../types/i
 import { RoomTemplate, ROOM_TEMPLATES, getTemplatesByDifficulty, getTemplateById } from "./roomTemplates.js";
 import { ITEM_DEFINITIONS } from "../data/items.js";
 import { ENEMY_TEMPLATES } from "../data/enemies.js";
+import { scaleEnemy, shouldSpawnBonusEnemy, scaleGoldReward, scaleTrapDamage } from "../scaling/LevelScaling.js";
 import crypto from "crypto";
 
 /**
@@ -58,7 +59,7 @@ function createEnemy(templateKey: string): import("../types/index.js").Enemy {
   };
 }
 
-function makeEvent(template: RoomTemplate, rng: () => number): RoomEvent {
+function makeEvent(template: RoomTemplate, rng: () => number, dungeonLevel = 1): RoomEvent {
   const eventType = pick(template.preferredEvents, rng);
 
   const base: RoomEvent = { type: eventType, triggered: false };
@@ -68,6 +69,18 @@ function makeEvent(template: RoomTemplate, rng: () => number): RoomEvent {
       const groups = template.enemyGroups ?? [];
       const group = groups.length > 0 ? pick(groups, rng) : [];
       base.enemies = group.map((k) => createEnemy(k));
+
+      // At higher dungeon levels, non-boss combat rooms may spawn a bonus enemy.
+      // Uses the seeded RNG so the result is deterministic for a given seed+level.
+      const isBossRoom = template.tags.includes("boss");
+      if (!isBossRoom && base.enemies && base.enemies.length > 0) {
+        const bonusRoll = rng();
+        if (shouldSpawnBonusEnemy(dungeonLevel, bonusRoll) && groups.length > 0) {
+          const bonusGroup = pick(groups, rng);
+          const bonusKey   = bonusGroup[0]; // pick the first (weakest) enemy from a group
+          if (bonusKey) base.enemies.push(createEnemy(bonusKey));
+        }
+      }
       break;
     }
 
@@ -79,12 +92,14 @@ function makeEvent(template: RoomTemplate, rng: () => number): RoomEvent {
         if (def) base.itemReward = cloneItem(def);
       }
       const [min, max] = template.goldRange ?? [5, 20];
-      base.goldReward = randInt(min, max, rng);
+      const baseGold   = randInt(min, max, rng);
+      base.goldReward  = scaleGoldReward(baseGold, dungeonLevel);
       break;
     }
 
     case EventType.TRAP: {
-      base.trapDamage = template.trapDamage ?? randInt(10, 25, rng);
+      const baseDmg    = template.trapDamage ?? randInt(10, 25, rng);
+      base.trapDamage  = scaleTrapDamage(baseDmg, dungeonLevel);
       break;
     }
 
@@ -193,13 +208,13 @@ function buildLayout(rng: () => number): LayoutNode[] {
   return nodes;
 }
 
-function instantiateRoom(node: LayoutNode, rng: () => number): Room {
+function instantiateRoom(node: LayoutNode, rng: () => number, dungeonLevel = 1): Room {
   const template = ROOM_TEMPLATES.find((t) => t.id === node.templateId)!;
 
   const name = pick(template.nameCandidates, rng);
   const description = pick(template.descriptionCandidates, rng);
   const ambient = pick(template.ambientCandidates, rng);
-  const event = makeEvent(template, rng);
+  const event = makeEvent(template, rng, dungeonLevel);
 
   const groundItems: Item[] = [];
   if (template.treasureItems && template.preferredEvents.includes(EventType.COMBAT)) {
@@ -232,7 +247,7 @@ function instantiateRoom(node: LayoutNode, rng: () => number): Room {
   };
 }
 
-export function generateDungeon(seed?: string): Dungeon {
+export function generateDungeon(seed?: string, dungeonLevel = 1): Dungeon {
   const resolvedSeed = seed ?? crypto.randomUUID();
   const rng = seededRng(resolvedSeed);
 
@@ -243,7 +258,7 @@ export function generateDungeon(seed?: string): Dungeon {
   const rooms = new Map<string, Room>();
 
   for (const node of layout) {
-    const room = instantiateRoom(node, rng);
+    const room = instantiateRoom(node, rng, dungeonLevel);
 
     if (node.id === "room-entrance") {
       room.event = {
@@ -254,6 +269,20 @@ export function generateDungeon(seed?: string): Dungeon {
     }
 
     rooms.set(room.id, room);
+  }
+
+  // ── Post-generation: scale all enemy stats for the current dungeon level ──
+  // Scaling happens here (after instantiation) so:
+  //   a) it is always applied regardless of which template spawned the enemy
+  //   b) restartLevel() re-reads the already-scaled maxHp when restoring HP
+  if (dungeonLevel > 1) {
+    for (const room of rooms.values()) {
+      if (room.event.enemies) {
+        for (const enemy of room.event.enemies) {
+          scaleEnemy(enemy, dungeonLevel);
+        }
+      }
+    }
   }
 
   return {

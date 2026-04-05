@@ -22,6 +22,7 @@ import {
   upgradeArmor as shopUpgradeArmor,
   findWeaponById,
 } from "../services/ShopService.js";
+import { getDungeonAtmosphere } from "../scaling/LevelScaling.js";
 
 function uuid(): string {
   return crypto.randomUUID();
@@ -57,7 +58,7 @@ export class GameEngine {
     // A random uuid() fallback is intentionally NOT used — we want repeatability
     // so the player gets a consistent dungeon if they restart at the same level.
     const effectiveSeed = dungeonSeed ?? `level-${player.dungeonLevel}-${player.id.slice(0, 8)}`;
-    const dungeon = generateDungeon(effectiveSeed);
+    const dungeon = generateDungeon(effectiveSeed, player.dungeonLevel);
 
     this.state = {
       sessionId: uuid(),
@@ -70,7 +71,8 @@ export class GameEngine {
         "   DORA DUNGEONS — BEGIN",
         "══════════════════════════════",
         `You are ${playerName}, a lone adventurer descending into an ancient dungeon.`,
-        `Level ${player.dungeonLevel}. Your mission is to explore the dungeon and defeat the boss to progress.`,
+        `Dungeon Level ${player.dungeonLevel}. Your mission: explore the dungeon and defeat the boss to progress.`,
+        getDungeonAtmosphere(player.dungeonLevel),
         "Your quest: reach the final chamber and slay the boss.",
         `Dungeon seed: ${dungeon.seed}`,
         "Commands: attack [enemy] | defend | move [direction] | cast [spell] [target] | use [item] | look | status | flee",
