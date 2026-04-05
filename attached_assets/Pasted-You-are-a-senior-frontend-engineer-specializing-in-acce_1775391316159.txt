@@ -1,0 +1,182 @@
+You are a senior frontend engineer specializing in accessibility and voice-first UX.
+
+Fix the MEDIUM issues in Dora Dungeons without breaking existing systems.
+
+---
+
+## GOAL
+
+Fix:
+
+1. Missing room narration after level transitions
+2. Shop button clickable during decision mode
+3. Confusing decision button label
+4. Improve TTS reliability for decision prompt
+
+---
+
+## STRICT RULES
+
+* DO NOT modify GameEngine
+* DO NOT change API contracts
+* DO NOT break voice system
+* ONLY enhance frontend behavior
+
+---
+
+## FIX 1 — ROOM NARRATION AFTER TRANSITIONS (CRITICAL UX)
+
+Problem:
+After nextLevelApi or replayLevelApi, the game updates state using queryClient.setQueryData()
+→ This does NOT trigger narration
+
+---
+
+Solution:
+
+After setQueryData success:
+
+1. Extract:
+
+* currentRoom
+* exits
+* items (if any)
+
+2. Build narration:
+
+Example:
+
+"You enter the {roomName}. {description}.
+Exits are {north, south, etc}.
+You sense {items if present}."
+
+3. Call:
+
+AudioManager.speakLines([...], { interrupt: true })
+
+---
+
+IMPORTANT:
+
+* This MUST run immediately after nextLevelApi and replayLevelApi
+* Do NOT rely on onSuccess hooks
+* Do NOT duplicate narration
+
+---
+
+## FIX 2 — DISABLE SHOP BUTTON IN DECISION MODE
+
+Problem:
+Shop button is clickable during modal
+
+---
+
+Solution:
+
+In navbar/shop button:
+
+Add:
+
+disabled={gameMode !== "explore"}
+
+---
+
+Also add visual feedback:
+
+* opacity: 0.5
+* cursor: not-allowed
+
+---
+
+Ensure:
+
+* Voice control already blocks it (DO NOT change voice logic)
+
+---
+
+## FIX 3 — IMPROVE BUTTON LABEL
+
+Problem:
+"No — Replay" is misleading
+
+---
+
+Solution:
+
+In decision modal:
+
+IF gameMode === "levelDecision":
+
+Change:
+
+"No — Replay"
+
+TO:
+
+"No — Other Options"
+
+---
+
+DO NOT change behavior — only label
+
+---
+
+## FIX 4 — ENSURE DECISION PROMPT ALWAYS PLAYS CLEARLY
+
+Problem:
+TTS uses interrupt: false → may delay prompt
+
+---
+
+Solution:
+
+When triggering decision prompt:
+
+AudioManager.speakLines(
+["Congratulations. You have completed this level. Would you like to continue to the next level?"],
+{ interrupt: true }
+)
+
+---
+
+Ensure:
+
+* Prompt plays immediately
+* No overlap with previous narration
+
+---
+
+## VALIDATION
+
+Test:
+
+1. Kill boss → next level
+   → Room description is spoken immediately
+
+2. Kill boss → replay
+   → Room description is spoken
+
+3. Open decision modal
+   → Shop button is disabled
+
+4. Decision prompt
+   → Plays instantly (no delay)
+
+5. UI text:
+   → Shows "No — Other Options"
+
+---
+
+## EXPECTED RESULT
+
+* Player always hears room context after transitions
+* UI cannot break during modal
+* Voice prompts are immediate and clear
+* UX feels polished and professional
+
+---
+
+## STOP AFTER THIS STEP
+
+Do NOT modify progression logic
+Do NOT implement payment yet

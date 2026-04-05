@@ -284,8 +284,8 @@ export function GameScreen({
             setGameMode("levelDecision");
             if (!isMutedRef.current) {
               AudioManager.speak(
-                `Congratulations! Dungeon level ${newData.player.dungeonLevel} complete. You defeated the boss. Would you like to advance to the next level? Say yes to continue, or say no to replay this level.`,
-                { interrupt: false }
+                `Congratulations! Dungeon level ${newData.player.dungeonLevel} complete. You defeated the boss. Would you like to advance to the next level? Say yes to continue, or say no for other options.`,
+                { interrupt: true }
               );
               AudioManager.onQueueDrained(() => {
                 stopListeningRef.current?.();
@@ -662,10 +662,10 @@ export function GameScreen({
     gameModeRef.current = "levelDecision";
     setGameMode("levelDecision");
     if (!isMutedRef.current) {
-      // Queue after any intro / room-description speech already in the pipe.
+      // Interrupt any stale speech so the decision prompt plays immediately on refresh.
       AudioManager.speak(
-        "Congratulations. You have completed this level. Would you like to continue to the next level? Say yes to advance, or no to replay this level.",
-        { interrupt: false }
+        "Congratulations. You have completed this level. Would you like to continue to the next level? Say yes to advance, or no for other options.",
+        { interrupt: true }
       );
       AudioManager.onQueueDrained(() => {
         stopListeningRef.current?.();
@@ -799,6 +799,23 @@ export function GameScreen({
     }
   };
 
+  // ── Room narration helper — called after level transitions ──────────────────
+  // setQueryData bypasses onSuccess, so narration must be triggered manually.
+  const speakRoomNarration = (room: GameStateResponse["currentRoom"]) => {
+    if (isMutedRef.current) return;
+    const lines: string[] = [];
+    lines.push(`You enter ${room.name}. ${room.description}`);
+    const exitKeys = Object.keys(room.exits);
+    if (exitKeys.length > 0) {
+      lines.push(buildExitsAnnouncement(room.exits));
+    }
+    if (room.items && room.items.length > 0) {
+      const itemList = room.items.join(", ");
+      lines.push(`Items on the floor: ${itemList}.`);
+    }
+    AudioManager.speakLines(lines, { interrupt: false });
+  };
+
   // ── Next Level API (VICTORY → advance to next dungeon) ────────────────────
   const nextLevelApi = async () => {
     if (progressionPending) return;
@@ -819,6 +836,7 @@ export function GameScreen({
         `Entering dungeon level ${data.player.dungeonLevel}. A new dungeon awaits. Prepare yourself.`,
         { interrupt: true }
       );
+      speakRoomNarration(data.currentRoom);
       AudioManager.onQueueDrained(() => {
         stopListeningRef.current?.();
         setTimeout(() => startListeningRef.current(), 120);
@@ -850,6 +868,7 @@ export function GameScreen({
         "You return to the start of this level. The dungeon awaits. Good luck.",
         { interrupt: true }
       );
+      speakRoomNarration(data.currentRoom);
       AudioManager.onQueueDrained(() => {
         stopListeningRef.current?.();
         setTimeout(() => startListeningRef.current(), 120);
@@ -1232,9 +1251,10 @@ export function GameScreen({
 
           {/* ── Shop button ── */}
           <motion.button
-            whileHover={{ scale: 1.06 }}
-            whileTap={{ scale: 0.94 }}
-            onClick={() => setShopOpen(v => !v)}
+            whileHover={{ scale: gameMode !== "explore" ? 1 : 1.06 }}
+            whileTap={{ scale: gameMode !== "explore" ? 1 : 0.94 }}
+            onClick={() => { if (gameMode === "explore") setShopOpen(v => !v); }}
+            disabled={gameMode !== "explore"}
             className="flex items-center gap-1 font-code text-xs uppercase px-2.5 py-1 transition-all"
             style={{
               border: shopOpen
@@ -1245,10 +1265,11 @@ export function GameScreen({
               borderRadius: 4,
               fontSize: "10px",
               letterSpacing: "0.15em",
-              cursor: "pointer",
+              opacity: gameMode !== "explore" ? 0.4 : 1,
+              cursor: gameMode !== "explore" ? "not-allowed" : "pointer",
             }}
             aria-label={shopOpen ? "Close shop" : "Open shop"}
-            title="Shop"
+            title={gameMode !== "explore" ? "Shop unavailable during level decision" : "Shop"}
           >
             <ShoppingBag size={10} />
             <span className="hidden sm:inline">Shop</span>
@@ -1410,7 +1431,7 @@ export function GameScreen({
                     }
                   }}
                   disabled={progressionPending}
-                  aria-label={gameMode === "levelDecision" ? "No, replay this level" : "No, exit the dungeon"}
+                  aria-label={gameMode === "levelDecision" ? "No, see other options" : "No, exit the dungeon"}
                   className="px-7 py-3 rounded-lg font-display text-lg font-bold tracking-wider"
                   style={{
                     background: "rgba(26,31,41,0.8)",
@@ -1421,7 +1442,7 @@ export function GameScreen({
                     minWidth: 130,
                   }}
                 >
-                  {gameMode === "levelDecision" ? "No — Replay" : "No — Exit"}
+                  {gameMode === "levelDecision" ? "No — Other Options" : "No — Exit"}
                 </motion.button>
 
                 {/* Yes */}
