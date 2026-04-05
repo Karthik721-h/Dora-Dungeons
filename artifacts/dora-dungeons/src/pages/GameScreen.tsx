@@ -170,22 +170,56 @@ export function GameScreen({
   }, []);
 
   // ── Auto-start voice ───────────────────────────────────────────────────────
+  // Runs exactly once on mount. Detects whether this is a brand-new game or a
+  // session restore so it can give the player the right opening narration.
+  //
+  //  • VICTORY  → VICTORY recovery effect handles all TTS (skip here)
+  //  • GAME_OVER → death TTS effect handles all TTS (skip here)
+  //  • New game (turnCount === 0) → welcome + starting room description
+  //  • Restore + EXPLORING → "Resuming your adventure" + room + exits
+  //  • Restore + IN_COMBAT  → "Resuming your adventure" + combat summary
   const hasAutoStartedRef = useRef(false);
   useEffect(() => {
     if (hasAutoStartedRef.current || isMuted || !voiceSupported) return;
     if (!gameState.logs.length) return;
+    // VICTORY and GAME_OVER have their own dedicated TTS effects
+    if (
+      gameState.gameStatus === "VICTORY" ||
+      gameState.gameStatus === "GAME_OVER"
+    ) return;
     hasAutoStartedRef.current = true;
 
+    const isRestore = (gameState.turnCount ?? 0) > 0;
+
     const t = setTimeout(() => {
-      AudioManager.speak(
-        "Welcome to Dora Dungeons. Voice control is active. Say help at any time to hear the list of commands. Speak when you are ready."
-      );
-      // Speak the last few log lines so the player hears the starting room
-      const lines = gameState.logs.slice(-5);
-      AudioManager.speakLines(lines);
-      // Always append exits so blind users know immediately where they can go
-      if (!exitsAlreadySpoken(lines)) {
-        AudioManager.speak(buildExitsAnnouncement(gameState.currentRoom.exits), { interrupt: false });
+      if (!isRestore) {
+        // ── New game ────────────────────────────────────────────────────────
+        AudioManager.speak(
+          "Welcome to Dora Dungeons. Voice control is active. Say help at any time to hear the list of commands. Speak when you are ready."
+        );
+        const lines = gameState.logs.slice(-5);
+        AudioManager.speakLines(lines, { interrupt: false });
+        if (!exitsAlreadySpoken(lines)) {
+          AudioManager.speak(buildExitsAnnouncement(gameState.currentRoom.exits), { interrupt: false });
+        }
+      } else if (gameState.gameStatus === "IN_COMBAT") {
+        // ── Restore: mid-combat ────────────────────────────────────────────
+        const living = gameState.currentRoom.enemies.filter(e => !e.isDefeated);
+        const enemySummary = living.length > 0
+          ? living.map(e => `${e.name} with ${e.hp} of ${e.maxHp} health`).join(", and ")
+          : "unknown enemies";
+        AudioManager.speak(
+          `Resuming your adventure. You are in combat with ${enemySummary}. What will you do?`,
+          { interrupt: true }
+        );
+      } else {
+        // ── Restore: exploring ─────────────────────────────────────────────
+        AudioManager.speak("Resuming your adventure.", { interrupt: true });
+        const lines = gameState.logs.slice(-3);
+        AudioManager.speakLines(lines, { interrupt: false });
+        if (!exitsAlreadySpoken(lines)) {
+          AudioManager.speak(buildExitsAnnouncement(gameState.currentRoom.exits), { interrupt: false });
+        }
       }
       AudioManager.onQueueDrained(() => {
         if (!hasAutoStartedRef.current) return;

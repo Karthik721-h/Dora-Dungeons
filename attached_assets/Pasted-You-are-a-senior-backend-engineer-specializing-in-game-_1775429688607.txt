@@ -1,0 +1,286 @@
+You are a senior backend engineer specializing in game state persistence and recovery systems.
+
+Implement a robust SAVE / RESTORE system for Dora Dungeons.
+
+---
+
+## GOAL
+
+* Persist full game state safely
+* Restore state perfectly on reload
+* Prevent data loss
+* Maintain voice-first continuity
+
+---
+
+## STRICT RULES
+
+* DO NOT break existing game logic
+* DO NOT duplicate state between frontend and backend
+* Backend (DB) is the ONLY source of truth
+* Save AFTER every meaningful action
+
+---
+
+## STEP 1 — DEFINE COMPLETE SAVE STATE
+
+Ensure the following player fields are ALWAYS persisted:
+
+* id
+* email
+* dungeonLevel
+* dungeonLevelCompleted
+* hasPaid
+
+---
+
+Combat + stats:
+
+* hp / maxHp
+* mp / maxMp
+* attack / defense
+* statusEffects
+
+---
+
+Progress:
+
+* currentRoomId
+* exploredRooms
+* enemies (with HP state)
+* dungeon seed
+
+---
+
+Inventory:
+
+* gold
+* weapons (IDs)
+* armors (IDs + levels)
+* inventory items
+
+---
+
+Game state:
+
+* gameStatus (EXPLORING, IN_COMBAT, VICTORY, GAME_OVER)
+* logs (last 80 lines max)
+
+---
+
+## STEP 2 — SAVE TRIGGERS (CRITICAL)
+
+Ensure saveSession() is called AFTER:
+
+* every command (/game/command)
+* shop actions (buy/sell/upgrade)
+* level transitions (/next-level, /replay-level)
+* restart after death
+* payment completion (webhook)
+
+---
+
+NO action should mutate state without saving
+
+---
+
+## STEP 3 — SAFE SERIALIZATION
+
+Create:
+
+serializePlayer(player)
+
+---
+
+Ensure:
+
+* No undefined fields
+* No circular references
+* Only JSON-safe data
+
+---
+
+Create:
+
+fromStorable(data)
+
+---
+
+Ensure:
+
+* Missing fields get defaults
+* Backward compatibility supported
+* state.event is cleared on load
+
+---
+
+## STEP 4 — RESTORE ON LOGIN / REFRESH
+
+On:
+
+GET /game/state
+
+---
+
+Load:
+
+* Player from DB
+* Restore full game state
+
+---
+
+Frontend:
+
+* Hydrate state using React Query
+* DO NOT reconstruct state manually
+
+---
+
+## STEP 5 — AUTO-RECOVERY LOGIC
+
+On app load:
+
+---
+
+IF:
+
+gameStatus === "VICTORY"
+
+→ set gameMode = "levelDecision"
+
+---
+
+IF:
+
+gameStatus === "GAME_OVER"
+
+→ set gameMode = "death"
+
+---
+
+IF:
+
+player.dungeonLevelCompleted === true
+AND hasPaid === true
+
+→ allow "Next Level"
+
+---
+
+Ensure:
+
+No stuck states after refresh
+
+---
+
+## STEP 6 — TTS CONTINUITY (IMPORTANT)
+
+After restore:
+
+---
+
+DO NOT replay entire log history
+
+---
+
+Instead:
+
+Speak only:
+
+* Current room description
+* Available exits
+* Items in room
+
+---
+
+IF in combat:
+
+* Announce enemy + HP
+
+---
+
+IF in victory:
+
+* Announce decision prompt
+
+---
+
+---
+
+## STEP 7 — PREVENT DATA CORRUPTION
+
+Add guards:
+
+* Validate state before saving
+* Reject invalid values (NaN, negative HP, etc.)
+
+---
+
+Ensure:
+
+* HP never < 0
+* Gold never < 0
+* Levels always ≥ 1
+
+---
+
+## STEP 8 — HANDLE EDGE CASES
+
+Test:
+
+1. Refresh mid-combat
+   → resumes combat correctly
+
+2. Refresh after death
+   → death flow resumes
+
+3. Refresh after victory
+   → decision modal returns
+
+4. Refresh after payment
+   → progression continues
+
+5. Partial DB data
+   → safe fallback defaults
+
+---
+
+## STEP 9 — PERFORMANCE OPTIMIZATION
+
+* Limit logs to last 80 entries
+* Avoid full DB writes if no change (optional)
+* Keep payload small
+
+---
+
+## STEP 10 — FINAL TEST
+
+Test full lifecycle:
+
+1. Start game
+
+2. Move, fight, gain items
+
+3. Refresh page
+   → state restored EXACTLY
+
+4. Kill boss → refresh
+   → decision restored
+
+5. Pay → refresh
+   → continue progression
+
+---
+
+## EXPECTED RESULT
+
+* No progress loss
+* Seamless resume experience
+* Stable long-term gameplay
+* Voice continuity maintained
+
+---
+
+## STOP AFTER THIS STEP
+
+Do NOT add cloud sync or multi-device sync yet

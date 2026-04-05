@@ -28,18 +28,77 @@ function toStorable(state: GameState): StoredState {
 }
 
 /**
- * Fill in any Player fields that may be missing in sessions persisted before
+ * Fill in any Player fields that may be absent in sessions persisted before
  * the current schema version.  Safe to call on both old and new sessions.
+ * Every field has a safe default so no undefined leaks into live state.
  */
 function migratePlayer(player: GameState["player"]): GameState["player"] {
+  const maxHp = Number(player.maxHp) || 100;
+  const maxMp = Number(player.maxMp) || 50;
   return {
     ...player,
-    gold:                 player.gold                 ?? 0,
-    weapons:              player.weapons              ?? [],
-    armors:               player.armors               ?? [],
-    dungeonLevel:         player.dungeonLevel         ?? 1,
+    // Core stats
+    level:              player.level              ?? 1,
+    xp:                 player.xp                ?? 0,
+    xpToNextLevel:      player.xpToNextLevel      ?? 100,
+    hp:                 player.hp                 ?? maxHp,
+    maxHp,
+    mp:                 player.mp                 ?? maxMp,
+    maxMp,
+    attack:             player.attack             ?? 10,
+    defense:            player.defense            ?? 5,
+    speed:              (player as any).speed     ?? 5,
+    baseAttack:         player.baseAttack         ?? player.attack ?? 10,
+    baseDefense:        player.baseDefense        ?? player.defense ?? 5,
+    // Combat flags
+    isDefending:        player.isDefending        ?? false,
+    statusEffects:      player.statusEffects      ?? [],
+    // Inventory
+    abilities:          player.abilities          ?? [],
+    inventory:          player.inventory          ?? [],
+    gold:               player.gold               ?? 0,
+    weapons:            player.weapons            ?? [],
+    armors:             player.armors             ?? [],
+    // Dungeon progression
+    dungeonLevel:          player.dungeonLevel          ?? 1,
     dungeonLevelCompleted: player.dungeonLevelCompleted ?? false,
+    hasPaid:               player.hasPaid               ?? false,
   };
+}
+
+/**
+ * Clamp numeric values that must never be invalid in a live session.
+ * Runs after migratePlayer — all fields are guaranteed to be present by then.
+ *
+ * Guards:  HP/MP never go below 0 or above their max
+ *          Gold/turnCount never go negative
+ *          Dungeon levels always ≥ 1
+ */
+function validateState(state: GameState): GameState {
+  const p = state.player;
+
+  const clamp = (v: number, lo: number, hi: number) =>
+    isNaN(v) ? lo : Math.min(Math.max(v, lo), hi);
+
+  p.maxHp = clamp(p.maxHp, 1, 99999);
+  p.maxMp = clamp(p.maxMp, 0, 99999);
+  p.hp    = clamp(p.hp,    0, p.maxHp);
+  p.mp    = clamp(p.mp,    0, p.maxMp);
+
+  p.gold  = clamp(p.gold,  0, 99999999);
+  state.gold = clamp(state.gold, 0, 99999999);
+
+  p.level        = clamp(p.level,        1, 9999);
+  p.dungeonLevel = clamp(p.dungeonLevel, 1, 9999);
+
+  state.turnCount = clamp(state.turnCount, 0, 9999999);
+
+  // Trim logs to 80 entries on load as well as on save
+  if (state.logs.length > 80) {
+    state.logs = state.logs.slice(-80);
+  }
+
+  return state;
 }
 
 function fromStorable(stored: StoredState): GameState {
@@ -50,11 +109,14 @@ function fromStorable(stored: StoredState): GameState {
       rooms: new Map(stored.dungeon.rooms),
     },
   } as GameState;
+
   state.player = migratePlayer(state.player);
+
   // Events are one-shot signals — they must not persist across requests.
   // Clear any event that was saved with the state (e.g. LEVEL_COMPLETED).
   delete state.event;
-  return state;
+
+  return validateState(state);
 }
 
 // ── Engine hydration ──────────────────────────────────────────────────────────
