@@ -1,5 +1,6 @@
 import { Item, ItemType, Player } from "../types/index.js";
 import { ITEM_DEFINITIONS } from "../data/items.js";
+import { scaleHealAmount } from "../scaling/LevelScaling.js";
 
 export { ITEM_DEFINITIONS };
 
@@ -68,8 +69,9 @@ export function useConsumable(player: Player, item: Item): { message: string; he
   let healed: number | undefined;
 
   if (item.effect.stat === "hp") {
-    const before = player.hp;
-    player.hp = Math.min(player.hp + item.effect.value, player.maxHp);
+    const before  = player.hp;
+    const heal    = scaleHealAmount(item.effect.value, player.dungeonLevel ?? 1);
+    player.hp = Math.min(player.hp + heal, player.maxHp);
     healed = player.hp - before;
     message = `Restores ${healed} HP. (${player.hp}/${player.maxHp} HP)`;
   } else if (item.effect.stat === "mp") {

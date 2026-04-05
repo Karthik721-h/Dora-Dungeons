@@ -6,14 +6,14 @@ import { Enemy, EnemyType } from "../types/index.js";
  * Pure, deterministic scaling functions for dungeon level progression.
  * All functions depend only on the dungeonLevel integer — no randomness.
  *
- * Curve:
- *   Level 1 → 1.0×   (baseline)
- *   Level 2 → 1.2×
- *   Level 3 → 1.4×
- *   Level 5 → 1.8×
- *   Level 11 → 3.0× (soft cap, never exceeds)
+ * Enemy curve (0.2 step):
+ *   Level 1 → 1.0×  |  Level 3 → 1.4×  |  Level 5 → 1.8×  |  Level 11 → 3.0× cap
  *
- * Boss multiplier is 1.5× the normal multiplier, also capped at 3.0×.
+ * Boss curve (0.3 step, independent):
+ *   Level 1 → 1.0×  |  Level 3 → 1.6×  |  Level 5 → 2.2×  |  Level 8  → 3.0× cap
+ *
+ * Heal curve (0.15 step):
+ *   Level 1 → 1.0×  |  Level 3 → 1.3×  |  Level 5 → 1.6×  |  Level 8  → 2.05× (uncapped)
  */
 
 const MULTIPLIER_STEP = 0.2;
@@ -49,7 +49,7 @@ function scaleValue(base: number, multiplier: number): number {
 /**
  * Apply level scaling to an enemy in-place.
  * Bosses use the boss multiplier; all others use the base multiplier.
- * Scales: hp, maxHp, attack, defense, xpReward, goldReward.
+ * Scales: hp, maxHp, attack, defense, xpReward, goldReward, and mp/maxMp for casters.
  * Speed is intentionally not scaled — it affects turn order and could
  * break combat balance disproportionately.
  */
@@ -65,6 +65,14 @@ export function scaleEnemy(enemy: Enemy, dungeonLevel: number): void {
   enemy.defense   = scaleValue(enemy.defense,    mult);
   enemy.xpReward  = scaleValue(enemy.xpReward,  mult);
   enemy.goldReward = scaleValue(enemy.goldReward, mult);
+
+  // Scale mana for caster-type enemies so spell budgets grow with difficulty.
+  // Guard: only apply when the enemy actually has a mana pool (maxMp > 0),
+  // so non-casters (maxMp = 0) are never upgraded to 1 MP unintentionally.
+  if (enemy.maxMp > 0) {
+    enemy.maxMp = scaleValue(enemy.maxMp, mult);
+    enemy.mp    = enemy.maxMp; // always start the fight with a full mana bar
+  }
 }
 
 /**
@@ -82,8 +90,16 @@ export function shouldSpawnBonusEnemy(dungeonLevel: number, rngValue: number): b
 
 /**
  * Atmospheric narration injected at dungeon start to signal difficulty tier.
+ *
+ * Tier 1 (L1–2): Calm — easing the player in.
+ * Tier 2 (L3–4): Tense — warning of stronger foes.
+ * Tier 3 (L5–7): Deadly — danger is real.
+ * Tier 4 (L8+):  Final form — absolute late-game.
  */
 export function getDungeonAtmosphere(dungeonLevel: number): string {
+  if (dungeonLevel >= 8) {
+    return "The dungeon has reached its final, unforgiving form. Every step forward could be your last.";
+  }
   if (dungeonLevel >= 5) {
     return "A deadly aura fills this dungeon. The shadows themselves feel hostile. Only the strong survive here.";
   }
@@ -108,4 +124,20 @@ export function scaleTrapDamage(baseDamage: number, dungeonLevel: number): numbe
   // Traps scale at half the rate of enemies to keep them fair.
   const trapMult = Math.min(1 + (dungeonLevel - 1) * 0.1, 2.0);
   return scaleValue(baseDamage, trapMult);
+}
+
+/**
+ * Scale consumable healing so potions remain useful at higher dungeon levels.
+ *
+ * Formula: baseHeal × (1 + (level - 1) × 0.15)
+ *   Level 1 → 1.00×  (40 HP → 40)
+ *   Level 3 → 1.30×  (40 HP → 52)
+ *   Level 5 → 1.60×  (40 HP → 64)
+ *   Level 8 → 2.05×  (40 HP → 82)
+ *
+ * Intentionally uncapped — healing should not lag behind enemy power at any level.
+ */
+export function scaleHealAmount(baseHeal: number, dungeonLevel: number): number {
+  const mult = 1 + (Math.max(1, dungeonLevel) - 1) * 0.15;
+  return Math.max(1, Math.round(baseHeal * mult));
 }

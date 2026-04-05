@@ -77,7 +77,11 @@ function makeEvent(template: RoomTemplate, rng: () => number, dungeonLevel = 1):
         const bonusRoll = rng();
         if (shouldSpawnBonusEnemy(dungeonLevel, bonusRoll) && groups.length > 0) {
           const bonusGroup = pick(groups, rng);
-          const bonusKey   = bonusGroup[0]; // pick the first (weakest) enemy from a group
+          // L5+: pick a random member of the group for variety.
+          // L3–4: always pick the first (weakest) enemy to ease into multi-enemy fights.
+          const bonusKey = dungeonLevel >= 5
+            ? bonusGroup[Math.floor(rng() * bonusGroup.length)]
+            : bonusGroup[0];
           if (bonusKey) base.enemies.push(createEnemy(bonusKey));
         }
       }

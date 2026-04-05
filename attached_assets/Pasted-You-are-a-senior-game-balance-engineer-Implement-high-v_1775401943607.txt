@@ -1,0 +1,182 @@
+You are a senior game balance engineer.
+
+Implement high-value improvements to the Level Scaling System in Dora Dungeons.
+
+---
+
+## GOAL
+
+Improve late-game balance, combat consistency, and player experience without breaking any existing systems.
+
+---
+
+## STRICT RULES
+
+* DO NOT modify core combat logic
+* DO NOT modify enemy scaling formula (0.2 multiplier)
+* DO NOT modify boss scaling (already fixed)
+* ONLY implement the improvements below
+
+---
+
+## STEP 1 — SCALE MP FOR CASTER ENEMIES
+
+PROBLEM:
+Caster enemies run out of mana too quickly at higher levels.
+
+---
+
+SOLUTION:
+
+Inside scaleEnemy():
+
+Add scaling for mp and maxMp:
+
+enemy.maxMp = Math.max(1, Math.round(enemy.maxMp * multiplier))
+enemy.mp = enemy.maxMp
+
+---
+
+RESULT:
+
+* Casters remain effective at higher levels
+* Spell usage stays consistent with difficulty
+
+---
+
+## STEP 2 — ADD ENDGAME NARRATION TIER
+
+PROBLEM:
+Levels 5+ all use the same narration tone.
+
+---
+
+SOLUTION:
+
+Extend narration tiers:
+
+Level 1–2:
+→ Calm tone (existing)
+
+Level 3–4:
+→ Tense tone (existing)
+
+Level 5–7:
+→ Deadly tone (existing)
+
+Level 8+:
+→ Add NEW tier:
+
+"The dungeon has reached its final, unforgiving form. Every step forward could be your last."
+
+---
+
+IMPLEMENTATION:
+
+Update narration selection logic to include:
+
+if (level >= 8) → use new narration
+
+---
+
+RESULT:
+
+* Better sense of progression
+* Strong late-game atmosphere
+
+---
+
+## STEP 3 — SCALE HEALTH POTIONS (OPTIONAL BUT IMPORTANT)
+
+PROBLEM:
+Fixed healing becomes weak at higher levels.
+
+---
+
+SOLUTION:
+
+Where potion healing is calculated:
+
+Replace fixed value with:
+
+healAmount = Math.round(baseHeal * (1 + (level - 1) * 0.15))
+
+---
+
+EXAMPLE:
+
+Level 1 → 100% heal
+Level 3 → 130%
+Level 5 → 160%
+
+---
+
+RESULT:
+
+* Healing remains relevant
+* Prevents frustration in late game
+
+---
+
+## STEP 4 — OPTIONAL: BONUS ENEMY VARIETY IMPROVEMENT
+
+PROBLEM:
+Bonus enemy always selects weakest enemy in group.
+
+---
+
+SOLUTION:
+
+Instead of:
+bonusEnemy = bonusGroup[0]
+
+Use:
+
+bonusEnemy = bonusGroup[Math.floor(rng() * bonusGroup.length)]
+
+---
+
+Only apply this for:
+
+level >= 5
+
+---
+
+RESULT:
+
+* More variety in encounters
+* More dynamic gameplay
+
+---
+
+## STEP 5 — VALIDATION
+
+Verify:
+
+* No TypeScript errors
+* No undefined stats
+* No negative values
+* No NaN values
+
+---
+
+Test:
+
+* Level 1 → unchanged behavior
+* Level 5 → noticeable improvement
+* Level 8+ → challenging but fair
+
+---
+
+## EXPECTED RESULT
+
+* Casters scale properly
+* Late-game narration feels epic
+* Healing remains useful
+* Combat stays balanced
+
+---
+
+## STOP AFTER THIS STEP
+
+Do NOT modify other systems
