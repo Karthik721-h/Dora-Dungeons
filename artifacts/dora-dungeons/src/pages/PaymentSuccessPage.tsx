@@ -1,3 +1,15 @@
+/**
+ * PaymentSuccessPage
+ *
+ * The frontend NEVER marks the payment as complete.
+ * Payment is confirmed exclusively via the Stripe webhook (checkout.session.completed),
+ * which sets hasPaid = true in the DB.
+ *
+ * This page polls GET /api/payment/status every second until hasPaid is true,
+ * then speaks a confirmation and redirects back to the game.
+ * If the webhook takes longer than 12 seconds, we redirect anyway with a friendly note —
+ * the game's /game/start endpoint re-reads hasPaid from DB on every load.
+ */
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
@@ -7,41 +19,60 @@ import { customFetch } from "@workspace/api-client-react";
 const BASE = import.meta.env.BASE_URL ?? "/";
 const API_BASE = `${BASE}api`.replace(/\/\//g, "/");
 
+const POLL_INTERVAL_MS = 1500;
+const POLL_TIMEOUT_MS  = 12000;
+
 export function PaymentSuccessPage() {
   const [, setLocation] = useLocation();
-  const [status, setStatus] = useState<"pending" | "success" | "error">("pending");
-  const calledRef = useRef(false);
+  const [status, setStatus] = useState<"polling" | "confirmed" | "timeout">("polling");
+  const startedRef  = useRef(false);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timeoutRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (calledRef.current) return;
-    calledRef.current = true;
+    if (startedRef.current) return;
+    startedRef.current = true;
 
-    const params = new URLSearchParams(window.location.search);
-    const sessionId = params.get("session_id") ?? undefined;
+    const stop = () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (timeoutRef.current)  clearTimeout(timeoutRef.current);
+    };
 
-    (async () => {
+    const confirmed = () => {
+      stop();
+      setStatus("confirmed");
+      AudioManager.speak(
+        "Your payment has been confirmed. All dungeon levels are now unlocked. Returning you to the game.",
+        { interrupt: true }
+      );
+      setTimeout(() => setLocation("/"), 3500);
+    };
+
+    const timedOut = () => {
+      stop();
+      setStatus("timeout");
+      AudioManager.speak(
+        "Payment received. It may take a moment to reflect in the game. Returning you now.",
+        { interrupt: true }
+      );
+      setTimeout(() => setLocation("/"), 3500);
+    };
+
+    const poll = async () => {
       try {
-        await customFetch(`${API_BASE}/payment/mark-paid`, {
-          method: "POST",
-          body: JSON.stringify({ sessionId }),
-        });
-
-        setStatus("success");
-
-        AudioManager.speak(
-          "Payment confirmed. Your full adventure awaits. Say next level to descend into Level 2.",
-          { interrupt: true }
-        );
-
-        setTimeout(() => setLocation("/"), 4000);
+        const data = await customFetch<{ hasPaid: boolean }>(`${API_BASE}/payment/status`);
+        if (data.hasPaid) confirmed();
       } catch {
-        setStatus("error");
-        AudioManager.speak(
-          "There was an issue confirming your payment. Please contact support.",
-          { interrupt: true }
-        );
+        // Swallow — keep polling until timeout
       }
-    })();
+    };
+
+    // Start polling
+    poll();
+    intervalRef.current = setInterval(poll, POLL_INTERVAL_MS);
+    timeoutRef.current  = setTimeout(timedOut, POLL_TIMEOUT_MS);
+
+    return stop;
   }, [setLocation]);
 
   return (
@@ -66,18 +97,25 @@ export function PaymentSuccessPage() {
         transition={{ duration: 0.5 }}
         style={{ textAlign: "center", maxWidth: 480, padding: "0 24px" }}
       >
-        {status === "pending" && (
+        {status === "polling" && (
           <>
-            <div style={{ fontSize: "2rem", marginBottom: 16 }}>⚔</div>
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ repeat: Infinity, duration: 1.4, ease: "linear" }}
+              style={{ fontSize: "2rem", marginBottom: 16, display: "inline-block" }}
+            >
+              ⚔
+            </motion.div>
             <h1 style={{ fontSize: "1.1rem", letterSpacing: "0.15em", textTransform: "uppercase", margin: 0 }}>
               Confirming payment…
             </h1>
             <p style={{ color: "rgba(200,190,180,0.6)", fontSize: "0.8rem", marginTop: 12 }}>
-              One moment while we unlock your adventure.
+              Waiting for Stripe to confirm your payment. This usually takes just a moment.
             </p>
           </>
         )}
-        {status === "success" && (
+
+        {status === "confirmed" && (
           <>
             <div style={{ fontSize: "2rem", marginBottom: 16 }}>✦</div>
             <h1 style={{ fontSize: "1.1rem", letterSpacing: "0.15em", textTransform: "uppercase", margin: 0 }}>
@@ -88,32 +126,16 @@ export function PaymentSuccessPage() {
             </p>
           </>
         )}
-        {status === "error" && (
+
+        {status === "timeout" && (
           <>
-            <div style={{ fontSize: "2rem", marginBottom: 16 }}>✕</div>
-            <h1 style={{ fontSize: "1.1rem", letterSpacing: "0.15em", textTransform: "uppercase", margin: 0, color: "#8b1e1e" }}>
-              Confirmation Failed
+            <div style={{ fontSize: "2rem", marginBottom: 16 }}>⚡</div>
+            <h1 style={{ fontSize: "1.1rem", letterSpacing: "0.15em", textTransform: "uppercase", margin: 0 }}>
+              Payment Received
             </h1>
             <p style={{ color: "rgba(200,190,180,0.7)", fontSize: "0.8rem", marginTop: 12 }}>
-              Please contact support if your payment went through.
+              Stripe confirmed your payment. It will appear in-game momentarily.
             </p>
-            <button
-              onClick={() => setLocation("/")}
-              style={{
-                marginTop: 24,
-                padding: "10px 28px",
-                background: "transparent",
-                border: "1px solid rgba(200,155,60,0.5)",
-                color: "#c89b3c",
-                fontFamily: "'Fira Code', monospace",
-                fontSize: "0.75rem",
-                letterSpacing: "0.1em",
-                textTransform: "uppercase",
-                cursor: "pointer",
-              }}
-            >
-              Return to Game
-            </button>
           </>
         )}
       </motion.div>

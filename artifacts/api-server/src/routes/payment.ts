@@ -1,7 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { loadSession, saveSession } from "../lib/gameSession.js";
 import { getUncachableStripeClient } from "../lib/stripeClient.js";
 import { requireAuth } from "../middlewares/authMiddleware.js";
 
@@ -12,7 +11,7 @@ const APP_BASE_URL = `https://${process.env.REPLIT_DOMAINS?.split(",")[0] ?? "lo
 /**
  * POST /payment/create-checkout-session
  * Creates a Stripe one-time-payment checkout session and returns the redirect URL.
- * Requires a valid JWT (requireAuth middleware applied on the router in index.ts).
+ * Attaches userId to session metadata so the webhook can identify the payer.
  */
 router.post("/create-checkout-session", requireAuth, async (req: Request, res: Response) => {
   const userId = req.user!.id;
@@ -66,8 +65,12 @@ router.post("/create-checkout-session", requireAuth, async (req: Request, res: R
         },
       ],
       mode: "payment",
-      success_url: `${APP_BASE_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}&uid=${userId}`,
+      // NOTE: success_url does NOT contain userId — payment confirmation is handled
+      // exclusively by the Stripe webhook (checkout.session.completed), not by
+      // anything the frontend sends after redirect. The frontend only polls /status.
+      success_url: `${APP_BASE_URL}/payment-success`,
       cancel_url: `${APP_BASE_URL}/payment-cancel`,
+      // userId in metadata is the authoritative source for the webhook handler
       metadata: { userId },
     });
 
@@ -82,44 +85,29 @@ router.post("/create-checkout-session", requireAuth, async (req: Request, res: R
 });
 
 /**
- * POST /payment/mark-paid
- * Called by the frontend after returning from a successful Stripe checkout.
- * Idempotent — safe to call more than once.
- * Validates the Stripe session before granting access.
+ * GET /payment/status
+ * Returns the current hasPaid status for the authenticated user.
+ * Used by the payment-success page to poll until the webhook has fired.
+ * Safe to call repeatedly — read-only, no side effects.
  */
-router.post("/mark-paid", requireAuth, async (req: Request, res: Response) => {
+router.get("/status", requireAuth, async (req: Request, res: Response) => {
   const userId = req.user!.id;
-  const { sessionId } = req.body ?? {};
 
   try {
-    const stripe = await getUncachableStripeClient();
+    const [user] = await db
+      .select({ hasPaid: usersTable.hasPaid })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId))
+      .limit(1);
 
-    if (sessionId) {
-      const session = await stripe.checkout.sessions.retrieve(sessionId as string);
-      if (session.payment_status !== "paid" || session.metadata?.userId !== userId) {
-        res.status(400).json({ error: "PAYMENT_NOT_CONFIRMED", message: "Payment could not be verified." });
-        return;
-      }
-    }
-
-    await db
-      .update(usersTable)
-      .set({ hasPaid: true })
-      .where(eq(usersTable.id, userId));
-
-    const session = await loadSession(userId);
-    if (session) {
-      session.state.player.hasPaid = true;
-      await saveSession(userId, session.state);
-    }
-
-    res.json({ success: true });
-  } catch (err: any) {
-    if (err.message?.includes("not yet connected")) {
-      res.status(503).json({ error: "STRIPE_NOT_CONFIGURED", message: "Payment system is not yet configured." });
+    if (!user) {
+      res.status(404).json({ error: "USER_NOT_FOUND" });
       return;
     }
-    res.status(500).json({ error: "MARK_PAID_FAILED", message: err.message });
+
+    res.json({ hasPaid: user.hasPaid });
+  } catch (err: any) {
+    res.status(500).json({ error: "STATUS_CHECK_FAILED", message: err.message });
   }
 });
 

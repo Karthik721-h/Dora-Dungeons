@@ -1,0 +1,288 @@
+You are a senior backend engineer specializing in Stripe integrations and secure payment systems.
+
+Upgrade Dora Dungeons payment system to a production-grade Stripe integration using webhooks.
+
+---
+
+## GOAL
+
+* Secure Stripe payment flow
+* No fake /api/payment-success
+* Backend-verified payments ONLY
+* Prevent all payment bypass
+
+---
+
+## STRICT RULES
+
+* DO NOT trust frontend for payment success
+* ONLY use Stripe webhooks to confirm payment
+* DO NOT break existing game logic
+* KEEP hasPaid as the single source of truth
+
+---
+
+## STEP 1 — INSTALL STRIPE SDK
+
+Install:
+
+npm install stripe
+
+---
+
+Add environment variables:
+
+STRIPE_SECRET_KEY=your_secret_key
+STRIPE_WEBHOOK_SECRET=your_webhook_secret
+
+---
+
+DO NOT expose secret key to frontend
+
+---
+
+## STEP 2 — CREATE CHECKOUT SESSION (SECURE)
+
+Update:
+
+POST /api/create-checkout-session
+
+---
+
+Use Stripe SDK:
+
+* mode: "payment"
+* line_items:
+
+  * name: "Dora Dungeons — Full Access"
+  * amount: $30
+  * quantity: 1
+
+---
+
+IMPORTANT:
+
+Attach metadata:
+
+metadata: {
+userId: currentUser.id
+}
+
+---
+
+Set URLs:
+
+success_url: https://your-app.com/payment-success
+cancel_url: https://your-app.com/payment-cancel
+
+---
+
+Return:
+
+{ url: session.url }
+
+---
+
+## STEP 3 — CREATE STRIPE WEBHOOK ENDPOINT
+
+Create:
+
+POST /api/stripe-webhook
+
+---
+
+IMPORTANT:
+
+* Use raw body (DO NOT JSON parse before verification)
+* Verify signature using STRIPE_WEBHOOK_SECRET
+
+---
+
+Handle event:
+
+checkout.session.completed
+
+---
+
+Inside handler:
+
+1. Extract:
+
+session.metadata.userId
+
+2. Find user in DB
+
+3. Set:
+
+player.hasPaid = true
+
+4. Save to DB
+
+---
+
+IMPORTANT:
+
+* Make operation idempotent
+* If already paid → do nothing
+
+---
+
+## STEP 4 — REMOVE INSECURE PAYMENT SUCCESS LOGIC
+
+REMOVE:
+
+/api/payment-success endpoint (or disable logic)
+
+---
+
+REPLACE WITH:
+
+Frontend-only success page (no DB mutation)
+
+---
+
+This page should:
+
+* Say "Payment successful"
+* Redirect back to game
+
+---
+
+## STEP 5 — VERIFY PAYMENT ON GAME LOAD
+
+On game load (GET /game/state):
+
+* player.hasPaid comes from DB
+
+---
+
+Frontend:
+
+IF:
+
+player.hasPaid === true
+
+→ allow next level
+
+---
+
+IF false:
+
+→ trigger payment flow again
+
+---
+
+## STEP 6 — PROTECT NEXT LEVEL (SERVER SIDE)
+
+Ensure in:
+
+POST /game/next-level
+
+---
+
+IF:
+
+player.dungeonLevel === 1 AND player.hasPaid === false
+
+→ BLOCK
+
+---
+
+RETURN:
+
+{ error: "PAYMENT_REQUIRED" }
+
+---
+
+This must ALWAYS run (even if frontend is bypassed)
+
+---
+
+## STEP 7 — HANDLE RETURN FROM STRIPE
+
+On success page:
+
+* DO NOT mark payment as complete
+* Just redirect user back to game
+
+---
+
+When game loads:
+
+* hasPaid already updated via webhook
+
+---
+
+TTS should say:
+
+"Your payment has been confirmed. You may now proceed to the next level."
+
+---
+
+## STEP 8 — HANDLE EDGE CASES
+
+Test:
+
+1. User closes Stripe before payment
+   → hasPaid remains false
+
+2. User refreshes after payment
+   → hasPaid persists
+
+3. Webhook fires twice
+   → no duplicate writes
+
+4. User tries to bypass frontend
+   → backend blocks access
+
+---
+
+## STEP 9 — OPTIONAL: LOGGING
+
+Add safe logs:
+
+* webhook received
+* payment completed
+* user unlocked
+
+---
+
+DO NOT log sensitive data
+
+---
+
+## STEP 10 — FINAL VALIDATION
+
+Test full secure flow:
+
+1. Complete Level 1
+2. Trigger payment
+3. Redirect to Stripe
+4. Pay successfully
+5. Webhook fires
+6. DB updates hasPaid = true
+7. Return to game
+8. Say "Next Level"
+9. Enter Level 2
+
+---
+
+Test failure:
+
+* Cancel payment → blocked from Level 2
+* Try API bypass → blocked
+
+---
+
+## EXPECTED RESULT
+
+* Fully secure Stripe integration
+* No payment spoofing possible
+* Clean upgrade flow
+* Production-ready system
+
+---
+
+## STOP AFTER THIS STEP
+
+Do NOT add subscriptions yet
