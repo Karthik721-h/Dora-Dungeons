@@ -2,6 +2,7 @@ import { AbilityEffect, Player, Enemy, StatusEffect } from "../types/index.js";
 import { STATUS_DEFINITIONS } from "../data/statusEffects.js";
 import { NarrationEngine, NarrationRegistry } from "../narration/NarrationEngine.js";
 import { applyStatusEffect, getDefenseBonus } from "../combat/StatusEffects.js";
+import { getLevelMultiplier } from "../scaling/LevelScaling.js";
 
 export interface EffectResult {
   xpGained: number;
@@ -77,9 +78,14 @@ AbilityEffectRegistry.register(
     const primaryTarget = liveTargets[0]!;
     const isAoe = liveTargets.length > 1;
 
+    // Scale spell damage with dungeon level so spells remain viable as enemies grow.
+    // Uses the same 0.2-step enemy multiplier (capped at 3.0×) — spells and enemies
+    // grow at the same rate, keeping the combat loop consistent at every level.
+    const scaledValue = Math.round((effect.value ?? 0) * getLevelMultiplier(player.dungeonLevel ?? 1));
+
     const damages: number[] = liveTargets.map((t) => {
       const defBonus = getDefenseBonus(t.statusEffects);
-      return clamp(Math.floor(rollDamage(effect.value ?? 0) - defBonus * 0.3), 1, 9999);
+      return clamp(Math.floor(rollDamage(scaledValue) - defBonus * 0.3), 1, 9999);
     });
 
     if (effect.narrationKey) {

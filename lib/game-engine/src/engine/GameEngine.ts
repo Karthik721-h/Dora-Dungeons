@@ -7,6 +7,7 @@ import {
   ParsedCommand,
   Enemy,
   ItemType,
+  EnemyType,
 } from "../types/index.js";
 import { CommandParser } from "../ai/CommandParser.js";
 import { DungeonManager } from "../dungeon/DungeonManager.js";
@@ -285,6 +286,16 @@ export class GameEngine {
     }
 
     if (!wasExplored) {
+      // Warn the player before boss combat begins so they can prepare.
+      // Only fires on first entry (wasExplored === false) to avoid repeated warnings.
+      const roomHasBoss = nextRoom.event?.enemies?.some((e) => e.type === EnemyType.BOSS) ?? false;
+      if (roomHasBoss) {
+        msgs.push(
+          "You sense a terrible presence beyond the threshold — this is the lair of the dungeon's master.",
+          "The air reeks of blood and power. Prepare your spells and potions before you advance."
+        );
+      }
+
       const eventResult = triggerRoomEvent(nextRoom.event, state.player);
       msgs.push(...eventResult.narration);
 

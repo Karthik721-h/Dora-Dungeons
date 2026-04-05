@@ -128,16 +128,17 @@ export function scaleTrapDamage(baseDamage: number, dungeonLevel: number): numbe
 
 /**
  * Scale consumable healing so potions remain useful at higher dungeon levels.
+ * Capped at MULTIPLIER_CAP (3.0×) for consistency with enemy scaling.
  *
- * Formula: baseHeal × (1 + (level - 1) × 0.15)
- *   Level 1 → 1.00×  (40 HP → 40)
- *   Level 3 → 1.30×  (40 HP → 52)
- *   Level 5 → 1.60×  (40 HP → 64)
- *   Level 8 → 2.05×  (40 HP → 82)
- *
- * Intentionally uncapped — healing should not lag behind enemy power at any level.
+ * Formula: min(1 + (level - 1) × 0.15, 3.0)
+ *   Level 1  → 1.00×  (40 HP → 40)
+ *   Level 3  → 1.30×  (40 HP → 52)
+ *   Level 5  → 1.60×  (40 HP → 64)
+ *   Level 8  → 2.05×  (40 HP → 82)
+ *   Level 14 → 3.00×  (40 HP → 120)  ← cap
  */
 export function scaleHealAmount(baseHeal: number, dungeonLevel: number): number {
-  const mult = 1 + (Math.max(1, dungeonLevel) - 1) * 0.15;
+  const raw  = 1 + (Math.max(1, dungeonLevel) - 1) * 0.15;
+  const mult = Math.min(raw, MULTIPLIER_CAP);
   return Math.max(1, Math.round(baseHeal * mult));
 }
