@@ -16,6 +16,7 @@ import { NarrationFeed } from "@/components/NarrationFeed";
 import { PlayerHUD } from "@/components/PlayerHUD";
 import { VoiceControl } from "@/components/VoiceControl";
 import { ShopPanel, ShopView, ShopBuyResult, ShopSellResult, ShopUpgradeResult } from "@/components/ShopPanel";
+import { GameModal, ModalButton } from "@/components/GameModal";
 import { ShopWeapon, ShopArmor, ShopInventoryItem, SHOP_WEAPONS } from "@/shop";
 import {
   speakShopOpen,
@@ -1642,338 +1643,199 @@ export function GameScreen({
         </div>
       </div>
 
-      {/* ── Payment Decision overlay ── */}
-      {/* Shown when Level 1 is cleared but user hasn't paid yet */}
-      <AnimatePresence>
-        {gameMode === "paymentDecision" && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 z-30 flex flex-col items-center justify-center"
-            style={{ background: "rgba(5,3,8,0.95)", backdropFilter: "blur(6px)" }}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Unlock full adventure — one-time payment required"
-          >
-            <motion.div
-              initial={{ scale: 0.85, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.15, type: "spring", stiffness: 180 }}
-              className="text-center space-y-6 px-6"
-              style={{ maxWidth: 520 }}
+      {/* ── Unified modal system — all overlays via GameModal (portal, z-9999) ── */}
+      {(() => {
+        type ModalView = "paymentDecision" | "levelDecision" | "replayPrompt" | "death" | null;
+        const modalView: ModalView =
+          isGameOver && showRestartModal ? "death" :
+          gameMode !== "explore"         ? (gameMode as ModalView) :
+          null;
+
+        // ── Payment Decision ──────────────────────────────────────────────
+        if (modalView === "paymentDecision") {
+          return (
+            <GameModal
+              isOpen
+              title="LEVEL 1 COMPLETE"
+              accentColor="#c89b3c"
+              disableClose
+              actions={
+                <>
+                  <ModalButton
+                    variant="secondary"
+                    ariaLabel="No, replay Level 1"
+                    disabled={paymentPending}
+                    onClick={() => {
+                      if (paymentPending) return;
+                      gameModeRef.current = "replayPrompt";
+                      setGameMode("replayPrompt");
+                      AudioManager.speak(
+                        "Would you like to replay Level 1, or exit the dungeon? Say yes to replay, or no to exit.",
+                        { interrupt: true }
+                      );
+                    }}
+                  >
+                    No — Replay
+                  </ModalButton>
+                  <ModalButton
+                    variant="primary"
+                    ariaLabel="Yes, proceed to payment and unlock all levels"
+                    disabled={paymentPending}
+                    onClick={() => { if (!paymentPending) initiatePayment(); }}
+                  >
+                    {paymentPending ? "Redirecting…" : "Yes — Unlock ($30)"}
+                  </ModalButton>
+                </>
+              }
             >
               <div className="rune-divider w-52 mx-auto">⚔</div>
-
-              <h2
-                className="font-display text-4xl font-black tracking-widest"
-                style={{
-                  color: "#c89b3c",
-                  textShadow: "0 0 40px rgba(200,155,60,0.8), 0 0 80px rgba(200,155,60,0.3)",
-                }}
-              >
-                LEVEL 1 COMPLETE
-              </h2>
-
               <p className="font-narration italic text-xl" style={{ color: "rgba(200,155,60,0.75)" }}>
                 The dungeon boss has fallen. Deeper darkness awaits.
               </p>
-
-              <p
-                className="text-base font-bold"
-                style={{ color: "rgba(255,255,255,0.9)", letterSpacing: "0.04em", lineHeight: 1.6 }}
-              >
-                Unlock all dungeon levels for a one-time payment of <span style={{ color: "#c89b3c" }}>$30</span>.
+              <p className="text-base font-bold" style={{ color: "rgba(255,255,255,0.9)", letterSpacing: "0.04em", lineHeight: 1.6 }}>
+                Unlock all dungeon levels for a one-time payment of{" "}
+                <span style={{ color: "#c89b3c" }}>$30</span>.
               </p>
-
               <p style={{ color: "rgba(200,190,180,0.55)", fontSize: "0.75rem", letterSpacing: "0.06em" }}>
                 Say "yes" to pay, or "no" to replay Level 1.
               </p>
+            </GameModal>
+          );
+        }
 
-              <div className="flex gap-4 justify-center pt-2">
-                <motion.button
-                  whileHover={{ scale: paymentPending ? 1 : 1.06 }}
-                  whileTap={{ scale: paymentPending ? 1 : 0.95 }}
-                  onClick={() => {
-                    if (paymentPending) return;
-                    gameModeRef.current = "replayPrompt";
-                    setGameMode("replayPrompt");
-                    AudioManager.speak(
-                      "Would you like to replay Level 1, or exit the dungeon? Say yes to replay, or no to exit.",
-                      { interrupt: true }
-                    );
-                  }}
-                  disabled={paymentPending}
-                  aria-label="No, replay Level 1"
-                  className="px-7 py-3 rounded-lg font-display text-lg font-bold tracking-wider"
-                  style={{
-                    background: "rgba(26,31,41,0.8)",
-                    border: "1px solid rgba(200,155,60,0.4)",
-                    color: paymentPending ? "rgba(200,155,60,0.3)" : "rgba(200,155,60,0.85)",
-                    cursor: paymentPending ? "not-allowed" : "pointer",
-                    minWidth: 130,
-                  }}
-                >
-                  No — Replay
-                </motion.button>
-
-                <motion.button
-                  whileHover={{ scale: paymentPending ? 1 : 1.06 }}
-                  whileTap={{ scale: paymentPending ? 1 : 0.95 }}
-                  onClick={() => { if (!paymentPending) initiatePayment(); }}
-                  disabled={paymentPending}
-                  aria-label="Yes, proceed to payment and unlock all levels"
-                  className="px-7 py-3 rounded-lg font-display text-lg font-bold tracking-wider"
-                  style={{
-                    background: paymentPending ? "rgba(200,155,60,0.3)" : "rgba(200,155,60,0.88)",
-                    border: "1px solid rgba(200,155,60,0.9)",
-                    color: paymentPending ? "rgba(0,0,0,0.3)" : "#060810",
-                    cursor: paymentPending ? "not-allowed" : "pointer",
-                    minWidth: 130,
-                  }}
-                >
-                  {paymentPending ? "Redirecting…" : "Yes — Unlock ($30)"}
-                </motion.button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ── Level Progression overlay ── */}
-      {/* Shown after boss defeat — routes the player to next level, replay, or exit */}
-      <AnimatePresence>
-        {(gameMode === "levelDecision" || gameMode === "replayPrompt") && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 z-30 flex flex-col items-center justify-center"
-            style={{ background: "rgba(5,3,8,0.93)", backdropFilter: "blur(6px)" }}
-            role="dialog"
-            aria-modal="true"
-            aria-label={gameMode === "levelDecision" ? "Level complete — proceed?" : "Replay this level?"}
-          >
-            <motion.div
-              initial={{ scale: 0.85, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.15, type: "spring", stiffness: 180 }}
-              className="text-center space-y-6 px-6"
-              style={{ maxWidth: 480 }}
+        // ── Level Decision / Replay Prompt ────────────────────────────────
+        if (modalView === "levelDecision" || modalView === "replayPrompt") {
+          return (
+            <GameModal
+              isOpen
+              title="VICTORIOUS"
+              accentColor="#c89b3c"
+              disableClose
+              actions={
+                <>
+                  <ModalButton
+                    variant="secondary"
+                    ariaLabel={
+                      modalView === "levelDecision"
+                        ? (player.hasPaid ? "No, replay this level" : "No, see other options")
+                        : "No, exit the dungeon"
+                    }
+                    disabled={progressionPending}
+                    onClick={() => {
+                      if (progressionPending) return;
+                      if (modalView === "levelDecision") {
+                        if (player.hasPaid) {
+                          replayLevelApi();
+                        } else {
+                          submitCommand("replay_prompt");
+                        }
+                      } else {
+                        stopListeningRef.current();
+                        AudioManager.speak(
+                          "You have left the dungeon. Your progress is safe.",
+                          { interrupt: true }
+                        );
+                        AudioManager.onQueueDrained(() => { onLogoutRef.current?.(); });
+                      }
+                    }}
+                  >
+                    {modalView === "levelDecision"
+                      ? (player.hasPaid ? "No — Replay" : "No — Other Options")
+                      : "No — Exit"}
+                  </ModalButton>
+                  <ModalButton
+                    variant="primary"
+                    ariaLabel={modalView === "levelDecision" ? "Yes, advance to next level" : "Yes, replay this level"}
+                    disabled={progressionPending}
+                    onClick={() => {
+                      if (progressionPending) return;
+                      if (modalView === "levelDecision") nextLevelApi();
+                      else replayLevelApi();
+                    }}
+                  >
+                    {progressionPending
+                      ? "Loading…"
+                      : modalView === "levelDecision"
+                      ? "Yes — Next Level"
+                      : "Yes — Replay"}
+                  </ModalButton>
+                </>
+              }
             >
               <div className="rune-divider w-52 mx-auto">✦</div>
-
-              <h2
-                className="font-display text-5xl font-black tracking-widest"
-                style={{
-                  color: "#c89b3c",
-                  textShadow: "0 0 40px rgba(200,155,60,0.8), 0 0 80px rgba(200,155,60,0.3)",
-                }}
-              >
-                VICTORIOUS
-              </h2>
-
               <p className="font-narration italic text-xl" style={{ color: "rgba(200,155,60,0.75)" }}>
-                {gameMode === "levelDecision"
+                {modalView === "levelDecision"
                   ? "The boss has fallen. The path forward is open."
                   : "Do you wish to face this dungeon once more?"}
               </p>
-
-              <p
-                className="text-base font-bold"
-                style={{ color: "rgba(255,255,255,0.9)", letterSpacing: "0.04em" }}
-              >
-                {gameMode === "levelDecision"
-                  ? "Proceed to the next level?"
-                  : "Replay this level?"}
+              <p className="text-base font-bold" style={{ color: "rgba(255,255,255,0.9)", letterSpacing: "0.04em" }}>
+                {modalView === "levelDecision" ? "Proceed to the next level?" : "Replay this level?"}
               </p>
-
-              <div className="flex gap-4 justify-center pt-2">
-                {/* No / secondary action */}
-                <motion.button
-                  whileHover={{ scale: progressionPending ? 1 : 1.06 }}
-                  whileTap={{ scale: progressionPending ? 1 : 0.95 }}
-                  onClick={() => {
-                    if (progressionPending) return;
-                    if (gameMode === "levelDecision") {
-                      // When already paid, "no" goes straight to replay (no extra prompt needed)
-                      if (player.hasPaid) {
-                        replayLevelApi();
-                      } else {
-                        submitCommand("replay_prompt");
-                      }
-                    } else {
-                      stopListeningRef.current();
-                      AudioManager.speak(
-                        "You have left the dungeon. Your progress is safe.",
-                        { interrupt: true }
-                      );
-                      AudioManager.onQueueDrained(() => { onLogoutRef.current?.(); });
-                    }
-                  }}
-                  disabled={progressionPending}
-                  aria-label={
-                    gameMode === "levelDecision"
-                      ? (player.hasPaid ? "No, replay this level" : "No, see other options")
-                      : "No, exit the dungeon"
-                  }
-                  className="px-7 py-3 rounded-lg font-display text-lg font-bold tracking-wider"
-                  style={{
-                    background: "rgba(26,31,41,0.8)",
-                    border: "1px solid rgba(200,155,60,0.4)",
-                    color: progressionPending ? "rgba(200,155,60,0.3)" : "rgba(200,155,60,0.85)",
-                    boxShadow: "0 0 10px rgba(200,155,60,0.12)",
-                    cursor: progressionPending ? "not-allowed" : "pointer",
-                    minWidth: 130,
-                  }}
-                >
-                  {gameMode === "levelDecision"
-                    ? (player.hasPaid ? "No — Replay" : "No — Other Options")
-                    : "No — Exit"}
-                </motion.button>
-
-                {/* Yes / primary action */}
-                <motion.button
-                  whileHover={{ scale: progressionPending ? 1 : 1.06 }}
-                  whileTap={{ scale: progressionPending ? 1 : 0.95 }}
-                  onClick={() => {
-                    if (progressionPending) return;
-                    if (gameMode === "levelDecision") nextLevelApi();
-                    else replayLevelApi();
-                  }}
-                  disabled={progressionPending}
-                  aria-label={gameMode === "levelDecision" ? "Yes, advance to next level" : "Yes, replay this level"}
-                  className="px-7 py-3 rounded-lg font-display text-lg font-bold tracking-wider"
-                  style={{
-                    background: progressionPending
-                      ? "rgba(200,155,60,0.3)"
-                      : "rgba(200,155,60,0.88)",
-                    border: "1px solid rgba(200,155,60,0.9)",
-                    color: progressionPending ? "rgba(0,0,0,0.3)" : "#060810",
-                    boxShadow: "0 0 18px rgba(200,155,60,0.4)",
-                    cursor: progressionPending ? "not-allowed" : "pointer",
-                    minWidth: 130,
-                  }}
-                >
-                  {progressionPending
-                    ? "Loading…"
-                    : gameMode === "levelDecision"
-                    ? "Yes — Next Level"
-                    : "Yes — Replay"}
-                </motion.button>
-              </div>
-
               <p className="text-xs" style={{ color: "rgba(255,255,255,0.28)", letterSpacing: "0.06em" }}>
-                {gameMode === "levelDecision" && gameState.player.hasPaid ? (
+                {modalView === "levelDecision" && gameState.player.hasPaid ? (
                   <>Say <strong style={{ color: "rgba(255,255,255,0.55)" }}>"next level"</strong> or <strong style={{ color: "rgba(255,255,255,0.55)" }}>"no"</strong></>
                 ) : (
                   <>Say <strong style={{ color: "rgba(255,255,255,0.55)" }}>"yes"</strong> or <strong style={{ color: "rgba(255,255,255,0.55)" }}>"no"</strong></>
                 )}
               </p>
-
               <div className="rune-divider w-52 mx-auto">✦</div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            </GameModal>
+          );
+        }
 
-      {/* ── Game Over overlay ── */}
-      <AnimatePresence>
-        {isGameOver && showRestartModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="absolute inset-0 z-30 flex flex-col items-center justify-center"
-            style={{ background: "rgba(5,3,8,0.93)", backdropFilter: "blur(6px)" }}
-            role="dialog"
-            aria-modal="true"
-            aria-label="You have fallen"
-          >
-            <motion.div
-              initial={{ scale: 0.85, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.15, type: "spring", stiffness: 180 }}
-              className="text-center space-y-6 px-6"
-              style={{ maxWidth: 480 }}
+        // ── Game Over ─────────────────────────────────────────────────────
+        if (modalView === "death") {
+          return (
+            <GameModal
+              isOpen
+              title="FALLEN"
+              accentColor="#8b1e1e"
+              disableClose
+              actions={
+                <>
+                  <ModalButton
+                    variant="secondary"
+                    accentColor="#8b1e1e"
+                    ariaLabel="No, exit the dungeon"
+                    disabled={restartPending}
+                    onClick={() => {
+                      stopListeningRef.current();
+                      AudioManager.speak("You have exited the dungeon. Return when you are ready.", { interrupt: true });
+                      AudioManager.onQueueDrained(() => { onLogoutRef.current?.(); });
+                    }}
+                  >
+                    No — Exit
+                  </ModalButton>
+                  <ModalButton
+                    variant="primary"
+                    accentColor="#8b1e1e"
+                    ariaLabel="Yes, restart the dungeon"
+                    disabled={restartPending}
+                    onClick={restartApi}
+                  >
+                    {restartPending ? "Restarting…" : "Yes — Restart"}
+                  </ModalButton>
+                </>
+              }
             >
-              {/* Blood rune divider */}
               <div className="rune-divider w-52 mx-auto">✦</div>
-
-              {/* Title */}
-              <h2
-                className="font-display text-6xl font-black tracking-widest"
-                style={{
-                  color: "#8b1e1e",
-                  textShadow: "0 0 40px rgba(139,30,30,0.8), 0 0 80px rgba(139,30,30,0.3)",
-                }}
-              >
-                FALLEN
-              </h2>
-
-              {/* Flavour */}
               <p className="font-narration italic text-xl" style={{ color: "rgba(200,155,60,0.75)" }}>
                 The dungeon claims another soul — but the story is not yet over.
               </p>
-
               <p className="text-sm" style={{ color: "rgba(255,255,255,0.45)", letterSpacing: "0.05em" }}>
                 Weapons, armor &amp; gold are preserved.
               </p>
-
-              {/* Yes / No buttons */}
-              <div className="flex gap-4 justify-center pt-2">
-                <motion.button
-                  whileHover={{ scale: restartPending ? 1 : 1.06 }}
-                  whileTap={{ scale: restartPending ? 1 : 0.95 }}
-                  onClick={restartApi}
-                  disabled={restartPending}
-                  aria-label="Yes, restart the dungeon"
-                  className="px-7 py-3 rounded-lg font-display text-lg font-bold tracking-wider"
-                  style={{
-                    background: restartPending ? "rgba(139,30,30,0.4)" : "rgba(139,30,30,0.85)",
-                    border: "1px solid rgba(139,30,30,0.9)",
-                    color: restartPending ? "rgba(255,255,255,0.4)" : "#fff",
-                    boxShadow: "0 0 18px rgba(139,30,30,0.4)",
-                    cursor: restartPending ? "not-allowed" : "pointer",
-                    minWidth: 130,
-                  }}
-                >
-                  {restartPending ? "Restarting…" : "Yes — Restart"}
-                </motion.button>
-
-                <motion.button
-                  whileHover={{ scale: restartPending ? 1 : 1.06 }}
-                  whileTap={{ scale: restartPending ? 1 : 0.95 }}
-                  onClick={() => {
-                    stopListeningRef.current();
-                    AudioManager.speak("You have exited the dungeon. Return when you are ready.", { interrupt: true });
-                    AudioManager.onQueueDrained(() => { onLogoutRef.current?.(); });
-                  }}
-                  disabled={restartPending}
-                  aria-label="No, exit the dungeon"
-                  className="px-7 py-3 rounded-lg font-display text-lg font-bold tracking-wider"
-                  style={{
-                    background: "rgba(26,31,41,0.8)",
-                    border: "1px solid rgba(200,155,60,0.4)",
-                    color: restartPending ? "rgba(200,155,60,0.3)" : "rgba(200,155,60,0.85)",
-                    boxShadow: "0 0 10px rgba(200,155,60,0.12)",
-                    cursor: restartPending ? "not-allowed" : "pointer",
-                    minWidth: 130,
-                  }}
-                >
-                  No — Exit
-                </motion.button>
-              </div>
-
-              {/* Voice hint */}
               <p className="text-xs" style={{ color: "rgba(255,255,255,0.28)", letterSpacing: "0.06em" }}>
-                Say <strong style={{ color: "rgba(255,255,255,0.55)" }}>"yes"</strong> or <strong style={{ color: "rgba(255,255,255,0.55)" }}>"no"</strong>
+                Say <strong style={{ color: "rgba(255,255,255,0.55)" }}>"yes"</strong> or{" "}
+                <strong style={{ color: "rgba(255,255,255,0.55)" }}>"no"</strong>
               </p>
-
               <div className="rune-divider w-52 mx-auto">✦</div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            </GameModal>
+          );
+        }
+
+        return null;
+      })()}
     </div>
   );
 }

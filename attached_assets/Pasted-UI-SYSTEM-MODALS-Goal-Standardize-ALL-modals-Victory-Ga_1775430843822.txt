@@ -1,0 +1,201 @@
+UI SYSTEM (MODALS)
+
+Goal:
+Standardize ALL modals (Victory, Game Over, Payment, Restart, Shop overlays) into a unified, accessible, voice-aware modal system that works flawlessly with TTS + voice control.
+
+This must NOT break:
+- Voice-first gameplay
+- GameMode state machine
+- TTS sequencing
+- Existing API flows
+
+-------------------------------------
+
+STEP 1 — CREATE GLOBAL MODAL COMPONENT
+
+Create:
+components/ui/GameModal.tsx
+
+Requirements:
+- Centered modal container
+- Backdrop overlay (dark, semi-transparent)
+- Always rendered via React Portal (document.body)
+- Z-index HIGHER than ALL UI (>= 9999)
+
+Props:
+- isOpen: boolean
+- title: string
+- children: ReactNode
+- actions: ReactNode (buttons area)
+- onClose?: () => void
+- disableClose?: boolean
+
+Accessibility:
+- role="dialog"
+- aria-modal="true"
+- aria-labelledby (title)
+- Trap focus inside modal
+- Escape key closes modal (unless disableClose)
+
+-------------------------------------
+
+STEP 2 — UNIFY GAME MODES → MODALS
+
+Map gameMode to modal rendering:
+
+levelDecision → VictoryModal
+replayPrompt → ReplayModal
+death → GameOverModal
+paymentDecision → PaymentModal
+restartConfirm → RestartModal
+
+DO NOT scatter modal logic across files.
+Render ALL modals from GameScreen.tsx using ONE switch:
+
+switch (gameMode) {
+  case "levelDecision":
+  case "replayPrompt":
+  case "death":
+  case "paymentDecision":
+  case "restartConfirm":
+}
+
+-------------------------------------
+
+STEP 3 — BUTTON STANDARDIZATION
+
+All modal buttons must follow:
+
+PRIMARY (right side):
+- Yes / Next Level / Confirm
+
+SECONDARY (left side):
+- No / Cancel / Exit
+
+Rules:
+- Disabled when pending (progressionPending)
+- Keyboard accessible
+- aria-label required
+- Visible focus state
+
+-------------------------------------
+
+STEP 4 — VOICE + MODAL SYNCHRONIZATION
+
+CRITICAL RULE:
+
+When modal opens:
+- TTS speaks the modal message
+- Mic must be OFF during TTS
+- Mic reactivates ONLY after queue drains
+
+Implement:
+
+AudioManager.onQueueDrained(() => {
+  startListening()
+})
+
+Modal must NEVER open silently.
+
+-------------------------------------
+
+STEP 5 — BLOCK BACKGROUND INTERACTIONS
+
+When ANY modal is open:
+
+- Disable:
+  - Shop button
+  - Movement buttons
+  - Voice dropdown
+  - Any clickable UI
+
+Implementation:
+- Add global guard:
+  gameMode !== "explore"
+
+- Add CSS:
+  pointer-events: none on background
+  pointer-events: auto on modal
+
+
+-------------------------------------
+
+STEP 6 — PREVENT MODAL STACKING BUGS
+
+Only ONE modal can exist at a time.
+
+Add guard:
+if (gameMode !== "explore") → block opening ANY new modal
+
+-------------------------------------
+
+STEP 7 — ANIMATION (LIGHTWEIGHT)
+
+Add subtle animations:
+- Fade in backdrop
+- Scale-in modal (0.95 → 1)
+
+Duration:
+200ms max
+
+DO NOT delay TTS because of animation.
+
+-------------------------------------
+
+STEP 8 — MOBILE + RESPONSIVE
+
+Modal must:
+- Fit small screens
+- Max width: 90%
+- Scroll if content overflows
+- Buttons stacked on mobile
+
+-------------------------------------
+
+STEP 9 — TEST CASES
+
+Verify:
+
+1. Victory modal:
+   - Appears after boss
+   - TTS speaks
+   - Mic activates after
+
+2. Replay modal:
+   - Correct transition from "No"
+
+3. Game over modal:
+   - Blocks all input
+   - Voice works (yes/no)
+
+4. Payment modal:
+   - Works with Stripe flow
+   - Correct hint text
+
+5. Restart modal:
+   - Button + voice both work
+
+6. Background is NOT clickable
+
+7. No overlapping modals
+
+8. Keyboard navigation works
+
+-------------------------------------
+
+HARD RULES:
+
+- DO NOT modify backend
+- DO NOT change API contracts
+- DO NOT break voice system
+- DO NOT introduce multiple modal systems
+
+-------------------------------------
+
+SUCCESS CRITERIA:
+
+- All modals are unified under ONE system
+- Fully accessible (screen reader + keyboard)
+- Fully voice-controlled
+- No UI overlap bugs
+- Clean, maintainable structure
