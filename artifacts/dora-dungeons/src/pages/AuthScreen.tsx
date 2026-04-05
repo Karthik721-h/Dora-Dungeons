@@ -412,6 +412,7 @@ export function AuthScreen({ auth }: AuthScreenProps) {
                 transition={{ delay: 0.55, duration: 0.45 }}
               >
                 <motion.button
+                  autoFocus
                   animate={{ boxShadow: ["0 0 18px rgba(200,155,60,0.25)", "0 0 32px rgba(200,155,60,0.5)", "0 0 18px rgba(200,155,60,0.25)"] }}
                   transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
                   onClick={handleAudioUnlock}
@@ -446,8 +447,19 @@ export function AuthScreen({ auth }: AuthScreenProps) {
                   textAlign: "center",
                 }}
               >
-                Voice narration will begin automatically
+                Tap or press Enter — voice narration starts immediately
               </motion.p>
+
+              {/* Silent muted audio — plays automatically to prime the AudioContext
+                  for spatial chimes before the first user gesture. Muted autoplay
+                  is permitted by browsers without a gesture. */}
+              <audio
+                autoPlay
+                muted
+                aria-hidden="true"
+                style={{ display: "none" }}
+                src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA="
+              />
             </div>
           </motion.div>
         )}

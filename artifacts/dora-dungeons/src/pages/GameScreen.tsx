@@ -194,7 +194,7 @@ export function GameScreen({
 
     if (!isMutedRef.current) {
       AudioManager.speak(
-        "You have fallen. Your quest ends here — for now. Say yes to restart the dungeon from the beginning, keeping all your weapons, armor, and gold. Say no to exit.",
+        "You have fallen. Your quest ends here — for now. Say yes to restart this dungeon level from the start, keeping all your weapons, armor, and gold. Say no to exit.",
         { priority: "critical" }
       );
       // Once the death message finishes, force the mic active so the player
@@ -285,7 +285,7 @@ export function GameScreen({
             if (!isMutedRef.current) {
               AudioManager.speak(
                 `Congratulations! Dungeon level ${newData.player.dungeonLevel} complete. You defeated the boss. Would you like to advance to the next level? Say yes to continue, or say no for other options.`,
-                { interrupt: false }
+                { interrupt: true }
               );
               AudioManager.onQueueDrained(() => {
                 stopListeningRef.current?.();
@@ -342,7 +342,7 @@ export function GameScreen({
         setGameMode("replayPrompt");
         if (!isMutedRef.current) {
           AudioManager.speak(
-            "Would you like to explore this level again? Say yes to restart from the beginning, or no to exit the dungeon.",
+            "Would you like to explore this level again? Say yes to restart this level from the start, or no to exit the dungeon.",
             { interrupt: true }
           );
         }
@@ -843,6 +843,10 @@ export function GameScreen({
       });
     } catch {
       AudioManager.speak("Something went wrong entering the next level. Please try again.", { interrupt: true });
+      AudioManager.onQueueDrained(() => {
+        stopListeningRef.current?.();
+        setTimeout(() => startListeningRef.current(), 120);
+      });
     } finally {
       setProgressionPending(false);
     }
@@ -875,6 +879,10 @@ export function GameScreen({
       });
     } catch {
       AudioManager.speak("Something went wrong. Please try again.", { interrupt: true });
+      AudioManager.onQueueDrained(() => {
+        stopListeningRef.current?.();
+        setTimeout(() => startListeningRef.current(), 120);
+      });
     } finally {
       setProgressionPending(false);
     }
