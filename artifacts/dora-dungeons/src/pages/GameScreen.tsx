@@ -103,10 +103,13 @@ export function GameScreen({
   const [paymentPending, setPaymentPending] = useState(false);
 
   // ── Payment-return detection ──────────────────────────────────────────────────
-  // Read ?payment=success from the URL synchronously during component init so that
-  // the VICTORY recovery effect below can read it on its single mount-time run.
+  // Read ?payment=success / ?payment=cancelled from the URL synchronously during
+  // component init so the VICTORY recovery effect can read them on its single run.
   const [paymentJustReturned] = useState(
     () => new URLSearchParams(window.location.search).get("payment") === "success"
+  );
+  const [paymentJustCancelled] = useState(
+    () => new URLSearchParams(window.location.search).get("payment") === "cancelled"
   );
   // Prevents the payment-confirmed TTS from firing more than once even if the
   // component somehow re-mounts (e.g. strict mode double-invoke in dev).
@@ -716,8 +719,8 @@ export function GameScreen({
   // the player would be stuck with no way to advance. This effect runs exactly
   // once on mount, detects that condition, and re-enters levelDecision mode.
   useEffect(() => {
-    // ── Clean ?payment=success from the URL without a page reload ────────────
-    if (paymentJustReturned) {
+    // ── Clean ?payment=success / ?payment=cancelled from the URL ─────────────
+    if (paymentJustReturned || paymentJustCancelled) {
       const clean = new URL(window.location.href);
       clean.searchParams.delete("payment");
       window.history.replaceState({}, "", clean.toString());
@@ -733,9 +736,14 @@ export function GameScreen({
       gameModeRef.current = "paymentDecision";
       setGameMode("paymentDecision");
       if (!isMutedRef.current) {
-        const msg = paymentJustReturned
-          ? "Your payment could not be confirmed yet. Please try again or contact support if you were charged."
-          : "You have completed Level 1 and defeated the dungeon boss. To unlock all levels beyond, a one-time payment of thirty dollars is required. Say yes to pay, or no to replay Level 1.";
+        let msg: string;
+        if (paymentJustReturned) {
+          msg = "Your payment could not be confirmed yet. Please try again or contact support if you were charged.";
+        } else if (paymentJustCancelled) {
+          msg = "Payment was not completed. No charge was made. You must complete payment to access Level 2 and beyond. Say yes to try again, or no to replay Level 1.";
+        } else {
+          msg = "You have completed Level 1 and defeated the dungeon boss. To unlock all levels beyond, a one-time payment of thirty dollars is required. Say yes to pay, or no to replay Level 1.";
+        }
         AudioManager.speak(msg, { interrupt: true });
         AudioManager.onQueueDrained(() => {
           stopListeningRef.current?.();
@@ -1744,10 +1752,11 @@ export function GameScreen({
               </div>
 
               <p className="text-xs" style={{ color: "rgba(255,255,255,0.28)", letterSpacing: "0.06em" }}>
-                Say{" "}
-                <strong style={{ color: "rgba(255,255,255,0.55)" }}>"yes"</strong>
-                {" "}or{" "}
-                <strong style={{ color: "rgba(255,255,255,0.55)" }}>"no"</strong>
+                {gameMode === "levelDecision" && gameState.player.hasPaid ? (
+                  <>Say <strong style={{ color: "rgba(255,255,255,0.55)" }}>"next level"</strong> or <strong style={{ color: "rgba(255,255,255,0.55)" }}>"no"</strong></>
+                ) : (
+                  <>Say <strong style={{ color: "rgba(255,255,255,0.55)" }}>"yes"</strong> or <strong style={{ color: "rgba(255,255,255,0.55)" }}>"no"</strong></>
+                )}
               </p>
 
               <div className="rune-divider w-52 mx-auto">✦</div>

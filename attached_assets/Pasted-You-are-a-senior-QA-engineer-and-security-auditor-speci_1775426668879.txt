@@ -1,0 +1,364 @@
+You are a senior QA engineer and security auditor specializing in payment systems, Stripe integrations, and voice-first UX.
+
+Perform a FULL audit of Dora Dungeons monetization system covering:
+
+* Phase 4: Paywall (Level 1 → Level 2 restriction)
+* Phase 5: Stripe Integration (secure payments + webhook)
+* Phase 6: Post-payment Flow (voice + UX)
+
+---
+
+## AUDIT GOAL
+
+Validate that:
+
+1. Payment is REQUIRED to access Level 2+
+2. Payment cannot be bypassed
+3. Stripe integration is secure (webhook-based)
+4. Post-payment flow is smooth and voice-driven
+5. No user can get stuck at any point
+
+---
+
+## SECTION 1 — PAYWALL LOGIC (PHASE 4)
+
+Verify:
+
+1. Player completes Level 1 → dungeonLevelCompleted = true
+
+2. When attempting next level:
+
+IF:
+player.hasPaid === false
+
+→ System BLOCKS progression
+
+---
+
+Check:
+
+* POST /game/next-level enforces:
+  dungeonLevel === 1 AND hasPaid === false → BLOCK
+
+---
+
+Expected:
+
+Return:
+{ error: "PAYMENT_REQUIRED" }
+
+---
+
+Test:
+
+* Try calling API directly (bypass frontend)
+  → MUST still block
+
+---
+
+Verify:
+
+* Voice flow prompts payment
+* Modal shows correct options
+* Replay still works
+
+---
+
+## SECTION 2 — STRIPE CHECKOUT SECURITY (PHASE 5)
+
+Verify:
+
+1. /api/create-checkout-session:
+
+* Uses Stripe SDK
+* Price = $30 (3000 cents)
+* metadata.userId is attached
+
+---
+
+Check:
+
+* Secret key NOT exposed to frontend
+* No sensitive data leaked
+
+---
+
+Verify:
+
+2. No fake payment success endpoint
+
+* /api/payment-success DOES NOT modify DB
+
+---
+
+Expected:
+
+Only webhook updates payment state
+
+---
+
+## SECTION 3 — WEBHOOK VALIDATION (CRITICAL)
+
+Verify:
+
+POST /api/stripe-webhook:
+
+1. Uses raw body
+2. Verifies Stripe signature
+3. Uses STRIPE_WEBHOOK_SECRET
+
+---
+
+Check event:
+
+checkout.session.completed
+
+---
+
+Inside handler:
+
+* Extract metadata.userId
+* Find player in DB
+* Set player.hasPaid = true
+* Save to DB
+
+---
+
+Verify:
+
+* Idempotency (no duplicate writes)
+* Handles repeated webhook calls safely
+
+---
+
+Test:
+
+* Simulate webhook twice → no issues
+
+---
+
+## SECTION 4 — BACKEND ENFORCEMENT (ANTI-BYPASS)
+
+Test:
+
+1. User manually calls:
+   POST /game/next-level
+
+WITHOUT payment
+
+---
+
+Expected:
+
+Blocked with PAYMENT_REQUIRED
+
+---
+
+Test:
+
+2. Modify frontend state manually
+   (set hasPaid = true in browser)
+
+---
+
+Expected:
+
+Server still blocks
+
+---
+
+Conclusion:
+
+Backend must be the final authority
+
+---
+
+## SECTION 5 — POST-PAYMENT FLOW (PHASE 6)
+
+Verify:
+
+1. User returns from Stripe with:
+   ?payment=success
+
+---
+
+System:
+
+* Detects return
+* Refetches /game/state
+* Reads hasPaid from backend
+
+---
+
+IF hasPaid === true:
+
+TTS says:
+
+"Payment confirmed. You now have full access. Say 'Next Level' to continue your adventure."
+
+---
+
+Verify:
+
+* gameMode = levelDecision
+* Voice command "Next Level" works
+
+---
+
+## SECTION 6 — FAILED / CANCELLED PAYMENT
+
+Test:
+
+* User cancels Stripe payment
+
+---
+
+Expected:
+
+TTS:
+
+"Payment was not completed. You must complete payment to proceed."
+
+---
+
+Verify:
+
+* User remains blocked from Level 2
+* Replay still works
+
+---
+
+## SECTION 7 — REFRESH + RECOVERY
+
+Test:
+
+1. Pay successfully
+2. Refresh page BEFORE clicking anything
+
+---
+
+Expected:
+
+* hasPaid persists
+* gameMode restores to levelDecision
+* TTS says:
+
+"Payment confirmed. Say 'Next Level' to proceed."
+
+---
+
+Verify:
+
+No stuck state
+
+---
+
+## SECTION 8 — VOICE-FIRST EXPERIENCE
+
+Verify:
+
+* Entire payment flow works WITHOUT clicks:
+
+Flow:
+
+Complete Level 1 → say "Yes" → Stripe → return → hear confirmation → say "Next Level"
+
+---
+
+Check:
+
+* No required button interaction
+* All states have TTS guidance
+* No silent states
+
+---
+
+## SECTION 9 — DUPLICATE TTS / AUDIO ISSUES
+
+Verify:
+
+* Payment confirmation speaks ONLY ONCE
+* No overlapping narration
+* No missing narration
+
+---
+
+Check:
+
+* hasAnnouncedPaymentRef or similar guard exists
+
+---
+
+## SECTION 10 — EDGE CASES
+
+Test:
+
+1. Webhook delay:
+   → user returns before webhook fires
+
+Expected:
+
+* Temporary message OR retry
+* Eventually resolves
+
+---
+
+2. User pays → closes tab → returns later
+
+Expected:
+
+* hasPaid true
+* flow resumes correctly
+
+---
+
+3. Double Stripe redirect
+
+Expected:
+
+* No duplicate narration
+* No duplicate state changes
+
+---
+
+## SECTION 11 — UI CONSISTENCY
+
+Verify:
+
+* Modal buttons update based on hasPaid
+
+IF hasPaid:
+→ "Next Level"
+
+ELSE:
+→ payment flow
+
+---
+
+Check:
+
+* Shop button disabled during decision mode
+* No UI overlap issues
+
+---
+
+## FINAL OUTPUT FORMAT
+
+Return structured report:
+
+✅ Working Correctly
+⚠️ Minor Issues
+❌ Critical Bugs
+🧠 Recommendations
+
+---
+
+## IMPORTANT:
+
+* Be STRICT on security (no assumptions)
+* Treat this like a real production payment audit
+* If ANY bypass exists → mark as CRITICAL
+
+---
+
+## END AUDIT

@@ -11,7 +11,7 @@ export function PaymentCancelPage() {
       "Payment cancelled. No charge was made. You can unlock Level 2 whenever you are ready. Returning to the game.",
       { interrupt: true }
     );
-    const t = setTimeout(() => setLocation("/"), 4000);
+    const t = setTimeout(() => setLocation("/?payment=cancelled"), 4000);
     return () => clearTimeout(t);
   }, [setLocation]);
 
@@ -45,7 +45,7 @@ export function PaymentCancelPage() {
           No charge was made. You can unlock Level 2 whenever you're ready.
         </p>
         <button
-          onClick={() => setLocation("/")}
+          onClick={() => setLocation("/?payment=cancelled")}
           style={{
             marginTop: 24,
             padding: "10px 28px",
