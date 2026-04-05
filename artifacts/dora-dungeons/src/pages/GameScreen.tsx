@@ -652,6 +652,29 @@ export function GameScreen({
   gameModeRef.current    = gameMode;
   startListeningRef.current = startListening;
 
+  // ── Restore decision mode if the page was refreshed during a VICTORY ────────
+  // gameMode is React state and resets to "explore" on every mount. If the DB
+  // still has gameStatus === "VICTORY" (boss was killed but no choice was made),
+  // the player would be stuck with no way to advance. This effect runs exactly
+  // once on mount, detects that condition, and re-enters levelDecision mode.
+  useEffect(() => {
+    if (gameState.gameStatus !== "VICTORY") return;
+    gameModeRef.current = "levelDecision";
+    setGameMode("levelDecision");
+    if (!isMutedRef.current) {
+      // Queue after any intro / room-description speech already in the pipe.
+      AudioManager.speak(
+        "Congratulations. You have completed this level. Would you like to continue to the next level? Say yes to advance, or no to replay this level.",
+        { interrupt: false }
+      );
+      AudioManager.onQueueDrained(() => {
+        stopListeningRef.current?.();
+        setTimeout(() => startListeningRef.current(), 120);
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentional empty array — runs exactly once on mount
+
   // ── Click-outside: close voice dropdown ──────────────────────────────────────
   // Check both the trigger container AND the portaled menu (rendered in document.body).
   useEffect(() => {
