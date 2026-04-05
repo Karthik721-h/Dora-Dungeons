@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "l74q9qPdMXcvBD1LWH9H7"
+uri = "file://dora-dungeons-source.tar.gz"
+type = "unspecified"
+title = "Dora Dungeons — Full Source Code"
