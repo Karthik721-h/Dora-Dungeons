@@ -25,9 +25,20 @@ export function getLevelMultiplier(dungeonLevel: number): number {
   return Math.min(raw, MULTIPLIER_CAP);
 }
 
-/** Boss-specific multiplier — 1.5× the base, hard-capped at 3.0×. */
+/**
+ * Boss-specific multiplier — grows at 0.3× per level (faster than normal enemies
+ * which grow at 0.2×), hard-capped at 3.0×.
+ *
+ * Level 1 → 1.0  (guaranteed baseline — no spike)
+ * Level 2 → 1.3
+ * Level 3 → 1.6
+ * Level 5 → 2.2
+ * Level 8 → 3.0  (cap reached)
+ */
 export function getBossMultiplier(dungeonLevel: number): number {
-  return Math.min(getLevelMultiplier(dungeonLevel) * 1.5, MULTIPLIER_CAP);
+  if (dungeonLevel <= 1) return 1.0;
+  const raw = 1 + (dungeonLevel - 1) * 0.3;
+  return Math.min(raw, MULTIPLIER_CAP);
 }
 
 /** Round and floor-clamp a stat so it is always ≥ 1. */
