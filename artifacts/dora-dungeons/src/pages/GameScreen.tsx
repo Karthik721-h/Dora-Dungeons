@@ -94,11 +94,13 @@ export function GameScreen({
   const deathTtsSpokenRef = useRef(false);
 
   // ── Level progression decision state ─────────────────────────────────────────
-  // "explore"       → normal gameplay
-  // "levelDecision" → boss defeated, asking "next level or replay?"
-  // "replayPrompt"  → player chose no, asking "replay or exit?"
-  const [gameMode, setGameMode] = useState<"explore" | "levelDecision" | "replayPrompt">("explore");
+  // "explore"         → normal gameplay
+  // "levelDecision"   → boss defeated, asking "next level or replay?"
+  // "replayPrompt"    → player chose no, asking "replay or exit?"
+  // "paymentDecision" → Level 1 boss beaten, payment required before Level 2
+  const [gameMode, setGameMode] = useState<"explore" | "levelDecision" | "replayPrompt" | "paymentDecision">("explore");
   const [progressionPending, setProgressionPending] = useState(false);
+  const [paymentPending, setPaymentPending] = useState(false);
   // Gold comes directly from gameState.gold — no separate shopGold state.
   const [shopWeapons, setShopWeapons] = useState<ShopWeapon[]>(() =>
     (gameState.player.weapons ?? []) as ShopWeapon[]
@@ -131,7 +133,7 @@ export function GameScreen({
   const queryClient = useQueryClient();
   const stopListeningRef    = useRef<() => void>(() => {});
   const startListeningRef   = useRef<() => void>(() => {});
-  const gameModeRef         = useRef<"explore" | "levelDecision" | "replayPrompt">("explore");
+  const gameModeRef         = useRef<"explore" | "levelDecision" | "replayPrompt" | "paymentDecision">("explore");
   const onLogoutRef = useRef(onLogout);
   const voiceGenderRef = useRef(voiceGender);
   const voiceDropdownRef = useRef<HTMLDivElement>(null);
@@ -276,19 +278,36 @@ export function GameScreen({
             AudioManager.playRewardChime();
           }
           // ── Dungeon level completion → progression decision ───────────────────
-          // Set mode first so the modal appears immediately, then speak the
-          // prompt and activate the mic so the player can answer by voice.
+          // If the player just finished Level 1 and hasn't paid, route them
+          // to the payment flow. Otherwise show the normal next/replay prompt.
           if (newData.event === "LEVEL_COMPLETED") {
-            setGameMode("levelDecision");
-            if (!isMutedRef.current) {
-              AudioManager.speak(
-                `Congratulations! Dungeon level ${newData.player.dungeonLevel} complete. You defeated the boss. Would you like to advance to the next level? Say yes to continue, or say no for other options.`,
-                { interrupt: true }
-              );
-              AudioManager.onQueueDrained(() => {
-                stopListeningRef.current?.();
-                setTimeout(() => startListeningRef.current(), 120);
-              });
+            const needsPayment = newData.player.dungeonLevel === 1 && !newData.player.hasPaid;
+            if (needsPayment) {
+              gameModeRef.current = "paymentDecision";
+              setGameMode("paymentDecision");
+              if (!isMutedRef.current) {
+                AudioManager.speak(
+                  "Congratulations! You have completed Level 1 and defeated the dungeon boss. To continue your adventure and unlock all levels beyond, a one-time payment of thirty dollars is required. Would you like to proceed to payment? Say yes to pay, or say no to replay this level.",
+                  { interrupt: true }
+                );
+                AudioManager.onQueueDrained(() => {
+                  stopListeningRef.current?.();
+                  setTimeout(() => startListeningRef.current(), 120);
+                });
+              }
+            } else {
+              gameModeRef.current = "levelDecision";
+              setGameMode("levelDecision");
+              if (!isMutedRef.current) {
+                AudioManager.speak(
+                  `Congratulations! Dungeon level ${newData.player.dungeonLevel} complete. You defeated the boss. Would you like to advance to the next level? Say yes to continue, or say no for other options.`,
+                  { interrupt: true }
+                );
+                AudioManager.onQueueDrained(() => {
+                  stopListeningRef.current?.();
+                  setTimeout(() => startListeningRef.current(), 120);
+                });
+              }
             }
           }
         }
@@ -331,6 +350,11 @@ export function GameScreen({
       // ── Level progression decision handlers ──────────────────────────────────
       if (trimmed === "next_level") {
         nextLevelApi();
+        return;
+      }
+
+      if (trimmed === "initiate_payment") {
+        initiatePayment();
         return;
       }
 
@@ -526,7 +550,25 @@ export function GameScreen({
         const isYes = /^(?:yes|yeah|yep|yup|sure|proceed|continue|advance|next|ok|okay|affirm|go|accept)$/.test(normalized);
         const isNo  = /^(?:no|nope|nah|cancel|decline|negative|stay|back|return|stop)$/.test(normalized);
 
-        if (gameModeRef.current === "levelDecision") {
+        if (gameModeRef.current === "paymentDecision") {
+          if (isYes) {
+            submitCommand("initiate_payment");
+          } else if (isNo) {
+            gameModeRef.current = "replayPrompt";
+            setGameMode("replayPrompt");
+            if (!isMutedRef.current) {
+              AudioManager.speak(
+                "Understood. Would you like to replay Level 1, or exit the dungeon? Say yes to replay, or no to exit.",
+                { interrupt: true }
+              );
+            }
+          } else if (!isMutedRef.current) {
+            AudioManager.speak(
+              "Say yes to proceed to payment, or no to replay Level 1.",
+              { interrupt: false }
+            );
+          }
+        } else if (gameModeRef.current === "levelDecision") {
           if (isYes) {
             submitCommand("next_level");
           } else if (isNo) {
@@ -657,18 +699,33 @@ export function GameScreen({
   // once on mount, detects that condition, and re-enters levelDecision mode.
   useEffect(() => {
     if (gameState.gameStatus !== "VICTORY") return;
-    gameModeRef.current = "levelDecision";
-    setGameMode("levelDecision");
-    if (!isMutedRef.current) {
-      // Interrupt any stale speech so the decision prompt plays immediately on refresh.
-      AudioManager.speak(
-        "Congratulations. You have completed this level. Would you like to continue to the next level? Say yes to advance, or no for other options.",
-        { interrupt: true }
-      );
-      AudioManager.onQueueDrained(() => {
-        stopListeningRef.current?.();
-        setTimeout(() => startListeningRef.current(), 120);
-      });
+    const needsPayment = gameState.player.dungeonLevel === 1 && !gameState.player.hasPaid;
+    if (needsPayment) {
+      gameModeRef.current = "paymentDecision";
+      setGameMode("paymentDecision");
+      if (!isMutedRef.current) {
+        AudioManager.speak(
+          "You have completed Level 1 and defeated the dungeon boss. To unlock all levels beyond, a one-time payment of thirty dollars is required. Say yes to pay, or no to replay Level 1.",
+          { interrupt: true }
+        );
+        AudioManager.onQueueDrained(() => {
+          stopListeningRef.current?.();
+          setTimeout(() => startListeningRef.current(), 120);
+        });
+      }
+    } else {
+      gameModeRef.current = "levelDecision";
+      setGameMode("levelDecision");
+      if (!isMutedRef.current) {
+        AudioManager.speak(
+          "Congratulations. You have completed this level. Would you like to continue to the next level? Say yes to advance, or no for other options.",
+          { interrupt: true }
+        );
+        AudioManager.onQueueDrained(() => {
+          stopListeningRef.current?.();
+          setTimeout(() => startListeningRef.current(), 120);
+        });
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // intentional empty array — runs exactly once on mount
@@ -883,6 +940,32 @@ export function GameScreen({
       });
     } finally {
       setProgressionPending(false);
+    }
+  };
+
+  // ── Payment initiation ────────────────────────────────────────────────────
+  const initiatePayment = async () => {
+    if (paymentPending) return;
+    setPaymentPending(true);
+    stopListeningRef.current?.();
+    AudioManager.stop();
+    try {
+      const resp = await customFetch<{ url: string }>(
+        `${import.meta.env.BASE_URL}api/payment/create-checkout-session`,
+        { method: "POST" }
+      );
+      if (resp.url) {
+        window.location.href = resp.url;
+      }
+    } catch {
+      setPaymentPending(false);
+      AudioManager.speak(
+        "There was an error starting the payment. Please try again.",
+        { interrupt: true }
+      );
+      AudioManager.onQueueDrained(() => {
+        startListeningRef.current?.();
+      });
     }
   };
 
@@ -1398,10 +1481,108 @@ export function GameScreen({
         </div>
       </div>
 
+      {/* ── Payment Decision overlay ── */}
+      {/* Shown when Level 1 is cleared but user hasn't paid yet */}
+      <AnimatePresence>
+        {gameMode === "paymentDecision" && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-30 flex flex-col items-center justify-center"
+            style={{ background: "rgba(5,3,8,0.95)", backdropFilter: "blur(6px)" }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Unlock full adventure — one-time payment required"
+          >
+            <motion.div
+              initial={{ scale: 0.85, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.15, type: "spring", stiffness: 180 }}
+              className="text-center space-y-6 px-6"
+              style={{ maxWidth: 520 }}
+            >
+              <div className="rune-divider w-52 mx-auto">⚔</div>
+
+              <h2
+                className="font-display text-4xl font-black tracking-widest"
+                style={{
+                  color: "#c89b3c",
+                  textShadow: "0 0 40px rgba(200,155,60,0.8), 0 0 80px rgba(200,155,60,0.3)",
+                }}
+              >
+                LEVEL 1 COMPLETE
+              </h2>
+
+              <p className="font-narration italic text-xl" style={{ color: "rgba(200,155,60,0.75)" }}>
+                The dungeon boss has fallen. Deeper darkness awaits.
+              </p>
+
+              <p
+                className="text-base font-bold"
+                style={{ color: "rgba(255,255,255,0.9)", letterSpacing: "0.04em", lineHeight: 1.6 }}
+              >
+                Unlock all dungeon levels for a one-time payment of <span style={{ color: "#c89b3c" }}>$30</span>.
+              </p>
+
+              <p style={{ color: "rgba(200,190,180,0.55)", fontSize: "0.75rem", letterSpacing: "0.06em" }}>
+                Say "yes" to pay, or "no" to replay Level 1.
+              </p>
+
+              <div className="flex gap-4 justify-center pt-2">
+                <motion.button
+                  whileHover={{ scale: paymentPending ? 1 : 1.06 }}
+                  whileTap={{ scale: paymentPending ? 1 : 0.95 }}
+                  onClick={() => {
+                    if (paymentPending) return;
+                    gameModeRef.current = "replayPrompt";
+                    setGameMode("replayPrompt");
+                    AudioManager.speak(
+                      "Would you like to replay Level 1, or exit the dungeon? Say yes to replay, or no to exit.",
+                      { interrupt: true }
+                    );
+                  }}
+                  disabled={paymentPending}
+                  aria-label="No, replay Level 1"
+                  className="px-7 py-3 rounded-lg font-display text-lg font-bold tracking-wider"
+                  style={{
+                    background: "rgba(26,31,41,0.8)",
+                    border: "1px solid rgba(200,155,60,0.4)",
+                    color: paymentPending ? "rgba(200,155,60,0.3)" : "rgba(200,155,60,0.85)",
+                    cursor: paymentPending ? "not-allowed" : "pointer",
+                    minWidth: 130,
+                  }}
+                >
+                  No — Replay
+                </motion.button>
+
+                <motion.button
+                  whileHover={{ scale: paymentPending ? 1 : 1.06 }}
+                  whileTap={{ scale: paymentPending ? 1 : 0.95 }}
+                  onClick={() => { if (!paymentPending) initiatePayment(); }}
+                  disabled={paymentPending}
+                  aria-label="Yes, proceed to payment and unlock all levels"
+                  className="px-7 py-3 rounded-lg font-display text-lg font-bold tracking-wider"
+                  style={{
+                    background: paymentPending ? "rgba(200,155,60,0.3)" : "rgba(200,155,60,0.88)",
+                    border: "1px solid rgba(200,155,60,0.9)",
+                    color: paymentPending ? "rgba(0,0,0,0.3)" : "#060810",
+                    cursor: paymentPending ? "not-allowed" : "pointer",
+                    minWidth: 130,
+                  }}
+                >
+                  {paymentPending ? "Redirecting…" : "Yes — Unlock ($30)"}
+                </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* ── Level Progression overlay ── */}
       {/* Shown after boss defeat — routes the player to next level, replay, or exit */}
       <AnimatePresence>
-        {gameMode !== "explore" && (
+        {(gameMode === "levelDecision" || gameMode === "replayPrompt") && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

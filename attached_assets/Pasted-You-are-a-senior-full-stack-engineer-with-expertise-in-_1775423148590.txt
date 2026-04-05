@@ -1,0 +1,309 @@
+You are a senior full-stack engineer with expertise in Stripe and game backend systems.
+
+Implement a one-time paywall in Dora Dungeons that unlocks progression from Level 1 to Level 2.
+
+---
+
+## GOAL
+
+* Level 1 is FREE
+* To access Level 2+, user must pay $30 (one-time)
+* Payment is required ONLY after completing Level 1
+* System must be secure, voice-integrated, and non-breaking
+
+---
+
+## STRICT RULES
+
+* DO NOT break existing game logic
+* DO NOT modify scaling, combat, or shop systems
+* DO NOT duplicate state logic
+* ALL payment validation must happen on backend
+
+---
+
+## STEP 1 — ADD PAYMENT STATE TO PLAYER
+
+In Player model (DB + types):
+
+ADD:
+
+hasPaid: boolean
+
+---
+
+DEFAULT:
+hasPaid = false
+
+---
+
+VERIFY:
+
+* Persisted in database
+* Included in serializePlayer()
+
+---
+
+## STEP 2 — BLOCK LEVEL 2 WITHOUT PAYMENT
+
+In POST /game/next-level:
+
+BEFORE incrementing dungeonLevel:
+
+IF:
+
+player.dungeonLevel === 1 AND player.hasPaid === false
+
+THEN:
+
+RETURN:
+
+{
+error: "PAYMENT_REQUIRED"
+}
+
+---
+
+IMPORTANT:
+
+* DO NOT increment dungeonLevel
+* DO NOT modify state
+* This is a hard server-side guard
+
+---
+
+## STEP 3 — CREATE STRIPE CHECKOUT SESSION
+
+Install Stripe SDK if not already.
+
+---
+
+Create API route:
+
+POST /api/create-checkout-session
+
+---
+
+Inside:
+
+* Use Stripe SDK
+* Create ONE-TIME payment
+
+CONFIG:
+
+amount: 3000 (=$30)
+currency: "usd"
+mode: "payment"
+
+---
+
+success_url:
+
+https://your-app.com/payment-success
+
+cancel_url:
+
+https://your-app.com/payment-cancel
+
+---
+
+RETURN:
+
+{ url: session.url }
+
+---
+
+## STEP 4 — HANDLE PAYMENT SUCCESS (BACKEND)
+
+Create endpoint:
+
+POST /api/payment-success
+
+---
+
+INPUT:
+
+* userId (from session or auth)
+
+---
+
+LOGIC:
+
+* Find user
+* Set:
+
+player.hasPaid = true
+
+* Save to DB
+
+---
+
+VERIFY:
+
+* Idempotent (safe if called twice)
+* Cannot be spoofed easily (validate user session)
+
+---
+
+## STEP 5 — FRONTEND: HANDLE PAYMENT REQUIRED FLOW
+
+In GameScreen.tsx (on LEVEL_COMPLETED):
+
+---
+
+IF:
+
+player.dungeonLevel === 1 AND player.hasPaid === false
+
+---
+
+THEN:
+
+1. Speak:
+
+"Congratulations. You have completed Level 1. To continue your journey, a one-time payment of thirty dollars is required. Would you like to proceed?"
+
+---
+
+2. Set gameMode = "paymentDecision"
+
+---
+
+3. Intercept voice:
+
+YES → call create-checkout-session
+NO → go to replay prompt or logout
+
+---
+
+## STEP 6 — REDIRECT TO STRIPE
+
+On YES:
+
+* Call /api/create-checkout-session
+* Redirect browser to returned URL
+
+---
+
+IMPORTANT:
+
+* Stop mic before redirect
+* Cancel all TTS
+
+---
+
+## STEP 7 — HANDLE RETURN FROM STRIPE
+
+On success_url page:
+
+* Call /api/payment-success
+* Then redirect user back to game
+
+---
+
+ON LOAD:
+
+IF player.hasPaid === true AND dungeonLevel === 1:
+
+Speak:
+
+"Payment confirmed. You may now proceed to the next level. Say 'Next Level' to continue."
+
+---
+
+Allow:
+
+submitCommand("next_level")
+
+---
+
+## STEP 8 — VOICE COMMAND SUPPORT
+
+Add voice commands:
+
+"upgrade"
+"proceed"
+"continue"
+
+→ trigger payment flow
+
+---
+
+Ensure:
+
+* Only works when payment is required
+* Ignored otherwise
+
+---
+
+## STEP 9 — UI MODAL (FALLBACK)
+
+Show modal:
+
+"Would you like to unlock the next level for $30?"
+
+Buttons:
+
+* YES → payment
+* NO → replay / logout
+
+---
+
+Ensure:
+
+* Accessible (aria-modal)
+* Disabled during processing
+
+---
+
+## STEP 10 — SECURITY CHECKS
+
+Ensure:
+
+* User cannot bypass payment via frontend
+* Backend ALWAYS checks hasPaid
+
+---
+
+Test:
+
+* Direct API call to next-level without payment → blocked
+* After payment → allowed
+
+---
+
+## STEP 11 — FINAL VALIDATION
+
+Test full flow:
+
+1. Complete Level 1
+2. Trigger payment prompt
+3. Say "yes"
+4. Redirect to Stripe
+5. Complete payment
+6. Return to game
+7. Say "Next Level"
+8. Enter Level 2
+
+---
+
+Also test:
+
+* Say "no" → replay flow
+* Refresh during payment → safe recovery
+* Payment already done → no prompt again
+
+---
+
+## EXPECTED RESULT
+
+* Clean paywall after Level 1
+* Fully voice-controlled payment flow
+* Secure backend validation
+* No impact on gameplay systems
+
+---
+
+## STOP AFTER THIS STEP
+
+Do NOT implement subscriptions yet

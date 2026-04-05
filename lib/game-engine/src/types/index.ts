@@ -190,6 +190,8 @@ export interface Player extends StatBlock {
   dungeonLevel: number;
   /** Set to true after the player defeats the boss on the current dungeon level. */
   dungeonLevelCompleted: boolean;
+  /** True when the player has completed the one-time Level 1 → Level 2 payment. */
+  hasPaid?: boolean;
 }
 
 export interface Enemy extends StatBlock {
