@@ -1,0 +1,223 @@
+AUDIT MODE — DO NOT MODIFY CODE
+You are performing a STRICT QA audit of TWO systems:
+
+PHASE 7 — SAVE / RESTORE LOGIC  
+PHASE 9 — UI SYSTEM (MODALS)
+
+Your job is to:
+- Inspect the EXISTING implementation
+- Identify ONLY real issues
+- Classify findings as:
+  ✅ Working Correctly
+  ⚠️ Minor Issues
+  ❌ Critical Bugs
+- Provide PRECISE file + line references
+
+DO NOT:
+- Refactor
+- Rewrite code
+- Suggest vague improvements
+
+-------------------------------------
+SECTION 1 — SAVE / RESTORE (PHASE 7)
+-------------------------------------
+
+1. SESSION PERSISTENCE
+Verify:
+- All player data is saved to DB after:
+  - commands
+  - shop actions
+  - level transitions
+  - death/restart
+
+Check:
+- saveSession() usage consistency
+- No state exists only in memory
+
+2. FULL STATE RESTORATION
+On GET /game/state:
+- Player state restored completely:
+  - hp, mp
+  - gold
+  - inventory
+  - weapons
+  - armors (with levels)
+  - dungeonLevel
+  - dungeon layout
+  - explored rooms
+  - enemies state
+
+❌ Flag if ANY field resets unexpectedly after refresh
+
+3. LOG RESTORATION
+Verify:
+- Terminal logs persist correctly
+- Logs are capped (e.g. last 80 lines)
+- No duplication after refresh
+
+4. EVENT CLEANUP
+Verify:
+- state.event is NOT persisted across reloads
+- fromStorable() removes transient fields
+
+❌ Critical if stale events re-trigger logic
+
+5. VICTORY RESTORE
+On refresh during VICTORY:
+- gameMode is restored to "levelDecision"
+- Modal reappears
+- TTS re-prompts user
+
+❌ Critical if user gets stuck
+
+6. GAME OVER RESTORE
+On refresh during GAME_OVER:
+- death modal appears again
+- TTS re-prompts
+- Restart flow still works
+
+7. PAYMENT STATE RESTORE
+Verify:
+- hasPaid is always read from DB
+- Not dependent on frontend state
+- Refresh after payment reflects correct state
+
+❌ Critical if payment can be bypassed via refresh
+
+8. LEVEL CONSISTENCY
+Verify:
+- dungeonLevel persists correctly
+- restartLevel() does NOT reset level
+- nextLevel increments ONLY server-side
+
+-------------------------------------
+SECTION 2 — MODAL SYSTEM (PHASE 9)
+-------------------------------------
+
+1. SINGLE MODAL SYSTEM
+Verify:
+- All modals use ONE shared component (GameModal)
+- No duplicate modal implementations
+
+❌ Flag if multiple modal systems exist
+
+2. PORTAL + Z-INDEX
+Verify:
+- Modal renders via React Portal
+- z-index is high enough (>9999)
+- Never hidden behind UI
+
+3. GAME MODE CONTROL
+Verify:
+- Modals are controlled ONLY by gameMode
+- No independent modal states
+
+❌ Critical if desync possible
+
+4. BACKGROUND INTERACTION BLOCK
+When modal is open:
+- Shop button disabled
+- Movement disabled
+- Voice dropdown disabled
+
+❌ Critical if user can interact behind modal
+
+5. VOICE SYNCHRONIZATION
+Verify:
+- Modal ALWAYS triggers TTS
+- Mic is OFF during speech
+- Mic resumes ONLY after TTS queue drains
+
+❌ Critical if:
+- Modal opens silently
+- Mic overlaps TTS
+
+6. BUTTON BEHAVIOR
+Verify:
+- Buttons:
+  - Accessible (aria-label)
+  - Disabled during pending states
+  - Trigger correct actions
+
+7. VOICE COMMANDS IN MODALS
+Verify:
+- Yes/No commands intercepted BEFORE game commands
+- No accidental command execution during modal
+
+❌ Critical if commands leak through
+
+8. MODAL STACKING
+Verify:
+- Only ONE modal visible at a time
+- No overlapping or nested modals
+
+❌ Critical if stacking occurs
+
+9. TTS MESSAGE QUALITY
+Verify:
+- Clear, professional narration
+- No duplication with terminal logs
+- No vague phrases
+
+10. RESPONSIVENESS
+Verify:
+- Modal fits:
+  - Mobile
+  - Tablet
+  - Desktop
+- Buttons stack correctly on small screens
+
+11. KEYBOARD ACCESSIBILITY
+Verify:
+- Focus trapped inside modal
+- Escape key works (if allowed)
+- Tab navigation works
+
+-------------------------------------
+SECTION 3 — CROSS-SYSTEM TESTS
+-------------------------------------
+
+Run these scenarios:
+
+1. Refresh during:
+   - combat
+   - shop
+   - victory
+   - death
+   - payment decision
+
+2. Perform:
+   - buy weapon → refresh → verify persistence
+   - upgrade armor → refresh → verify level
+   - sell item → refresh → verify gold sync
+
+3. Trigger modal + voice:
+   - say YES during modal → correct path
+   - say invalid word → re-prompt
+
+4. Payment flow:
+   - cancel → correct message
+   - success → unlock next level
+   - refresh after success → state intact
+
+-------------------------------------
+OUTPUT FORMAT:
+
+✅ Working Correctly  
+(List detailed confirmations)
+
+⚠️ Minor Issues  
+(File + line + explanation)
+
+❌ Critical Bugs  
+(File + line + reproduction steps)
+
+🧠 Recommendations  
+(Only HIGH-IMPACT suggestions)
+
+-------------------------------------
+
+FINAL LINE:
+
+“GO” → if system is stable for production  
+“NO-GO” → if ANY critical bug exists
