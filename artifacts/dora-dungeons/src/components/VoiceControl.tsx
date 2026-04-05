@@ -15,6 +15,7 @@ interface VoiceControlProps {
   intentHint: string | null;
   isPending: boolean;
   isGameOver: boolean;
+  isModalOpen: boolean;
   isCombat: boolean;
   command: string;
   onCommandChange: (v: string) => void;
@@ -73,7 +74,7 @@ function ActionBtn({ icon, label, onClick, disabled, variant = "default", small 
 
 export function VoiceControl({
   isSupported, audioState, isListening, interimTranscript, intentHint,
-  isPending, isGameOver, isCombat, command, onCommandChange, onSubmit, onToggleListen,
+  isPending, isGameOver, isModalOpen, isCombat, command, onCommandChange, onSubmit, onToggleListen,
 }: VoiceControlProps) {
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -204,10 +205,10 @@ export function VoiceControl({
             — Combat —
           </div>
           <div className="flex gap-1.5 flex-wrap">
-            <ActionBtn icon={<Swords size={14} />} label="Attack"  onClick={() => onSubmit("attack")}       disabled={isPending || isGameOver} variant="danger" />
-            <ActionBtn icon={<Shield size={14} />} label="Defend"  onClick={() => onSubmit("defend")}       disabled={isPending || isGameOver} />
-            <ActionBtn icon={<Flame  size={14} />} label="Spell"   onClick={() => onSubmit("cast fireball")} disabled={isPending || isGameOver} variant="magic" />
-            <ActionBtn icon={<Zap    size={14} />} label="Flee"    onClick={() => onSubmit("flee")}          disabled={isPending || isGameOver} variant="gold" small />
+            <ActionBtn icon={<Swords size={14} />} label="Attack"  onClick={() => onSubmit("attack")}        disabled={isPending || isGameOver || isModalOpen} variant="danger" />
+            <ActionBtn icon={<Shield size={14} />} label="Defend"  onClick={() => onSubmit("defend")}        disabled={isPending || isGameOver || isModalOpen} />
+            <ActionBtn icon={<Flame  size={14} />} label="Spell"   onClick={() => onSubmit("cast fireball")} disabled={isPending || isGameOver || isModalOpen} variant="magic" />
+            <ActionBtn icon={<Zap    size={14} />} label="Flee"    onClick={() => onSubmit("flee")}           disabled={isPending || isGameOver || isModalOpen} variant="gold" small />
           </div>
         </div>
       )}
@@ -221,12 +222,12 @@ export function VoiceControl({
           — Movement —
         </div>
         <div className="flex items-center justify-start gap-1">
-          <ActionBtn icon={<ArrowLeft  size={12} />} label="W" onClick={() => onSubmit("move west")}  disabled={isPending || isGameOver} small />
+          <ActionBtn icon={<ArrowLeft  size={12} />} label="W" onClick={() => onSubmit("move west")}  disabled={isPending || isGameOver || isModalOpen} small />
           <div className="flex flex-col gap-1">
-            <ActionBtn icon={<ArrowUp   size={12} />} label="N" onClick={() => onSubmit("move north")} disabled={isPending || isGameOver} small />
-            <ActionBtn icon={<ArrowDown size={12} />} label="S" onClick={() => onSubmit("move south")} disabled={isPending || isGameOver} small />
+            <ActionBtn icon={<ArrowUp   size={12} />} label="N" onClick={() => onSubmit("move north")} disabled={isPending || isGameOver || isModalOpen} small />
+            <ActionBtn icon={<ArrowDown size={12} />} label="S" onClick={() => onSubmit("move south")} disabled={isPending || isGameOver || isModalOpen} small />
           </div>
-          <ActionBtn icon={<ArrowRight size={12} />} label="E" onClick={() => onSubmit("move east")}  disabled={isPending || isGameOver} small />
+          <ActionBtn icon={<ArrowRight size={12} />} label="E" onClick={() => onSubmit("move east")}  disabled={isPending || isGameOver || isModalOpen} small />
         </div>
       </div>
 
@@ -244,7 +245,7 @@ export function VoiceControl({
             value={command}
             onChange={(e) => onCommandChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            disabled={isPending || isGameOver}
+            disabled={isPending || isGameOver || isModalOpen}
             placeholder={isListening ? "Listening..." : "Type command..."}
             autoComplete="off"
             spellCheck="false"
@@ -259,18 +260,18 @@ export function VoiceControl({
           />
         </div>
         <motion.button
-          whileHover={{ scale: isPending || !command.trim() || isGameOver ? 1 : 1.04 }}
-          whileTap={{ scale: isPending || !command.trim() || isGameOver ? 1 : 0.95 }}
+          whileHover={{ scale: isPending || !command.trim() || isGameOver || isModalOpen ? 1 : 1.04 }}
+          whileTap={{ scale: isPending || !command.trim() || isGameOver || isModalOpen ? 1 : 0.95 }}
           onClick={() => { if (command.trim()) onSubmit(command); }}
-          disabled={isPending || !command.trim() || isGameOver}
+          disabled={isPending || !command.trim() || isGameOver || isModalOpen}
           className="action-btn px-4 font-display text-xs tracking-widest uppercase transition-all"
           style={{
             background: "rgba(139,30,30,0.18)",
             border: "1px solid rgba(139,30,30,0.5)",
             color: "#f87171",
             borderRadius: "0.5rem",
-            opacity: isPending || !command.trim() || isGameOver ? 0.3 : 1,
-            cursor: isPending || !command.trim() || isGameOver ? "not-allowed" : "pointer",
+            opacity: isPending || !command.trim() || isGameOver || isModalOpen ? 0.3 : 1,
+            cursor: isPending || !command.trim() || isGameOver || isModalOpen ? "not-allowed" : "pointer",
             letterSpacing: "0.14em",
             whiteSpace: "nowrap",
           }}

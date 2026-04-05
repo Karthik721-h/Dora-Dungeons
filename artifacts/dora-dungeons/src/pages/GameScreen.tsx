@@ -89,8 +89,7 @@ export function GameScreen({
   const [shopMode, setShopMode] = useState<"main" | "buy" | "sell" | "upgrade">("main");
 
   // ── Death / restart state ────────────────────────────────────────────────────
-  const [showRestartModal, setShowRestartModal] = useState(false);
-  const [restartPending, setRestartPending]     = useState(false);
+  const [restartPending, setRestartPending] = useState(false);
   // Guards against re-speaking the death TTS on subsequent renders.
   const deathTtsSpokenRef = useRef(false);
 
@@ -241,7 +240,6 @@ export function GameScreen({
     }
     if (deathTtsSpokenRef.current) return;
     deathTtsSpokenRef.current = true;
-    setShowRestartModal(true);
 
     // Hard-stop everything in progress, then speak the death message at
     // critical priority so it always wins over any in-flight narration.
@@ -752,6 +750,10 @@ export function GameScreen({
   gameModeRef.current    = gameMode;
   startListeningRef.current = startListening;
 
+  // True whenever any modal is covering the screen — used to visually disable
+  // all interactive controls that sit behind the portal overlay.
+  const isModalOpen = isGameOver || gameMode !== "explore";
+
   // ── Restore decision mode if the page was refreshed during a VICTORY ────────
   // gameMode is React state and resets to "explore" on every mount. If the DB
   // still has gameStatus === "VICTORY" (boss was killed but no choice was made),
@@ -1000,7 +1002,6 @@ export function GameScreen({
       setShopExtraLogs([]);
       setLocalExtraLogs([]);
       deathTtsSpokenRef.current = false;
-      setShowRestartModal(false);
       setShopOpen(false);
       setShopMode("main");
       setGameMode("explore");
@@ -1530,10 +1531,10 @@ export function GameScreen({
 
           {/* ── Shop button ── */}
           <motion.button
-            whileHover={{ scale: gameMode !== "explore" ? 1 : 1.06 }}
-            whileTap={{ scale: gameMode !== "explore" ? 1 : 0.94 }}
-            onClick={() => { if (gameMode === "explore") setShopOpen(v => !v); }}
-            disabled={gameMode !== "explore"}
+            whileHover={{ scale: isModalOpen ? 1 : 1.06 }}
+            whileTap={{ scale: isModalOpen ? 1 : 0.94 }}
+            onClick={() => { if (!isModalOpen) setShopOpen(v => !v); }}
+            disabled={isModalOpen}
             className="flex items-center gap-1 font-code text-xs uppercase px-2.5 py-1 transition-all"
             style={{
               border: shopOpen
@@ -1544,11 +1545,11 @@ export function GameScreen({
               borderRadius: 4,
               fontSize: "10px",
               letterSpacing: "0.15em",
-              opacity: gameMode !== "explore" ? 0.4 : 1,
-              cursor: gameMode !== "explore" ? "not-allowed" : "pointer",
+              opacity: isModalOpen ? 0.4 : 1,
+              cursor: isModalOpen ? "not-allowed" : "pointer",
             }}
             aria-label={shopOpen ? "Close shop" : "Open shop"}
-            title={gameMode !== "explore" ? "Shop unavailable during level decision" : "Shop"}
+            title={isModalOpen ? "Shop unavailable" : "Shop"}
           >
             <ShoppingBag size={10} />
             <span className="hidden sm:inline">Shop</span>
@@ -1634,6 +1635,7 @@ export function GameScreen({
             intentHint={intentHint}
             isPending={isPending}
             isGameOver={isGameOver}
+            isModalOpen={isModalOpen}
             isCombat={isCombat}
             command={command}
             onCommandChange={setCommand}
@@ -1647,8 +1649,8 @@ export function GameScreen({
       {(() => {
         type ModalView = "paymentDecision" | "levelDecision" | "replayPrompt" | "death" | null;
         const modalView: ModalView =
-          isGameOver && showRestartModal ? "death" :
-          gameMode !== "explore"         ? (gameMode as ModalView) :
+          isGameOver          ? "death" :
+          gameMode !== "explore" ? (gameMode as ModalView) :
           null;
 
         // ── Payment Decision ──────────────────────────────────────────────
