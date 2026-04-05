@@ -285,7 +285,7 @@ export function GameScreen({
             if (!isMutedRef.current) {
               AudioManager.speak(
                 `Congratulations! Dungeon level ${newData.player.dungeonLevel} complete. You defeated the boss. Would you like to advance to the next level? Say yes to continue, or say no for other options.`,
-                { interrupt: true }
+                { interrupt: false }
               );
               AudioManager.onQueueDrained(() => {
                 stopListeningRef.current?.();
