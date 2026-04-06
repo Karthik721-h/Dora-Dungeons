@@ -1,0 +1,243 @@
+AUDIT MODE — DO NOT MODIFY CODE
+
+You are auditing the "Controlled TTS on Load / Refresh / Login" system.
+
+Your goal:
+- Verify narration behavior is CORRECT and CONTEXT-AWARE
+- Ensure NO terminal logs are spoken automatically on load
+- Confirm voice UX is clean for visually impaired users
+
+DO NOT:
+- Refactor
+- Rewrite
+- Suggest vague improvements
+
+-------------------------------------
+SECTION 1 — INITIAL LOAD GUARDS
+-------------------------------------
+
+Verify existence and correct usage of:
+
+- hasInitializedRef
+- isHydratingRef
+
+Check:
+- hasInitializedRef prevents double initialization
+- isHydratingRef blocks narration during hydration phase
+
+❌ Critical if:
+- Initial logic runs more than once
+- Hydration flag is never turned off
+
+-------------------------------------
+SECTION 2 — TERMINAL TTS BLOCKING
+-------------------------------------
+
+Locate:
+speakLines(newLines)
+
+Verify:
+
+IF (isHydratingRef.current === true)
+→ speakLines is NOT called
+
+❌ Critical if:
+- Terminal logs are spoken on:
+  - first load
+  - login
+  - refresh
+
+-------------------------------------
+SECTION 3 — EXPLORING STATE NARRATION
+-------------------------------------
+
+On load/refresh when:
+
+gameStatus === "EXPLORING"
+
+Verify TTS speaks ONLY:
+
+1. Room name + description
+2. Exits
+
+Verify:
+- Correct order (description → exits)
+- Uses interrupt: true for first speech
+- Uses interrupt: false for exits
+
+❌ Critical if:
+- Any terminal logs are spoken
+- Old messages are replayed
+- Narration order is incorrect
+
+-------------------------------------
+SECTION 4 — COMBAT STATE NARRATION
+-------------------------------------
+
+On load/refresh when:
+
+gameStatus === "IN_COMBAT"
+
+Verify TTS says EXACTLY:
+
+"Resuming your adventure. You are in combat with [Enemy Name] with [current HP] out of [max HP]. What will you do?"
+
+Check:
+- Correct enemy name
+- Correct HP values
+- No extra narration
+
+❌ Critical if:
+- Combat logs are spoken
+- Missing enemy data
+- Message unclear or duplicated
+
+-------------------------------------
+SECTION 5 — GAME OVER NARRATION
+-------------------------------------
+
+On load/refresh when:
+
+gameStatus === "GAME_OVER"
+
+Verify:
+- Only death prompt is spoken
+- No terminal logs replayed
+
+-------------------------------------
+SECTION 6 — VICTORY NARRATION
+-------------------------------------
+
+On load/refresh when:
+
+gameStatus === "VICTORY"
+
+Verify:
+- DOES NOT replay victory logs
+- Speaks ONLY:
+  "You have completed this level. Would you like to proceed?"
+
+Verify:
+- setGameMode("levelDecision") is triggered
+
+❌ Critical if:
+- Victory logs replay
+- Modal not restored
+
+-------------------------------------
+SECTION 7 — AUDIO RESET
+-------------------------------------
+
+Before initial narration:
+
+Verify:
+AudioManager.stopAll() is called
+
+Purpose:
+- Prevent overlap
+- Clear stale queue
+
+❌ Critical if:
+- Old audio overlaps new narration
+
+-------------------------------------
+SECTION 8 — QUEUE + MIC HANDLING
+-------------------------------------
+
+Verify:
+
+AudioManager.onQueueDrained(() => {
+  isHydratingRef.current = false
+  startListening()
+})
+
+Check:
+- Mic activates ONLY after narration finishes
+- Hydration flag resets correctly
+
+❌ Critical if:
+- Mic activates early
+- Hydration flag stays true forever
+
+-------------------------------------
+SECTION 9 — POST-LOAD USER ACTION
+-------------------------------------
+
+After hydration completes:
+
+Verify:
+- speakLines(newLines) works normally
+
+Trigger:
+- Movement command
+- Combat command
+- Shop action
+
+❌ Critical if:
+- No narration after commands
+- Or narration still blocked
+
+-------------------------------------
+SECTION 10 — DOUBLE SPEECH PREVENTION
+-------------------------------------
+
+Verify:
+- No duplicate narration on load
+- No overlapping TTS calls
+
+Check:
+- stopAll() used correctly
+- No multiple speak() calls firing simultaneously
+
+-------------------------------------
+SECTION 11 — TEST SCENARIOS
+-------------------------------------
+
+Run ALL:
+
+1. New user:
+   - Welcome message
+   - Then ONLY room + exits
+
+2. Returning user login:
+   - Same behavior
+
+3. Refresh while exploring:
+   - ONLY room + exits
+
+4. Refresh mid-combat:
+   - ONLY combat summary
+
+5. Refresh during GAME_OVER:
+   - ONLY death prompt
+
+6. Refresh during VICTORY:
+   - ONLY progression prompt
+
+7. After command:
+   - Terminal logs spoken normally
+
+-------------------------------------
+OUTPUT FORMAT:
+
+✅ Working Correctly  
+(List exact confirmations)
+
+⚠️ Minor Issues  
+(File + line + explanation)
+
+❌ Critical Bugs  
+(File + line + reproduction steps)
+
+🧠 Recommendations  
+(ONLY high-impact improvements)
+
+-------------------------------------
+
+FINAL LINE:
+
+"PASS — TTS SYSTEM IS CLEAN AND CONTROLLED"
+
+OR
+
+"FAIL — ISSUES FOUND"
