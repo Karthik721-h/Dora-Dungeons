@@ -1,0 +1,231 @@
+FEATURE: FAST CONNECTION + LOADING RELIABILITY
+
+Goal:
+- Eliminate long “Connecting…” delays
+- Ensure instant feedback to user
+- Prevent infinite loading states
+- Optimize both new users and returning users
+
+-------------------------------------
+
+STEP 1 — ADD HARD TIMEOUT (CRITICAL)
+
+Wrap initial API calls (/auth/session, /game/state):
+
+Add timeout (3–5 seconds max)
+
+If request > 5s:
+→ FAIL FAST
+→ Show fallback UI
+
+Example:
+
+Promise.race([
+  fetchGameState(),
+  timeout(5000)
+])
+
+If timeout:
+→ Show:
+"Connection is taking longer than expected. Retrying..."
+
+❌ NEVER allow infinite loading
+
+-------------------------------------
+
+STEP 2 — ADD LOADING STATES (MULTI-STAGE)
+
+Replace single "Connecting..." with stages:
+
+1. "Connecting to server..."
+2. "Loading your adventure..."
+3. "Preparing dungeon..."
+
+This gives perceived speed boost.
+
+-------------------------------------
+
+STEP 3 — CACHE LAST SESSION (INSTANT LOAD)
+
+Use localStorage:
+
+localStorage.setItem("lastGameState", JSON.stringify(state))
+
+On app load:
+
+IF exists:
+→ Render cached state IMMEDIATELY
+→ THEN fetch fresh state in background
+
+This removes blank screen delay.
+
+-------------------------------------
+
+STEP 4 — PARALLELIZE REQUESTS
+
+DO NOT do:
+
+await auth
+await gameState
+
+DO:
+
+Promise.all([
+  fetchAuth(),
+  fetchGameState()
+])
+
+-------------------------------------
+
+STEP 5 — OPTIMISTIC UI RENDER
+
+If user is authenticated:
+
+→ Skip waiting for full game load
+→ Render game shell immediately
+
+Show:
+- UI
+- Last known state (if exists)
+
+Then hydrate in background
+
+-------------------------------------
+
+STEP 6 — RETRY SYSTEM (AUTO RECOVERY)
+
+If request fails:
+
+Retry up to 3 times:
+
+- 1st retry → after 1s
+- 2nd retry → after 2s
+- 3rd retry → after 3s
+
+After failure:
+
+→ Show:
+"Unable to connect. Please check your internet or refresh."
+
+-------------------------------------
+
+STEP 7 — PREVENT DOUBLE FETCHES
+
+Check:
+
+- No duplicate API calls on mount
+- No useEffect loops
+
+Common bug:
+
+useEffect(() => {
+  fetchGame()
+}, [gameState]) ❌
+
+Fix:
+→ Empty dependency array or proper guards
+
+-------------------------------------
+
+STEP 8 — ADD LOADING FAILSAFE UI
+
+If still loading after 6–8 seconds:
+
+Replace spinner with:
+
+- Retry button
+- Clear message
+
+Example:
+
+"Connection timed out. Tap to retry."
+
+-------------------------------------
+
+STEP 9 — SERVER OPTIMIZATION (IMPORTANT)
+
+Check backend:
+
+- Ensure /game/state < 300ms response time
+- Add DB indexes on:
+  - userId
+  - sessionId
+
+- Avoid heavy computation during load
+- Move dungeon generation OUT of initial load if possible
+
+-------------------------------------
+
+STEP 10 — PRELOAD CRITICAL DATA
+
+When user logs in:
+
+→ Immediately prefetch:
+
+- /game/state
+- /payment/status
+
+Using React Query:
+
+queryClient.prefetchQuery(...)
+
+-------------------------------------
+
+STEP 11 — REMOVE BLOCKING OPERATIONS
+
+Ensure these DO NOT block load:
+
+- TTS initialization
+- Voice recognition setup
+- Audio permissions
+
+Load them AFTER UI renders
+
+-------------------------------------
+
+STEP 12 — TEST SCENARIOS
+
+1. Fast internet:
+   → Loads < 1s
+
+2. Slow network:
+   → Shows progress stages
+
+3. Server delay:
+   → Timeout + retry triggers
+
+4. No internet:
+   → Error UI appears
+
+5. Returning user:
+   → Sees cached state instantly
+
+-------------------------------------
+
+STEP 13 — LOG PERFORMANCE
+
+Add console timing:
+
+console.time("game-load")
+console.timeEnd("game-load")
+
+Track:
+- Auth time
+- Game state time
+
+-------------------------------------
+
+HARD RULES:
+
+- NEVER show infinite spinner
+- ALWAYS give feedback within 2 seconds
+- ALWAYS allow retry
+- ALWAYS render something (even cached)
+
+-------------------------------------
+
+SUCCESS CRITERIA:
+
+- No user waits blindly
+- Load feels instant (even if not)
+- System recovers automatically from failures

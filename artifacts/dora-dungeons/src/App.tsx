@@ -26,18 +26,38 @@ const queryClient = new QueryClient({
   },
 });
 
+// ── Loading stage messages ────────────────────────────────────────────────────
+const LOAD_STAGES = [
+  "CONNECTING TO SERVER...",
+  "LOADING YOUR ADVENTURE...",
+  "PREPARING THE DUNGEON...",
+] as const;
+const STAGE_INTERVAL_MS = 2500;  // advance label every 2.5 s
+const TIMEOUT_MS         = 8000; // hard timeout before showing retry UI
+
 function GameOrchestrator({ onLogout, playerFirstName }: { onLogout: () => void; playerFirstName?: string | null }) {
   const queryClient = useQueryClient();
   const hasStartedRef = useRef(false);
 
-  const { data: gameState, isLoading: stateLoading, isError } = useGetGameState({
-    query: {
-      queryKey: getGetGameStateQueryKey(),
-      retry: false,
-    }
+  // Loading-stage animation state
+  const [stageIdx, setStageIdx]       = useState(0);
+  const [hasTimedOut, setHasTimedOut] = useState(false);
+
+  const {
+    data: gameState,
+    isLoading: stateLoading,
+    isError,
+    refetch,
+  } = useGetGameState({
+    query: { queryKey: getGetGameStateQueryKey(), retry: false },
   });
 
-  const { mutate: startGame, isPending: isStarting, error: startError } = useStartGame({
+  const {
+    mutate: startGame,
+    isPending: isStarting,
+    error: startError,
+    reset: resetStart,
+  } = useStartGame({
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getGetGameStateQueryKey() });
@@ -45,7 +65,43 @@ function GameOrchestrator({ onLogout, playerFirstName }: { onLogout: () => void;
     },
   });
 
-  // When there is no existing session, auto-start immediately using the player's auth name
+  // True while any loading gate is active (same condition as before, extended)
+  const isInLoadingState = stateLoading || isStarting || (!gameState && !startError);
+
+  // Advance label every STAGE_INTERVAL_MS while loading
+  useEffect(() => {
+    if (!isInLoadingState) { setStageIdx(0); return; }
+    const id = setInterval(
+      () => setStageIdx((i) => Math.min(i + 1, LOAD_STAGES.length - 1)),
+      STAGE_INTERVAL_MS,
+    );
+    return () => clearInterval(id);
+  }, [isInLoadingState]);
+
+  // Hard timeout: flip hasTimedOut after TIMEOUT_MS of continuous loading
+  useEffect(() => {
+    if (!isInLoadingState) { setHasTimedOut(false); return; }
+    const id = setTimeout(() => {
+      setHasTimedOut(true);
+      // Speak the timeout message for screen-reader / visually impaired users
+      AudioManager.speak(
+        "Connection is taking longer than expected. Please tap Retry to try again.",
+        { interrupt: true },
+      );
+    }, TIMEOUT_MS);
+    return () => clearTimeout(id);
+  }, [isInLoadingState]);
+
+  // Manual retry: reset all state and re-fetch
+  const handleRetry = useCallback(() => {
+    hasStartedRef.current = false;
+    setStageIdx(0);
+    setHasTimedOut(false);
+    resetStart();
+    refetch();
+  }, [refetch, resetStart]);
+
+  // When there is no existing session, auto-start immediately
   useEffect(() => {
     if (stateLoading) return;
     if (gameState) return;
@@ -55,37 +111,104 @@ function GameOrchestrator({ onLogout, playerFirstName }: { onLogout: () => void;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stateLoading, gameState]);
 
-  if (stateLoading || isStarting || (!gameState && !startError)) {
+  // ── Loading / timeout screens ─────────────────────────────────────────────
+  if (isInLoadingState) {
     return (
       <div
         className="min-h-screen w-full flex items-center justify-center"
         style={{ background: "#09080c" }}
+        role="status"
+        aria-live="polite"
       >
-        <div className="flex flex-col items-center gap-5">
-          <Loader2
-            className="w-10 h-10 animate-spin"
-            style={{ color: "rgba(179,18,47,0.6)" }}
-          />
-          <p
-            className="font-code text-xs animate-pulse tracking-widest"
-            style={{ color: "rgba(200,190,180,0.3)", letterSpacing: "0.3em" }}
-          >
-            {isError || isStarting ? "INITIALIZING SESSION..." : "CONNECTING..."}
-          </p>
+        <div className="flex flex-col items-center gap-6">
+          {hasTimedOut ? (
+            <>
+              <p
+                className="font-code text-xs tracking-widest text-center"
+                style={{ color: "rgba(220,100,80,0.85)", letterSpacing: "0.25em", maxWidth: 280 }}
+              >
+                CONNECTION TIMED OUT
+              </p>
+              <p
+                className="font-code text-xs text-center"
+                style={{ color: "rgba(200,185,160,0.5)", letterSpacing: "0.15em", maxWidth: 280 }}
+              >
+                The server is taking too long to respond.
+              </p>
+              <button
+                onClick={handleRetry}
+                style={{
+                  fontFamily: "'Cinzel', serif",
+                  fontSize: "0.8rem",
+                  fontWeight: 700,
+                  letterSpacing: "0.2em",
+                  textTransform: "uppercase",
+                  color: "#c89b3c",
+                  background: "rgba(200,155,60,0.08)",
+                  border: "1px solid rgba(200,155,60,0.4)",
+                  borderRadius: "4px",
+                  padding: "0.75rem 2rem",
+                  cursor: "pointer",
+                }}
+                aria-label="Retry connection"
+              >
+                Retry
+              </button>
+            </>
+          ) : (
+            <>
+              <Loader2
+                className="w-10 h-10 animate-spin"
+                style={{ color: "rgba(179,18,47,0.6)" }}
+                aria-hidden="true"
+              />
+              <p
+                className="font-code text-xs animate-pulse tracking-widest"
+                style={{ color: "rgba(200,190,180,0.3)", letterSpacing: "0.3em" }}
+              >
+                {isStarting ? "INITIALIZING SESSION..." : LOAD_STAGES[stageIdx]}
+              </p>
+            </>
+          )}
         </div>
       </div>
     );
   }
 
+  // ── Start-game hard error ──────────────────────────────────────────────────
   if (startError) {
     return (
       <div
         className="min-h-screen w-full flex items-center justify-center"
         style={{ background: "#09080c" }}
       >
-        <p className="font-mono text-sm" style={{ color: "rgba(220,60,60,0.8)" }}>
-          Failed to start game session. Please refresh.
-        </p>
+        <div className="flex flex-col items-center gap-6">
+          <p
+            className="font-code text-xs tracking-widest"
+            style={{ color: "rgba(220,80,60,0.85)", letterSpacing: "0.25em" }}
+          >
+            FAILED TO START SESSION
+          </p>
+          <button
+            onClick={handleRetry}
+            style={{
+              fontFamily: "'Cinzel', serif",
+              fontSize: "0.8rem",
+              fontWeight: 700,
+              letterSpacing: "0.2em",
+              textTransform: "uppercase",
+              color: "#c89b3c",
+              background: "rgba(200,155,60,0.08)",
+              border: "1px solid rgba(200,155,60,0.4)",
+              borderRadius: "4px",
+              padding: "0.75rem 2rem",
+              cursor: "pointer",
+            }}
+            aria-label="Retry starting session"
+          >
+            Retry
+          </button>
+        </div>
       </div>
     );
   }
