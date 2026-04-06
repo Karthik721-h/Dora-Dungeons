@@ -5,7 +5,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { GameScreen } from "@/pages/GameScreen";
 import { AuthScreen } from "@/pages/AuthScreen";
-import { IntroScene } from "@/components/IntroScene";
 import { IntroVideo } from "@/components/IntroVideo";
 import { PaymentSuccessPage } from "@/pages/PaymentSuccessPage";
 import { PaymentCancelPage } from "@/pages/PaymentCancelPage";
@@ -27,9 +26,7 @@ const queryClient = new QueryClient({
   },
 });
 
-const INTRO_SEEN_KEY = "dd_intro_seen";
-
-function GameOrchestrator({ skipIntro, onLogout, playerFirstName }: { skipIntro: boolean; onLogout: () => void; playerFirstName?: string | null }) {
+function GameOrchestrator({ onLogout, playerFirstName }: { onLogout: () => void; playerFirstName?: string | null }) {
   const queryClient = useQueryClient();
   const hasStartedRef = useRef(false);
 
@@ -110,11 +107,9 @@ function GameOrchestrator({ skipIntro, onLogout, playerFirstName }: { skipIntro:
 
 function App() {
   const auth = useJwtAuth();
-  const [showIntro, setShowIntro] = useState(false);
-  const [introComplete, setIntroComplete] = useState(false);
   // Pre-auth video intro — shown once per page load for unauthenticated users.
-  // React state only (no localStorage) so it re-shows on every page load when
-  // the user is not logged in, matching spec test case 2.
+  // React state only (no persistence) so it re-shows on every unauthenticated
+  // page load. Authenticated users never reach this branch.
   const [hasSeenIntro, setHasSeenIntro] = useState(false);
 
   useEffect(() => {
@@ -123,37 +118,16 @@ function App() {
 
   // Wipe the React Query cache whenever the logged-in user changes so a
   // newly-signed-up or switched user never sees a stale game session from
-  // the previous user.  Without this, useGetGameState can return the old
-  // user's cached data, causing the game action buttons to hit the server
-  // with a JWT that has no matching session → 404.
+  // the previous user.
   const prevUserIdRef = useRef<string | null | undefined>(undefined);
   useEffect(() => {
     const currentId = auth.user?.id ?? null;
     if (prevUserIdRef.current !== undefined && prevUserIdRef.current !== currentId) {
-      // User changed (logout or account switch) — wipe stale game cache and
-      // silence any TTS that may still be playing.  Voice recognition stops
-      // automatically when GameScreen unmounts.
       queryClient.clear();
       AudioManager.stop();
     }
     prevUserIdRef.current = currentId;
   }, [auth.user?.id]);
-
-  useEffect(() => {
-    if (auth.isLoading || !auth.isAuthenticated) return;
-    const seen = sessionStorage.getItem(INTRO_SEEN_KEY);
-    if (!seen) {
-      setShowIntro(true);
-    } else {
-      setIntroComplete(true);
-    }
-  }, [auth.isLoading, auth.isAuthenticated]);
-
-  const handleIntroComplete = () => {
-    sessionStorage.setItem(INTRO_SEEN_KEY, "1");
-    setShowIntro(false);
-    setIntroComplete(true);
-  };
 
   if (auth.isLoading) {
     return (
@@ -167,10 +141,8 @@ function App() {
   }
 
   if (!auth.isAuthenticated) {
-    // Show the cinematic intro video before the tap-anywhere / login screen.
-    // IntroVideo is never rendered once the user is authenticated, satisfying
-    // the "NEVER show in-game" rule (the authenticated branch below handles all
-    // game rendering).
+    // Cinematic intro video plays before the tap-anywhere / login screen.
+    // IntroVideo never renders for authenticated users.
     if (!hasSeenIntro) {
       return <IntroVideo onComplete={() => setHasSeenIntro(true)} />;
     }
@@ -181,34 +153,22 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <div className="scanline-overlay" />
-
-        <AnimatePresence>
-          {showIntro && (
-            <IntroScene onComplete={handleIntroComplete} />
-          )}
-        </AnimatePresence>
-
-        <AnimatePresence>
-          {introComplete && (
-            <motion.div
-              key="main"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.35 }}
-              className="h-screen"
-            >
-              <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-                <Switch>
-                  <Route path="/payment-success" component={() => <PaymentSuccessPage />} />
-                  <Route path="/payment-cancel" component={() => <PaymentCancelPage />} />
-                  <Route path="/" component={() => <GameOrchestrator skipIntro={!showIntro} onLogout={auth.logout} playerFirstName={auth.user?.firstName} />} />
-                  <Route component={() => <GameOrchestrator skipIntro onLogout={auth.logout} playerFirstName={auth.user?.firstName} />} />
-                </Switch>
-              </WouterRouter>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
+        <motion.div
+          key="main"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.35 }}
+          className="h-screen"
+        >
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <Switch>
+              <Route path="/payment-success" component={() => <PaymentSuccessPage />} />
+              <Route path="/payment-cancel" component={() => <PaymentCancelPage />} />
+              <Route path="/" component={() => <GameOrchestrator onLogout={auth.logout} playerFirstName={auth.user?.firstName} />} />
+              <Route component={() => <GameOrchestrator onLogout={auth.logout} playerFirstName={auth.user?.firstName} />} />
+            </Switch>
+          </WouterRouter>
+        </motion.div>
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>
