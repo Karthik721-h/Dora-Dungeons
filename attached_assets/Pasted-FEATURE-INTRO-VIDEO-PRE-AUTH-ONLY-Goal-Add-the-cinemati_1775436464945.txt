@@ -1,0 +1,182 @@
+FEATURE: INTRO VIDEO (PRE-AUTH ONLY)
+
+Goal:
+Add the cinematic intro video (video uploaded above) and make sure it:
+- Plays ONLY when user is NOT logged in
+- Appears BEFORE the page which ask user to tap anywhere before moving to the login/signup page
+- NEVER plays inside the game
+- NEVER interferes with TTS or voice system
+
+-------------------------------------
+
+STEP 1 — UPLOAD VIDEO
+
+Place video file in:
+
+/public/videos/intro.mp4
+
+Ensure:
+- File is optimized (720p is fine)
+- Autoplay allowed
+
+-------------------------------------
+
+STEP 2 — CREATE INTRO COMPONENT
+
+Create:
+
+components/IntroVideo.tsx
+
+Features:
+- Fullscreen video
+- Skip option (keyboard + click)
+
+Structure:
+
+- Overlay container
+- Skip handler
+
+-------------------------------------
+
+STEP 3 — CONTROL VISIBILITY (AUTH STATE)
+
+In App root or main routing layer:
+
+Condition:
+
+IF user is NOT authenticated:
+  → Show IntroVideo FIRST
+
+ELSE:
+  → Go directly into game
+
+-------------------------------------
+
+STEP 4 — PREVENT REPLAY AFTER LOGIN
+
+Use state:
+
+const [hasSeenIntro, setHasSeenIntro] = useState(false)
+
+Flow:
+
+IF:
+- not logged in
+- AND hasSeenIntro === false
+
+→ Show Intro
+
+After:
+- video ends OR user skips
+
+→ setHasSeenIntro(true)
+
+Then:
+→ Show the page which ask user to tap anywhere before moving to the login/signup page
+
+-------------------------------------
+
+STEP 5 — PERSIST INTRO STATE (OPTIONAL)
+
+Use localStorage:
+
+localStorage.setItem("introSeen", "true")
+
+On load:
+
+const introSeen = localStorage.getItem("introSeen")
+
+IF introSeen === "true":
+→ Skip intro
+
+-------------------------------------
+
+STEP 6 — DISABLE TTS DURING VIDEO
+
+CRITICAL:
+
+Before video starts:
+
+AudioManager.stopAll()
+
+Disable:
+- TTS
+- Voice recognition
+
+DO NOT allow:
+- Any narration during video
+
+-------------------------------------
+
+STEP 7 — RE-ENABLE VOICE AFTER VIDEO
+
+After video ends OR skip:
+
+- Enable audio system again
+- DO NOT auto-start TTS
+- Let login/signup flow control narration
+
+-------------------------------------
+
+STEP 8 — NEVER SHOW IN-GAME
+
+Ensure:
+
+IF user is authenticated:
+→ IntroVideo MUST NEVER RENDER
+
+Even on:
+- refresh
+- app reload
+- navigation
+
+-------------------------------------
+
+STEP 9 — MOBILE + UX
+
+Ensure:
+- Video scales to full screen
+- object-fit: cover
+- Works on mobile (playsInline required)
+
+Add fallback:
+- If autoplay blocked → show play button
+
+-------------------------------------
+
+STEP 10 — TEST CASES
+
+1. New user:
+   → Video plays
+   → Skip works
+   → Goes to the page which ask user to tap anywhere before moving to the login/signup page
+
+2. Returning or on app load or refresh (not logged in):
+   → Video plays 
+
+3. Logged-in user:
+   → NO video
+   → Goes directly to game
+
+4. Refresh inside game:
+   → NO video
+
+5. TTS:
+   → Completely silent during video
+
+-------------------------------------
+
+HARD RULES:
+
+- NEVER show intro after login
+- NEVER overlap video with TTS
+- NEVER block login/signup flow
+- KEEP separation: intro ≠ game
+
+-------------------------------------
+
+SUCCESS CRITERIA:
+
+- Clean cinematic entry experience
+- No interference with gameplay
+- Perfect auth-based visibility

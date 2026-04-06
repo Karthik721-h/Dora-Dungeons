@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { GameScreen } from "@/pages/GameScreen";
 import { AuthScreen } from "@/pages/AuthScreen";
 import { IntroScene } from "@/components/IntroScene";
+import { IntroVideo } from "@/components/IntroVideo";
 import { PaymentSuccessPage } from "@/pages/PaymentSuccessPage";
 import { PaymentCancelPage } from "@/pages/PaymentCancelPage";
 import { useGetGameState, useStartGame, getGetGameStateQueryKey } from "@workspace/api-client-react";
@@ -111,6 +112,10 @@ function App() {
   const auth = useJwtAuth();
   const [showIntro, setShowIntro] = useState(false);
   const [introComplete, setIntroComplete] = useState(false);
+  // Pre-auth video intro — shown once per page load for unauthenticated users.
+  // React state only (no localStorage) so it re-shows on every page load when
+  // the user is not logged in, matching spec test case 2.
+  const [hasSeenIntro, setHasSeenIntro] = useState(false);
 
   useEffect(() => {
     AudioManager.initializeVoices();
@@ -162,6 +167,13 @@ function App() {
   }
 
   if (!auth.isAuthenticated) {
+    // Show the cinematic intro video before the tap-anywhere / login screen.
+    // IntroVideo is never rendered once the user is authenticated, satisfying
+    // the "NEVER show in-game" rule (the authenticated branch below handles all
+    // game rendering).
+    if (!hasSeenIntro) {
+      return <IntroVideo onComplete={() => setHasSeenIntro(true)} />;
+    }
     return <AuthScreen auth={auth} />;
   }
 
