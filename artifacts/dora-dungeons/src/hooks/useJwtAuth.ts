@@ -33,25 +33,36 @@ async function apiFetch(path: string, options?: RequestInit) {
   return data;
 }
 
+/**
+ * Optimistic JWT auth hook.
+ *
+ * If a token already exists in localStorage we immediately treat the user as
+ * authenticated (isLoading: false, isAuthenticated: true) so the game screen
+ * can begin loading in parallel with the background auth/me validation.
+ *
+ * If the token turns out to be invalid/expired, auth/me will fail and we
+ * quietly sign the user out, returning them to the login screen.
+ */
 export function useJwtAuth(): UseJwtAuth {
-  const [state, setState] = useState<AuthState>({
-    user: null,
-    token: localStorage.getItem(TOKEN_KEY),
-    isLoading: true,
-    isAuthenticated: false,
+  const existingToken = localStorage.getItem(TOKEN_KEY);
+
+  const [state, setState] = useState<AuthState>(() => {
+    // Optimistic: if a token is present, skip the loading spinner entirely.
+    if (existingToken) {
+      return { user: null, token: existingToken, isLoading: false, isAuthenticated: true };
+    }
+    return { user: null, token: null, isLoading: false, isAuthenticated: false };
   });
 
+  // Validate the stored token in the background.  On success we fill in the
+  // user object.  On failure we sign out — the game screen will unmount.
   useEffect(() => {
     const token = localStorage.getItem(TOKEN_KEY);
-    if (!token) {
-      setState({ user: null, token: null, isLoading: false, isAuthenticated: false });
-      return;
-    }
-    apiFetch("/api/auth/me", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(({ user }) => {
-        setState({ user, token, isLoading: false, isAuthenticated: true });
+    if (!token) return;
+
+    apiFetch("/api/auth/me", { headers: { Authorization: `Bearer ${token}` } })
+      .then(({ user }: { user: AuthUser }) => {
+        setState((prev) => ({ ...prev, user, token, isAuthenticated: true, isLoading: false }));
       })
       .catch(() => {
         localStorage.removeItem(TOKEN_KEY);
