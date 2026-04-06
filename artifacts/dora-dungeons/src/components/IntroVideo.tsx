@@ -17,8 +17,6 @@ export function IntroVideo({ onComplete }: IntroVideoProps) {
   };
 
   useEffect(() => {
-    // Stop all TTS/voice queued so far — the video window is completely silent
-    // from the game's audio perspective.
     AudioManager.stopAll();
 
     const video = videoRef.current;
@@ -46,9 +44,13 @@ export function IntroVideo({ onComplete }: IntroVideoProps) {
         zIndex: 10000,
         background: "#000",
         outline: "none",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: "hidden",
       }}
     >
-      {/* Video fills the entire viewport */}
+      {/* Video — contain ensures the full frame is always visible on all screen sizes */}
       <video
         ref={videoRef}
         src={`${import.meta.env.BASE_URL}videos/intro.mp4`}
@@ -57,31 +59,34 @@ export function IntroVideo({ onComplete }: IntroVideoProps) {
         style={{
           width: "100%",
           height: "100%",
-          objectFit: "cover",
+          objectFit: "contain",
           display: "block",
+          maxWidth: "100vw",
+          maxHeight: "100vh",
         }}
         aria-hidden="true"
       />
 
-      {/* Skip button — always visible */}
+      {/* Skip button — responsive: smaller on mobile, positioned to avoid subtitle area */}
       <button
         onClick={finish}
         aria-label="Skip intro"
         style={{
           position: "absolute",
-          bottom: "2rem",
-          right: "2rem",
+          top: "clamp(0.75rem, 3vw, 1.5rem)",
+          right: "clamp(0.75rem, 3vw, 1.5rem)",
           background: "rgba(0,0,0,0.55)",
           border: "1px solid rgba(255,255,255,0.25)",
           color: "rgba(255,255,255,0.75)",
-          padding: "0.5rem 1.4rem",
+          padding: "clamp(0.3rem, 1.2vw, 0.5rem) clamp(0.8rem, 2.5vw, 1.4rem)",
           borderRadius: "0.4rem",
-          fontSize: "12px",
+          fontSize: "clamp(10px, 1.8vw, 12px)",
           fontFamily: "inherit",
           letterSpacing: "0.12em",
           cursor: "pointer",
           transition: "background 0.15s, color 0.15s",
           zIndex: 1,
+          whiteSpace: "nowrap",
         }}
         onMouseEnter={e => {
           (e.currentTarget as HTMLButtonElement).style.background = "rgba(0,0,0,0.8)";
@@ -107,14 +112,16 @@ export function IntroVideo({ onComplete }: IntroVideoProps) {
             justifyContent: "center",
             background: "rgba(6,8,16,0.92)",
             zIndex: 2,
+            padding: "1rem",
           }}
         >
           <p
             style={{
               color: "rgba(200,190,180,0.65)",
-              fontSize: "14px",
+              fontSize: "clamp(12px, 3vw, 14px)",
               marginBottom: "1.5rem",
               letterSpacing: "0.06em",
+              textAlign: "center",
             }}
           >
             Click to begin
@@ -129,9 +136,9 @@ export function IntroVideo({ onComplete }: IntroVideoProps) {
               background: "rgba(139,30,30,0.18)",
               border: "1px solid rgba(139,30,30,0.55)",
               color: "#f87171",
-              padding: "0.8rem 2.5rem",
+              padding: "clamp(0.6rem, 2vw, 0.8rem) clamp(1.5rem, 5vw, 2.5rem)",
               borderRadius: "0.5rem",
-              fontSize: "14px",
+              fontSize: "clamp(12px, 3vw, 14px)",
               fontFamily: "inherit",
               letterSpacing: "0.14em",
               cursor: "pointer",
@@ -147,7 +154,7 @@ export function IntroVideo({ onComplete }: IntroVideoProps) {
               background: "transparent",
               border: "none",
               color: "rgba(200,190,180,0.35)",
-              fontSize: "11px",
+              fontSize: "clamp(10px, 2.5vw, 11px)",
               fontFamily: "inherit",
               letterSpacing: "0.1em",
               cursor: "pointer",
