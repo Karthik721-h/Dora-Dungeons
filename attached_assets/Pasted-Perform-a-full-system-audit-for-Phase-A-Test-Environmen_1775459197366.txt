@@ -1,0 +1,90 @@
+Perform a full system audit for Phase A — Test Environment Stabilization.
+
+GOAL:
+Verify that the platform is fully testable with real data, correct relationships, and working end-to-end flows.
+
+STEP 1 — Student Assignment Validation
+- Verify redeem_invite_code RPC:
+  - Creates coach_student_relations row
+  - Links student_id → coach_id → workspace_id
+- Confirm:
+  - Each student is assigned to exactly one coach
+  - Each student belongs to exactly one workspace
+- Verify profiles.connected_to_coach is automatically updated via trigger
+- Ensure no orphan students (students without a coach)
+
+STEP 2 — Workspace Structure Validation
+- Verify at least one workspace exists with:
+  - 1 head coach
+  - 1 coach
+  - 3+ students
+- Ensure:
+  - Coach is linked via coach_workspace_memberships
+  - Students are linked via coach_student_relations
+
+STEP 3 — Data Seeding Validation
+Verify existence of real data:
+
+Products:
+- At least 10 product_submissions
+- Mix of statuses: pending, approved, rejected, commented
+- planned_publish_date is populated
+- coach_comment exists on some records
+
+Competitors:
+- At least 5 competitor_submissions
+- Mixed statuses
+
+Chat:
+- chat_messages table contains messages between coach and students
+
+Notifications:
+- Notifications exist and are linked to real events
+
+STEP 4 — End-to-End Flow Validation
+Simulate flows:
+
+1. Student → submission:
+   - Appears in coach review queue
+   - Appears in head coach workspace view
+
+2. Coach → approval:
+   - Updates submission status
+   - Triggers notification for student
+
+3. Chat:
+   - Coach sends message → student receives it
+   - Real-time updates working
+
+4. Head Coach:
+   - Can see all students and submissions in workspace
+
+STEP 5 — Real-Time System Check
+- Verify Supabase realtime subscriptions:
+  - chat_messages
+  - notifications
+- Confirm UI updates without refresh
+
+STEP 6 — Empty State Handling
+- Ensure UI does NOT show blank screens
+- Instead shows:
+  - “No students assigned yet”
+  - “No submissions yet”
+  - “No messages yet”
+
+STEP 7 — Data Integrity Checks
+- No duplicate coach_student_relations
+- No submissions without a valid student_id
+- No broken foreign key references
+
+FINAL OUTPUT:
+Provide a structured report with:
+- PASS / FAIL per section
+- Data counts (students, submissions, chats, notifications)
+- Any missing links or broken flows
+- Any blockers that prevent full system testing
+
+CONSTRAINTS:
+- Use only real database data (no mocks)
+- Respect RLS policies
+- Do not assume data — verify it
