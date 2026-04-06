@@ -178,33 +178,50 @@ export function GameScreen({
   //  • New game (turnCount === 0) → welcome + starting room description
   //  • Restore + EXPLORING → "Resuming your adventure" + room + exits
   //  • Restore + IN_COMBAT  → "Resuming your adventure" + combat summary
+  //
+  // isHydratingRef stays true until the opening narration drains, at which
+  // point it flips to false. The onSuccess handler checks this flag before
+  // calling speakLines so terminal-log narration never fires during the
+  // initial load window.
   const hasAutoStartedRef = useRef(false);
+  const isHydratingRef    = useRef(true);
   useEffect(() => {
-    if (hasAutoStartedRef.current || isMuted || !voiceSupported) return;
+    if (hasAutoStartedRef.current) return;
+    // When audio is off (muted or not supported), collapse the hydration window
+    // immediately so subsequent command narration isn't permanently blocked.
+    if (isMuted || !voiceSupported) {
+      isHydratingRef.current = false;
+      return;
+    }
     if (!gameState.logs.length) return;
     // VICTORY and GAME_OVER have their own dedicated TTS effects
     if (
       gameState.gameStatus === "VICTORY" ||
       gameState.gameStatus === "GAME_OVER"
-    ) return;
+    ) {
+      isHydratingRef.current = false;
+      return;
+    }
     hasAutoStartedRef.current = true;
 
     const isRestore = (gameState.turnCount ?? 0) > 0;
+    const room = gameState.currentRoom;
 
     const t = setTimeout(() => {
+      AudioManager.stopAll();
       if (!isRestore) {
         // ── New game ────────────────────────────────────────────────────────
+        // Speak welcome → room name + description → exits.
+        // Terminal logs are intentionally omitted: new players hear only the
+        // contextual dungeon state, not raw engine output.
         AudioManager.speak(
-          "Welcome to Dora Dungeons. Voice control is active. Say help at any time to hear the list of commands. Speak when you are ready."
+          "Welcome to Dora Dungeons. Voice control is active. Say help at any time to hear the list of commands."
         );
-        const lines = gameState.logs.slice(-5);
-        AudioManager.speakLines(lines, { interrupt: false });
-        if (!exitsAlreadySpoken(lines)) {
-          AudioManager.speak(buildExitsAnnouncement(gameState.currentRoom.exits), { interrupt: false });
-        }
+        AudioManager.speak(`${room.name}. ${room.description}`, { interrupt: false });
+        AudioManager.speak(buildExitsAnnouncement(room.exits), { interrupt: false });
       } else if (gameState.gameStatus === "IN_COMBAT") {
         // ── Restore: mid-combat ────────────────────────────────────────────
-        const living = gameState.currentRoom.enemies.filter(e => !e.isDefeated);
+        const living = room.enemies.filter(e => !e.isDefeated);
         const enemySummary = living.length > 0
           ? living.map(e => `${e.name} with ${e.hp} of ${e.maxHp} health`).join(", and ")
           : "unknown enemies";
@@ -214,14 +231,14 @@ export function GameScreen({
         );
       } else {
         // ── Restore: exploring ─────────────────────────────────────────────
-        AudioManager.speak("Resuming your adventure.", { interrupt: true });
-        const lines = gameState.logs.slice(-3);
-        AudioManager.speakLines(lines, { interrupt: false });
-        if (!exitsAlreadySpoken(lines)) {
-          AudioManager.speak(buildExitsAnnouncement(gameState.currentRoom.exits), { interrupt: false });
-        }
+        // Speak room name + description → exits only.
+        // Terminal logs are intentionally omitted to avoid replaying stale
+        // engine output to the player on refresh.
+        AudioManager.speak(`${room.name}. ${room.description}`, { interrupt: true });
+        AudioManager.speak(buildExitsAnnouncement(room.exits), { interrupt: false });
       }
       AudioManager.onQueueDrained(() => {
+        isHydratingRef.current = false;
         if (!hasAutoStartedRef.current) return;
         startListening();
       });
@@ -287,7 +304,11 @@ export function GameScreen({
         // The death TTS useEffect handles the only speech in this state.
         // Allowing combat/log narration here would overlap with the death message.
         const transitioningToDeath = newData.gameStatus === "GAME_OVER";
-        if (!transitioningToDeath && !isMutedRef.current && newLines.length > 0) {
+        // ── Hydration guard: skip log narration during the initial load window ──
+        // isHydratingRef is true from mount until the opening narration finishes.
+        // This prevents terminal logs from being spoken when the page first loads
+        // (e.g. if a user submits a command in the brief window before TTS drains).
+        if (!transitioningToDeath && !isMutedRef.current && !isHydratingRef.current && newLines.length > 0) {
           // When the engine returns an "Unknown command" response, replace the
           // verbose hint text with a single accessible prompt instead of reading
           // out the raw developer-facing command syntax.

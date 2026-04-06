@@ -1,0 +1,223 @@
+FEATURE: CONTROLLED TTS ON APP LOAD / REFRESH / LOGIN
+
+Goal:
+Ensure TTS ONLY speaks contextual narration (room or combat state) on:
+- First load (new user)
+- Login (existing user)
+- Page refresh
+
+TTS must NOT read terminal logs unless triggered by a user action.
+
+-------------------------------------
+
+STEP 1 — ADD "INITIAL LOAD GUARD"
+
+In GameScreen.tsx:
+
+Create refs:
+
+const hasInitializedRef = useRef(false)
+const isHydratingRef = useRef(true)
+
+Purpose:
+- Prevent terminal narration on initial load
+- Allow ONLY controlled narration
+
+-------------------------------------
+
+STEP 2 — BLOCK TERMINAL TTS ON LOAD
+
+Locate where speakLines(newLines) is triggered (onSuccess of command or state load).
+
+Modify:
+
+IF (isHydratingRef.current === true):
+  → SKIP speakLines(newLines)
+
+Only allow speakLines when:
+- A user command was issued
+- NOT during initial load / refresh
+
+-------------------------------------
+
+STEP 3 — CONTROLLED TTS ON INITIAL LOAD
+
+Inside useEffect that runs after gameState loads:
+
+if (!gameState || hasInitializedRef.current) return
+
+Set:
+hasInitializedRef.current = true
+isHydratingRef.current = true
+
+-------------------------------------
+
+STEP 4 — HANDLE EXPLORING STATE
+
+IF:
+gameState.gameStatus === "EXPLORING"
+
+THEN:
+
+Speak ONLY:
+
+1. Room description
+2. Exits
+
+Implementation:
+
+AudioManager.stopAll()
+
+speak(
+  `${room.name}. ${room.description}`,
+  { interrupt: true }
+)
+
+Then queue exits AFTER:
+
+speak(
+  buildExitsAnnouncement(room.exits),
+  { interrupt: false }
+)
+
+DO NOT:
+- Speak terminal logs
+- Speak previous messages
+
+-------------------------------------
+
+STEP 5 — HANDLE COMBAT STATE
+
+IF:
+gameState.gameStatus === "IN_COMBAT"
+
+Extract:
+enemy.name
+enemy.hp
+enemy.maxHp
+
+Speak:
+
+"Resuming your adventure. You are in combat with [Enemy Name] with [current HP] out of [max HP]. What will you do?"
+
+Implementation:
+
+AudioManager.stopAll()
+
+speak(
+  `Resuming your adventure. You are in combat with ${enemy.name} with ${enemy.hp} out of ${enemy.maxHp}. What will you do?`,
+  { interrupt: true }
+)
+
+DO NOT:
+- Speak combat logs
+- Speak previous actions
+
+-------------------------------------
+
+STEP 6 — HANDLE GAME OVER STATE
+
+IF:
+gameState.gameStatus === "GAME_OVER"
+
+Speak:
+
+"You have fallen. Would you like to restart this level?"
+
+-------------------------------------
+
+STEP 7 — HANDLE VICTORY STATE
+
+IF:
+gameState.gameStatus === "VICTORY"
+
+DO NOT replay full victory logs
+
+Instead:
+
+Speak ONLY:
+
+"You have completed this level. Would you like to proceed?"
+
+Then trigger:
+setGameMode("levelDecision")
+
+-------------------------------------
+
+STEP 8 — RE-ENABLE NORMAL TTS AFTER LOAD
+
+After initial narration finishes:
+
+AudioManager.onQueueDrained(() => {
+  isHydratingRef.current = false
+  startListening()
+})
+
+-------------------------------------
+
+STEP 9 — USER COMMAND TTS (UNCHANGED)
+
+Ensure:
+
+When user:
+- speaks a command
+- clicks a button
+
+THEN:
+speakLines(newLines) works normally
+
+Condition:
+
+ONLY run if:
+isHydratingRef.current === false
+
+-------------------------------------
+
+STEP 10 — PREVENT DOUBLE SPEECH
+
+Before any initial narration:
+
+AudioManager.stopAll()
+
+Clear queue completely to avoid overlap.
+
+-------------------------------------
+
+STEP 11 — TEST CASES
+
+1. New user:
+- Hears welcome
+- Then room description + exits ONLY
+
+2. Returning user:
+- Same behavior
+
+3. Refresh while exploring:
+- ONLY room + exits
+
+4. Refresh mid-combat:
+- ONLY combat summary message
+
+5. No terminal logs spoken automatically
+
+6. After user command:
+- Logs are spoken normally
+
+7. Mic activates AFTER narration finishes
+
+-------------------------------------
+
+HARD RULES:
+
+- NEVER narrate terminal logs on load
+- NEVER mix old logs with new narration
+- ALWAYS prioritize clarity for visually impaired users
+- KEEP narration SHORT, CLEAR, CONTEXTUAL
+
+-------------------------------------
+
+SUCCESS CRITERIA:
+
+- Clean, predictable narration on load
+- No repeated or confusing logs
+- Perfect voice-first UX
