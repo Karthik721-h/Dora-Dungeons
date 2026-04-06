@@ -175,6 +175,9 @@ export function AuthScreen({ auth }: AuthScreenProps) {
     interimTranscript,
     startListening,
     stopListening,
+    toggleListening,
+    needsActivation,
+    isPTT,
   } = useVoiceInput({ onFinalTranscript: handleTranscript });
 
   // ── speakThenListen helper ────────────────────────────────────────────────
@@ -320,7 +323,8 @@ export function AuthScreen({ auth }: AuthScreenProps) {
 
   // ── Mic indicator colour ──────────────────────────────────────────────────
   const micColor =
-    step === "processing" ? "rgba(200,155,60,0.6)"
+    step === "processing"          ? "rgba(200,155,60,0.6)"
+    : needsActivation              ? "#c89b3c"
     : voiceState === "listening"   ? "#34d399"
     : voiceState === "speaking"    ? "#3a86ff"
     : voiceState === "processing"  ? "#c89b3c"
@@ -519,9 +523,17 @@ export function AuthScreen({ auth }: AuthScreenProps) {
 
             {/* Mic circle + step label */}
             <div className="flex flex-col items-center gap-2">
-              <motion.div
+              <motion.button
+                onClick={(needsActivation || isPTT) ? toggleListening : undefined}
+                aria-label={
+                  needsActivation
+                    ? (isPTT ? "Tap to speak" : "Tap to activate microphone")
+                    : voiceState === "listening" ? "Microphone active" : "Microphone"
+                }
                 animate={{
-                  boxShadow: voiceState === "listening"
+                  boxShadow: needsActivation
+                    ? ["0 0 0 0 rgba(200,155,60,0.5)", "0 0 0 16px rgba(200,155,60,0)", "0 0 0 0 rgba(200,155,60,0.5)"]
+                    : voiceState === "listening"
                     ? ["0 0 0 0 rgba(52,211,153,0.5)", "0 0 0 14px rgba(52,211,153,0)", "0 0 0 0 rgba(52,211,153,0.5)"]
                     : voiceState === "speaking"
                     ? ["0 0 0 0 rgba(58,134,255,0.5)", "0 0 0 12px rgba(58,134,255,0)", "0 0 0 0 rgba(58,134,255,0.5)"]
@@ -535,20 +547,23 @@ export function AuthScreen({ auth }: AuthScreenProps) {
                   border: `2px solid ${micColor}`,
                   display: "flex", alignItems: "center", justifyContent: "center",
                   transition: "border-color 0.3s ease",
+                  cursor: (needsActivation || isPTT) ? "pointer" : "default",
+                  outline: "none",
+                  padding: 0,
                 }}
               >
                 {step === "processing" || voiceState === "processing"
                   ? <Loader2 size={22} className="animate-spin" style={{ color: micColor }} />
                   : voiceState === "listening" || voiceState === "speaking"
                   ? <Mic size={22} style={{ color: micColor }} />
-                  : <MicOff size={22} style={{ color: micColor }} />
+                  : <Mic size={22} style={{ color: micColor }} />
                 }
-              </motion.div>
+              </motion.button>
 
-              {/* Step instruction */}
+              {/* Step instruction — override with mobile activation prompt */}
               <AnimatePresence mode="wait">
                 <motion.p
-                  key={step}
+                  key={needsActivation ? "needs-activation" : step}
                   initial={{ opacity: 0, y: 4 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -4 }}
@@ -559,11 +574,15 @@ export function AuthScreen({ auth }: AuthScreenProps) {
                     fontSize: "0.7rem",
                     letterSpacing: "0.18em",
                     textTransform: "uppercase",
-                    color: step === "processing" ? "rgba(200,155,60,0.7)" : "rgba(200,185,160,0.7)",
+                    color: needsActivation ? "#c89b3c"
+                      : step === "processing" ? "rgba(200,155,60,0.7)"
+                      : "rgba(200,185,160,0.7)",
                     textAlign: "center",
                   }}
                 >
-                  {STEP_LABEL[step]}
+                  {needsActivation
+                    ? (isPTT ? "Tap mic to speak" : "Tap mic to activate")
+                    : STEP_LABEL[step]}
                 </motion.p>
               </AnimatePresence>
             </div>
