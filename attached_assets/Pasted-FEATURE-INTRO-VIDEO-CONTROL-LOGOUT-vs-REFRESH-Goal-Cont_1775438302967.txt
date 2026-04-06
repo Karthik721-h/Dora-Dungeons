@@ -1,0 +1,106 @@
+FEATURE: INTRO VIDEO CONTROL (LOGOUT vs REFRESH)
+
+Goal:
+Control intro video behavior based on HOW the user reached the unauthenticated state.
+
+RULES:
+
+1. Logout / Exit → GO TO login/signup (NO intro)
+2. Refresh (not logged in) → SHOW intro video
+3. Logged-in users → NEVER see intro
+4. Intro should ONLY appear on fresh page load, not navigation
+
+-------------------------------------
+
+STEP 1 — DIFFERENTIATE LOGOUT vs REFRESH
+
+Use sessionStorage (NOT localStorage)
+
+Reason:
+- sessionStorage resets on refresh → good for detecting reload
+- persists during navigation → good for logout control
+
+-------------------------------------
+
+STEP 2 — SET LOGOUT FLAG
+
+When user logs out OR exits game:
+
+In logout handler:
+
+sessionStorage.setItem("skipIntro", "true")
+
+Then:
+redirect to "/auth" (login/signup page)
+
+
+-------------------------------------
+
+STEP 3 — AUTHENTICATED GUARD
+
+If user IS authenticated:
+
+→ NEVER render IntroVideo
+
+Even if:
+- skipIntro is missing
+- refresh happens
+
+-------------------------------------
+
+STEP 4 — DISABLE INTRO DURING GAME
+
+Double guard:
+
+IF route === "/game" OR user != null:
+→ return null for IntroVideo
+
+
+-------------------------------------
+
+STEP 5 — TEST SCENARIOS
+
+1. NEW USER (first visit):
+   → Intro plays ✅
+
+2. USER LOGS OUT:
+   → Goes to login/signup (NO intro) ✅
+
+3. USER REFRESHES on login page:
+   → Intro plays again ✅
+
+4. USER LOGGED IN:
+   → No intro ever ✅
+
+5. USER REFRESHES inside game:
+   → No intro ✅
+
+6. USER EXITS via voice ("log out"):
+   → No intro ✅
+
+-------------------------------------
+
+EDGE CASE HANDLING:
+
+- If user opens new tab:
+  → Intro SHOULD show (new session)
+
+- If user logs out and refreshes:
+  → Refresh clears sessionStorage → intro shows (expected)
+
+-------------------------------------
+
+HARD RULES:
+
+- NEVER use localStorage for skipIntro
+- NEVER persist skipIntro across sessions
+- NEVER show intro after logout navigation
+- ALWAYS show intro on true refresh
+
+-------------------------------------
+
+SUCCESS CRITERIA:
+
+- Intro appears ONLY on fresh unauthenticated loads
+- Logout is smooth (no intro interruption)
+- UX feels intentional and controlled

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -105,12 +105,36 @@ function GameOrchestrator({ onLogout, playerFirstName }: { onLogout: () => void;
   );
 }
 
+// sessionStorage key written by logout/exit so the intro is skipped when the
+// user lands on the auth screen via an intentional action rather than a cold
+// page load.  sessionStorage is tab-scoped and resets on a true refresh, which
+// is exactly the behaviour we want:
+//   • Fresh page load   → key absent  → intro plays
+//   • Logout / exit     → key present → skip intro, go straight to auth
+//   • New tab           → key absent  → intro plays  (new session)
+//   • Refresh after logout → key cleared by browser → intro plays (fine)
+const SKIP_INTRO_KEY = "dd_skip_intro";
+
 function App() {
   const auth = useJwtAuth();
-  // Pre-auth video intro — shown once per page load for unauthenticated users.
-  // React state only (no persistence) so it re-shows on every unauthenticated
-  // page load. Authenticated users never reach this branch.
-  const [hasSeenIntro, setHasSeenIntro] = useState(false);
+
+  // Consume the skip flag once on mount.  Reading + deleting inside useState
+  // keeps this synchronous (no flash) and prevents it persisting for the
+  // lifetime of the React tree.
+  const [hasSeenIntro, setHasSeenIntro] = useState(() => {
+    const skip = sessionStorage.getItem(SKIP_INTRO_KEY) === "true";
+    if (skip) sessionStorage.removeItem(SKIP_INTRO_KEY);
+    return skip;
+  });
+
+  // Logout handler: skip the intro both for THIS render (setHasSeenIntro) and
+  // for any same-tab page reload that follows (sessionStorage key).
+  const handleLogout = useCallback(() => {
+    sessionStorage.setItem(SKIP_INTRO_KEY, "true");
+    setHasSeenIntro(true);   // immediate — no intro flash within this React tree
+    auth.logout();
+    AudioManager.stop();
+  }, [auth]);
 
   useEffect(() => {
     AudioManager.initializeVoices();
@@ -164,8 +188,8 @@ function App() {
             <Switch>
               <Route path="/payment-success" component={() => <PaymentSuccessPage />} />
               <Route path="/payment-cancel" component={() => <PaymentCancelPage />} />
-              <Route path="/" component={() => <GameOrchestrator onLogout={auth.logout} playerFirstName={auth.user?.firstName} />} />
-              <Route component={() => <GameOrchestrator onLogout={auth.logout} playerFirstName={auth.user?.firstName} />} />
+              <Route path="/" component={() => <GameOrchestrator onLogout={handleLogout} playerFirstName={auth.user?.firstName} />} />
+              <Route component={() => <GameOrchestrator onLogout={handleLogout} playerFirstName={auth.user?.firstName} />} />
             </Switch>
           </WouterRouter>
         </motion.div>
