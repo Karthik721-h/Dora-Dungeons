@@ -86,7 +86,7 @@ export function PlayerHUD({
 
   return (
     <div
-      className="glass-panel p-4 flex flex-col gap-4 overflow-y-auto"
+      className="glass-panel p-2 sm:p-4 flex flex-col gap-2 sm:gap-4 overflow-y-auto"
       style={{
         borderColor: isCombat ? "rgba(139,30,30,0.4)" : undefined,
         boxShadow: isCombat

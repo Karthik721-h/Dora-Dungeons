@@ -1246,7 +1246,7 @@ export function GameScreen({
         </div>
 
         {/* Center: game status + dungeon level */}
-        <div className="dd-navbar-center">
+        <div className="dd-navbar-center min-w-0">
           <span
             className="status-badge"
             style={{
@@ -1400,7 +1400,7 @@ export function GameScreen({
           </div>
 
           {/* Rate control */}
-          <div className="flex items-center gap-0.5" style={{ color: "rgba(200,190,180,0.35)" }}>
+          <div className="hidden sm:flex items-center gap-0.5" style={{ color: "rgba(200,190,180,0.35)" }}>
             <button
               onClick={() => adjustRate(-0.1)}
               className="p-1 hover:text-white transition-colors rounded"
@@ -1463,7 +1463,7 @@ export function GameScreen({
       </header>
 
       {/* ══════════════ LOCATION STRIP ══════════════ */}
-      <div className="location-strip">
+      <div className="location-strip px-2 sm:px-6">
         <Map size={12} style={{ color: "rgba(200,155,60,0.55)", flexShrink: 0 }} />
         <span
           className="font-display text-xs uppercase tracking-widest"
@@ -1579,7 +1579,7 @@ export function GameScreen({
       </div>
 
       {/* ══════════════ MAIN CONTENT ══════════════ */}
-      <div className="relative z-10 flex flex-col flex-1 overflow-hidden px-3 pt-3 pb-0 gap-3" style={{ minHeight: 0 }}>
+      <div className="relative z-10 flex flex-col flex-1 overflow-hidden px-2 sm:px-3 pt-2 sm:pt-3 pb-0 gap-2 sm:gap-3" style={{ minHeight: 0 }}>
 
         {/* Terminal / Narration feed */}
         <div className="terminal-panel flex flex-col" style={{ height: "clamp(200px, 45vh, 480px)", flexShrink: 0 }}>
@@ -1632,7 +1632,7 @@ export function GameScreen({
         </div>
 
         {/* Bottom HUD: 2-col on desktop, stacked on mobile */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 flex-1 min-h-0 pb-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3 flex-1 min-h-0 pb-2 sm:pb-3">
           <PlayerHUD
             name={player.name}
             level={player.level}
