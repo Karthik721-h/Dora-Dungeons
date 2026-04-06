@@ -62,7 +62,6 @@ function migratePlayer(player: GameState["player"]): GameState["player"] {
     // Dungeon progression
     dungeonLevel:          player.dungeonLevel          ?? 1,
     dungeonLevelCompleted: player.dungeonLevelCompleted ?? false,
-    hasPaid:               player.hasPaid               ?? false,
   };
 }
 

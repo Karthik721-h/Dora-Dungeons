@@ -1,0 +1,194 @@
+FEATURE: REMOVE STRIPE & PAYWALL SYSTEM (SAFE CLEANUP)
+
+OBJECTIVE:
+Completely remove Stripe and all payment-related logic from the game WITHOUT breaking:
+
+* Level progression
+* Voice system (TTS + commands)
+* Game state / save system
+* UI flows
+
+---
+
+STEP 1 — REMOVE BACKEND PAYWALL
+
+File: /api/game/next-level
+
+REMOVE:
+
+* hasPaid checks
+* paymentStatus checks
+* 402 PAYMENT_REQUIRED responses
+
+REPLACE WITH:
+
+if (!userId) {
+return res.status(401).json({ error: "UNAUTHORIZED" });
+}
+
+if (state.gameStatus !== "VICTORY") {
+return res.status(400).json({ error: "LEVEL_NOT_COMPLETE" });
+}
+
+// Continue to next level normally
+
+---
+
+STEP 2 — DELETE PAYMENT ROUTES
+
+DELETE these files completely:
+
+/api/payment/create-checkout-session.ts
+/api/payment/webhook.ts
+/api/payment/status.ts
+/api/payment/success.ts
+/api/payment/cancel.ts
+
+---
+
+STEP 3 — REMOVE STRIPE FROM PROJECT
+
+DELETE:
+
+* All Stripe imports
+* Stripe SDK usage
+
+REMOVE ENV VARIABLES:
+
+* STRIPE_SECRET_KEY
+* STRIPE_PUBLIC_KEY
+* STRIPE_WEBHOOK_SECRET
+
+Search entire project and remove:
+stripe
+checkout
+webhook
+
+---
+
+STEP 4 — CLEAN DATABASE & TYPES
+
+REMOVE these fields everywhere:
+
+hasPaid
+paymentStatus
+stripeCustomerId
+
+Remove from:
+
+* Player type
+* DB schema
+* Session storage
+* Serialization logic
+
+---
+
+STEP 5 — REMOVE FRONTEND PAYMENT LOGIC
+
+File: GameScreen.tsx
+
+REMOVE:
+
+* paymentDecision mode
+* hasPaid state
+* hasAnnouncedPaymentRef
+* Payment polling logic
+* URL params (?payment=success, ?payment=cancelled)
+
+---
+
+STEP 6 — FIX LEVEL COMPLETION TTS
+
+REPLACE ALL payment-related narration with:
+
+"Congratulations. You have completed this dungeon. Would you like to continue to the next level?"
+
+---
+
+STEP 7 — STANDARDIZE VOICE COMMANDS
+
+ENSURE:
+
+"yes" → go to next level
+"next level" → go to next level
+"no" → replay prompt
+
+REMOVE:
+
+* "upgrade"
+* any payment-related commands
+
+---
+
+STEP 8 — UPDATE MODAL UI
+
+REPLACE payment modal with:
+
+Title:
+Level Complete
+
+Message:
+Would you like to continue to the next level?
+
+Buttons:
+RIGHT → Yes (next level)
+LEFT → No (replay prompt)
+
+---
+
+STEP 9 — FIX LOGIN RESUME FLOW
+
+REPLACE:
+
+"Say upgrade to proceed"
+
+WITH:
+
+"You have completed this level. Say next level to continue your adventure."
+
+---
+
+STEP 10 — GLOBAL CLEANUP
+
+Search and REMOVE all references to:
+
+payment
+stripe
+hasPaid
+checkout
+webhook
+upgrade (payment context only)
+
+---
+
+STEP 11 — DO NOT MODIFY
+
+* LEVEL_COMPLETED event system
+* levelDecision / replayPrompt flow
+* Dungeon system
+* Save/restore logic
+* TTS system
+
+---
+
+STEP 12 — TESTING CHECKLIST
+
+Verify:
+
+1. Beat Level 1 → continue prompt appears (NO payment)
+2. Say "yes" → Level 2 loads
+3. Say "no" → replay prompt appears
+4. Login after completion → "next level" works
+5. No Stripe redirects anywhere
+6. No console/server errors
+7. Voice commands fully working
+
+---
+
+SUCCESS RESULT:
+
+* No Stripe code remains
+* No payment system exists
+* Game progression is fully free
+* Voice UX unchanged
+* No regressions

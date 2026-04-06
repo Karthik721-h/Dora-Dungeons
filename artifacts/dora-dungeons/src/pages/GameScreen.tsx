@@ -94,30 +94,11 @@ export function GameScreen({
   const deathTtsSpokenRef = useRef(false);
 
   // ── Level progression decision state ─────────────────────────────────────────
-  // "explore"         → normal gameplay
-  // "levelDecision"   → boss defeated, asking "next level or replay?"
-  // "replayPrompt"    → player chose no, asking "replay or exit?"
-  // "paymentDecision" → Level 1 boss beaten, payment required before Level 2
-  const [gameMode, setGameMode] = useState<"explore" | "levelDecision" | "replayPrompt" | "paymentDecision">("explore");
+  // "explore"       → normal gameplay
+  // "levelDecision" → boss defeated, asking "next level or replay?"
+  // "replayPrompt"  → player chose no, asking "replay or exit?"
+  const [gameMode, setGameMode] = useState<"explore" | "levelDecision" | "replayPrompt">("explore");
   const [progressionPending, setProgressionPending] = useState(false);
-  const [paymentPending, setPaymentPending] = useState(false);
-
-  // ── Payment-return detection ──────────────────────────────────────────────────
-  // Read ?payment=success / ?payment=cancelled from the URL synchronously during
-  // component init so the VICTORY recovery effect can read them on its single run.
-  const [paymentJustReturned] = useState(
-    () => new URLSearchParams(window.location.search).get("payment") === "success"
-  );
-  const [paymentJustCancelled] = useState(
-    () => new URLSearchParams(window.location.search).get("payment") === "cancelled"
-  );
-  // Prevents the payment-confirmed TTS from firing more than once even if the
-  // component somehow re-mounts (e.g. strict mode double-invoke in dev).
-  const hasAnnouncedPaymentRef  = useRef(false);
-  const hasAnnouncedWaitingRef  = useRef(false);
-  // When ?payment=success returns but the webhook hasn't fired yet, we poll
-  // /api/payment/status until hasPaid is confirmed, then auto-transition.
-  const [webhookWaiting, setWebhookWaiting] = useState(false);
 
   // Gold comes directly from gameState.gold — no separate shopGold state.
   const [shopWeapons, setShopWeapons] = useState<ShopWeapon[]>(() =>
@@ -151,7 +132,7 @@ export function GameScreen({
   const queryClient = useQueryClient();
   const stopListeningRef    = useRef<() => void>(() => {});
   const startListeningRef   = useRef<() => void>(() => {});
-  const gameModeRef         = useRef<"explore" | "levelDecision" | "replayPrompt" | "paymentDecision">("explore");
+  const gameModeRef         = useRef<"explore" | "levelDecision" | "replayPrompt">("explore");
   const onLogoutRef = useRef(onLogout);
   const voiceGenderRef = useRef(voiceGender);
   const voiceDropdownRef = useRef<HTMLDivElement>(null);
@@ -350,36 +331,18 @@ export function GameScreen({
             AudioManager.playRewardChime();
           }
           // ── Dungeon level completion → progression decision ───────────────────
-          // If the player just finished Level 1 and hasn't paid, route them
-          // to the payment flow. Otherwise show the normal next/replay prompt.
           if (newData.event === "LEVEL_COMPLETED") {
-            const needsPayment = newData.player.dungeonLevel === 1 && !newData.player.hasPaid;
-            if (needsPayment) {
-              gameModeRef.current = "paymentDecision";
-              setGameMode("paymentDecision");
-              if (!isMutedRef.current) {
-                AudioManager.speak(
-                  "The path forward is sealed by ancient magic. Only those who pledge their commitment may enter the next dungeon. A one-time offering of 30 dollars unlocks all future adventures. Say yes to proceed, or no to replay the dungeon.",
-                  { interrupt: true }
-                );
-                AudioManager.onQueueDrained(() => {
-                  stopListeningRef.current?.();
-                  setTimeout(() => startListeningRef.current(), 120);
-                });
-              }
-            } else {
-              gameModeRef.current = "levelDecision";
-              setGameMode("levelDecision");
-              if (!isMutedRef.current) {
-                AudioManager.speak(
-                  `Congratulations! Dungeon level ${newData.player.dungeonLevel} complete. You defeated the boss. Would you like to advance to the next level? Say yes to continue, or say no for other options.`,
-                  { interrupt: true }
-                );
-                AudioManager.onQueueDrained(() => {
-                  stopListeningRef.current?.();
-                  setTimeout(() => startListeningRef.current(), 120);
-                });
-              }
+            gameModeRef.current = "levelDecision";
+            setGameMode("levelDecision");
+            if (!isMutedRef.current) {
+              AudioManager.speak(
+                `Congratulations! Dungeon level ${newData.player.dungeonLevel} complete. You defeated the boss. Would you like to advance to the next level? Say yes to continue, or say no to replay the dungeon.`,
+                { interrupt: true }
+              );
+              AudioManager.onQueueDrained(() => {
+                stopListeningRef.current?.();
+                setTimeout(() => startListeningRef.current(), 120);
+              });
             }
           }
         }
@@ -422,11 +385,6 @@ export function GameScreen({
       // ── Level progression decision handlers ──────────────────────────────────
       if (trimmed === "next_level") {
         nextLevelApi();
-        return;
-      }
-
-      if (trimmed === "initiate_payment") {
-        initiatePayment();
         return;
       }
 
@@ -622,41 +580,17 @@ export function GameScreen({
         const isYes = /^(?:yes|yeah|yep|yup|sure|proceed|continue|advance|next|ok|okay|affirm|go|accept)$/.test(normalized);
         const isNo  = /^(?:no|nope|nah|cancel|decline|negative|stay|back|return|stop)$/.test(normalized);
 
-        if (gameModeRef.current === "paymentDecision") {
-          if (isYes) {
-            submitCommand("initiate_payment");
-          } else if (isNo) {
-            gameModeRef.current = "replayPrompt";
-            setGameMode("replayPrompt");
-            if (!isMutedRef.current) {
-              AudioManager.speak(
-                "You may continue exploring this dungeon, but greater challenges await beyond the sealed gate. Say yes whenever you are ready to proceed.",
-                { interrupt: true }
-              );
-            }
-          } else if (!isMutedRef.current) {
-            AudioManager.speak(
-              "Say yes to proceed with payment, or no to replay the dungeon.",
-              { interrupt: false }
-            );
-          }
-        } else if (gameModeRef.current === "levelDecision") {
-          // "next level" as a two-word phrase is the natural post-payment command.
+        if (gameModeRef.current === "levelDecision") {
           const isNextLevel = /^next\s+level$/i.test(normalized);
           if (isYes || isNextLevel) {
             submitCommand("next_level");
           } else if (isNo) {
-            // When paid, skip the extra "replay or exit?" prompt — go straight to replay.
-            if (gameStateRef.current.player.hasPaid) {
-              submitCommand("replay_level");
-            } else {
-              submitCommand("replay_prompt");
-            }
+            submitCommand("replay_prompt");
           } else if (!isMutedRef.current) {
-            const hint = gameStateRef.current.player.hasPaid
-              ? "Say next level to continue, or no to replay this level."
-              : "Say yes to advance to the next level, or no for other options.";
-            AudioManager.speak(hint, { interrupt: false });
+            AudioManager.speak(
+              "Say yes to advance to the next level, or no for other options.",
+              { interrupt: false }
+            );
           }
         } else if (gameModeRef.current === "replayPrompt") {
           if (isYes) {
@@ -778,142 +712,23 @@ export function GameScreen({
   // ── Restore decision mode if the page was refreshed during a VICTORY ────────
   // gameMode is React state and resets to "explore" on every mount. If the DB
   // still has gameStatus === "VICTORY" (boss was killed but no choice was made),
-  // the player would be stuck with no way to advance. This effect runs exactly
-  // once on mount, detects that condition, and re-enters levelDecision mode.
+  // re-enter levelDecision so the player isn't stuck.
   useEffect(() => {
-    // ── Clean ?payment=success / ?payment=cancelled from the URL ─────────────
-    if (paymentJustReturned || paymentJustCancelled) {
-      const clean = new URL(window.location.href);
-      clean.searchParams.delete("payment");
-      window.history.replaceState({}, "", clean.toString());
-    }
-
     if (gameState.gameStatus !== "VICTORY") return;
-
-    const needsPayment = gameState.player.dungeonLevel === 1 && !gameState.player.hasPaid;
-
-    if (needsPayment) {
-      // hasPaid is still false — either the webhook hasn't fired yet, or the
-      // player cancelled. Keep them in the paymentDecision gate.
-      gameModeRef.current = "paymentDecision";
-      setGameMode("paymentDecision");
-      if (!isMutedRef.current) {
-        if (paymentJustReturned) {
-          // Webhook hasn't fired yet — speak a holding message and start polling.
-          if (!hasAnnouncedWaitingRef.current) {
-            hasAnnouncedWaitingRef.current = true;
-            AudioManager.speak(
-              "Finalizing your access. This may take a few seconds. Please wait.",
-              { interrupt: true }
-            );
-          }
-          setWebhookWaiting(true);
-        } else {
-          let msg: string;
-          if (paymentJustCancelled) {
-            msg = "Payment was not completed. No charge was made. You must complete payment to access Level 2 and beyond. Say yes to try again, or no to replay the dungeon.";
-          } else {
-            msg = "The path forward is sealed by ancient magic. Only those who pledge their commitment may enter the next dungeon. A one-time offering of 30 dollars unlocks all future adventures. Say yes to proceed, or no to replay the dungeon.";
-          }
-          AudioManager.speak(msg, { interrupt: true });
-          AudioManager.onQueueDrained(() => {
-            stopListeningRef.current?.();
-            setTimeout(() => startListeningRef.current(), 120);
-          });
-        }
-      }
-    } else {
-      // hasPaid is true — enter the normal level-decision flow.
-      gameModeRef.current = "levelDecision";
-      setGameMode("levelDecision");
-      if (!isMutedRef.current) {
-        // If the player just returned from Stripe checkout, use payment-specific TTS
-        // so they hear confirmation rather than the generic "congratulations" message.
-        // hasAnnouncedPaymentRef prevents double-firing in React strict-mode dev.
-        if (paymentJustReturned && !hasAnnouncedPaymentRef.current) {
-          hasAnnouncedPaymentRef.current = true;
-          AudioManager.speak(
-            "Payment confirmed. The ancient seal has been broken. A new dungeon awakens before you. Say next level to continue your adventure.",
-            { interrupt: true }
-          );
-        } else if (!paymentJustReturned) {
-          AudioManager.speak(
-            "Congratulations. You have completed this level. Would you like to continue to the next level? Say yes to advance, or no for other options.",
-            { interrupt: true }
-          );
-        }
-        AudioManager.onQueueDrained(() => {
-          stopListeningRef.current?.();
-          setTimeout(() => startListeningRef.current(), 120);
-        });
-      }
+    gameModeRef.current = "levelDecision";
+    setGameMode("levelDecision");
+    if (!isMutedRef.current) {
+      AudioManager.speak(
+        "Congratulations. You have completed this level. Would you like to continue to the next level? Say yes to advance, or no for other options.",
+        { interrupt: true }
+      );
+      AudioManager.onQueueDrained(() => {
+        stopListeningRef.current?.();
+        setTimeout(() => startListeningRef.current(), 120);
+      });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // intentional empty array — runs exactly once on mount
-
-  // ── Webhook-delay poller ─────────────────────────────────────────────────────
-  // When the player returned from Stripe but the webhook hasn't confirmed yet,
-  // we poll /api/payment/status every 2 s (up to 6 tries = 12 s). On success we
-  // transition to levelDecision and speak the reward TTS. On timeout we fall back
-  // to the standard paymentDecision gate so the player isn't stuck.
-  useEffect(() => {
-    if (!webhookWaiting) return;
-    const BASE = import.meta.env.BASE_URL as string;
-    const token = localStorage.getItem("dd_jwt");
-    let attempts = 0;
-    const MAX = 6;
-
-    const poll = async () => {
-      try {
-        const res = await fetch(`${BASE}api/payment/status`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
-        if (res.ok) {
-          const data = await res.json() as { hasPaid: boolean };
-          if (data.hasPaid) {
-            setWebhookWaiting(false);
-            gameModeRef.current = "levelDecision";
-            setGameMode("levelDecision");
-            if (!isMutedRef.current && !hasAnnouncedPaymentRef.current) {
-              hasAnnouncedPaymentRef.current = true;
-              AudioManager.speak(
-                "Payment confirmed. The ancient seal has been broken. A new dungeon awakens before you. Say next level to continue your adventure.",
-                { interrupt: true }
-              );
-              AudioManager.onQueueDrained(() => {
-                stopListeningRef.current?.();
-                setTimeout(() => startListeningRef.current(), 120);
-              });
-            }
-            return; // done — do not reschedule
-          }
-        }
-      } catch {
-        // network error — continue polling
-      }
-      attempts += 1;
-      if (attempts >= MAX) {
-        // Webhook took too long — drop into the normal payment gate.
-        setWebhookWaiting(false);
-        if (!isMutedRef.current) {
-          AudioManager.speak(
-            "Access could not be confirmed. If you completed payment, please refresh the page. Otherwise, say yes to try again.",
-            { interrupt: true }
-          );
-          AudioManager.onQueueDrained(() => {
-            stopListeningRef.current?.();
-            setTimeout(() => startListeningRef.current(), 120);
-          });
-        }
-      } else {
-        id = window.setTimeout(poll, 2000);
-      }
-    };
-
-    let id = window.setTimeout(poll, 2000);
-    return () => window.clearTimeout(id);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [webhookWaiting]);
 
   // ── Click-outside: close voice dropdown ──────────────────────────────────────
   // Check both the trigger container AND the portaled menu (rendered in document.body).
@@ -1124,32 +939,6 @@ export function GameScreen({
       });
     } finally {
       setProgressionPending(false);
-    }
-  };
-
-  // ── Payment initiation ────────────────────────────────────────────────────
-  const initiatePayment = async () => {
-    if (paymentPending) return;
-    setPaymentPending(true);
-    stopListeningRef.current?.();
-    AudioManager.stop();
-    try {
-      const resp = await customFetch<{ url: string }>(
-        `${import.meta.env.BASE_URL}api/payment/create-checkout-session`,
-        { method: "POST" }
-      );
-      if (resp.url) {
-        window.location.href = resp.url;
-      }
-    } catch {
-      setPaymentPending(false);
-      AudioManager.speak(
-        "There was an error starting the payment. Please try again.",
-        { interrupt: true }
-      );
-      AudioManager.onQueueDrained(() => {
-        startListeningRef.current?.();
-      });
     }
   };
 
@@ -1668,63 +1457,11 @@ export function GameScreen({
 
       {/* ── Unified modal system — all overlays via GameModal (portal, z-9999) ── */}
       {(() => {
-        type ModalView = "paymentDecision" | "levelDecision" | "replayPrompt" | "death" | null;
+        type ModalView = "levelDecision" | "replayPrompt" | "death" | null;
         const modalView: ModalView =
-          isGameOver          ? "death" :
+          isGameOver             ? "death" :
           gameMode !== "explore" ? (gameMode as ModalView) :
           null;
-
-        // ── Payment Decision ──────────────────────────────────────────────
-        if (modalView === "paymentDecision") {
-          return (
-            <GameModal
-              isOpen
-              title="LEVEL 1 COMPLETE"
-              accentColor="#c89b3c"
-              disableClose
-              actions={
-                <>
-                  <ModalButton
-                    variant="secondary"
-                    ariaLabel="No, replay Level 1"
-                    disabled={paymentPending}
-                    onClick={() => {
-                      if (paymentPending) return;
-                      gameModeRef.current = "replayPrompt";
-                      setGameMode("replayPrompt");
-                      AudioManager.speak(
-                        "Would you like to replay Level 1, or exit the dungeon? Say yes to replay, or no to exit.",
-                        { interrupt: true }
-                      );
-                    }}
-                  >
-                    No — Replay
-                  </ModalButton>
-                  <ModalButton
-                    variant="primary"
-                    ariaLabel="Yes, proceed to payment and unlock all levels"
-                    disabled={paymentPending}
-                    onClick={() => { if (!paymentPending) initiatePayment(); }}
-                  >
-                    {paymentPending ? "Redirecting…" : "Yes — Unlock ($30)"}
-                  </ModalButton>
-                </>
-              }
-            >
-              <div className="rune-divider w-52 mx-auto">⚔</div>
-              <p className="font-narration italic text-xl" style={{ color: "rgba(200,155,60,0.75)" }}>
-                The dungeon boss has fallen. Deeper darkness awaits.
-              </p>
-              <p className="text-base font-bold" style={{ color: "rgba(255,255,255,0.9)", letterSpacing: "0.04em", lineHeight: 1.6 }}>
-                Unlock all dungeon levels for a one-time payment of{" "}
-                <span style={{ color: "#c89b3c" }}>$30</span>.
-              </p>
-              <p style={{ color: "rgba(200,190,180,0.55)", fontSize: "0.75rem", letterSpacing: "0.06em" }}>
-                Say "yes" to pay, or "no" to replay Level 1.
-              </p>
-            </GameModal>
-          );
-        }
 
         // ── Level Decision / Replay Prompt ────────────────────────────────
         if (modalView === "levelDecision" || modalView === "replayPrompt") {
@@ -1740,18 +1477,14 @@ export function GameScreen({
                     variant="secondary"
                     ariaLabel={
                       modalView === "levelDecision"
-                        ? (player.hasPaid ? "No, replay this level" : "No, see other options")
+                        ? "No, see other options"
                         : "No, exit the dungeon"
                     }
                     disabled={progressionPending}
                     onClick={() => {
                       if (progressionPending) return;
                       if (modalView === "levelDecision") {
-                        if (player.hasPaid) {
-                          replayLevelApi();
-                        } else {
-                          submitCommand("replay_prompt");
-                        }
+                        submitCommand("replay_prompt");
                       } else {
                         stopListeningRef.current();
                         AudioManager.speak(
@@ -1762,9 +1495,7 @@ export function GameScreen({
                       }
                     }}
                   >
-                    {modalView === "levelDecision"
-                      ? (player.hasPaid ? "No — Replay" : "No — Other Options")
-                      : "No — Exit"}
+                    {modalView === "levelDecision" ? "No — Other Options" : "No — Exit"}
                   </ModalButton>
                   <ModalButton
                     variant="primary"
@@ -1795,11 +1526,7 @@ export function GameScreen({
                 {modalView === "levelDecision" ? "Proceed to the next level?" : "Replay this level?"}
               </p>
               <p className="text-xs" style={{ color: "rgba(255,255,255,0.28)", letterSpacing: "0.06em" }}>
-                {modalView === "levelDecision" && gameState.player.hasPaid ? (
-                  <>Say <strong style={{ color: "rgba(255,255,255,0.55)" }}>"next level"</strong> or <strong style={{ color: "rgba(255,255,255,0.55)" }}>"no"</strong></>
-                ) : (
-                  <>Say <strong style={{ color: "rgba(255,255,255,0.55)" }}>"yes"</strong> or <strong style={{ color: "rgba(255,255,255,0.55)" }}>"no"</strong></>
-                )}
+                <>Say <strong style={{ color: "rgba(255,255,255,0.55)" }}>"yes"</strong> or <strong style={{ color: "rgba(255,255,255,0.55)" }}>"no"</strong></>
               </p>
               <div className="rune-divider w-52 mx-auto">✦</div>
             </GameModal>

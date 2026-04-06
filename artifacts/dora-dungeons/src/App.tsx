@@ -6,8 +6,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { GameScreen } from "@/pages/GameScreen";
 import { AuthScreen } from "@/pages/AuthScreen";
 import { IntroVideo } from "@/components/IntroVideo";
-import { PaymentSuccessPage } from "@/pages/PaymentSuccessPage";
-import { PaymentCancelPage } from "@/pages/PaymentCancelPage";
 import { useGetGameState, useStartGame, getGetGameStateQueryKey } from "@workspace/api-client-react";
 import { useJwtAuth } from "@/hooks/useJwtAuth";
 import { Loader2 } from "lucide-react";
@@ -309,8 +307,6 @@ function App() {
         >
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
             <Switch>
-              <Route path="/payment-success" component={() => <PaymentSuccessPage />} />
-              <Route path="/payment-cancel" component={() => <PaymentCancelPage />} />
               <Route path="/" component={() => <GameOrchestrator onLogout={handleLogout} playerFirstName={auth.user?.firstName} />} />
               <Route component={() => <GameOrchestrator onLogout={handleLogout} playerFirstName={auth.user?.firstName} />} />
             </Switch>

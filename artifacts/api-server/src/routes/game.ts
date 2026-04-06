@@ -22,8 +22,6 @@ import {
   ShopActionResponse,
 } from "@workspace/api-zod";
 import { loadSession, saveSession, deleteSession } from "../lib/gameSession.js";
-import { db, usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -57,7 +55,6 @@ function serializePlayer(p: Player) {
     })),
     dungeonLevel: p.dungeonLevel ?? 1,
     dungeonLevelCompleted: p.dungeonLevelCompleted ?? false,
-    hasPaid: p.hasPaid ?? false,
   };
 }
 
@@ -124,14 +121,6 @@ router.post("/start", async (req: Request, res: Response) => {
   // Try to resume an existing session first
   const existing = await loadSession(userId);
   if (existing) {
-    // Sync hasPaid from users table into JSONB state on every game-start so
-    // the frontend always sees the authoritative payment status.
-    const [userRow] = await db.select({ hasPaid: usersTable.hasPaid })
-      .from(usersTable).where(eq(usersTable.id, userId)).limit(1);
-    if (userRow && existing.state.player.hasPaid !== userRow.hasPaid) {
-      existing.state.player.hasPaid = userRow.hasPaid;
-      await saveSession(userId, existing.state);
-    }
     const response = StartGameResponse.parse(serializeGameState(existing.state));
     res.json(response);
     return;
@@ -321,21 +310,6 @@ router.post("/next-level", async (req: Request, res: Response) => {
       message: "Can only advance to the next level after defeating the dungeon boss.",
     });
     return;
-  }
-
-  // ── Payment gate: Level 1 → Level 2 requires a one-time payment ─────────────
-  // Always checked against the database (authoritative source) — never trusts
-  // the JSONB state or any client-supplied flag.
-  if (state.player.dungeonLevel === 1) {
-    const [userRow] = await db.select({ hasPaid: usersTable.hasPaid })
-      .from(usersTable).where(eq(usersTable.id, userId)).limit(1);
-    if (!userRow?.hasPaid) {
-      res.status(402).json({
-        error: "PAYMENT_REQUIRED",
-        message: "A one-time payment is required to unlock Level 2 and beyond.",
-      });
-      return;
-    }
   }
 
   const oldPlayer = state.player;

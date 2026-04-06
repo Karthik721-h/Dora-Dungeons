@@ -43,6 +43,4 @@ export interface PlayerState {
   dungeonLevel: number;
   /** True when the boss of the current dungeon has been defeated */
   dungeonLevelCompleted: boolean;
-  /** True when the player has completed the one-time paywall to unlock Level 2+ */
-  hasPaid: boolean;
 }
