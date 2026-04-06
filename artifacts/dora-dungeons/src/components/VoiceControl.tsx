@@ -21,6 +21,10 @@ interface VoiceControlProps {
   onCommandChange: (v: string) => void;
   onSubmit: (cmd: string) => void;
   onToggleListen: () => void;
+  /** iOS: push-to-talk mode — user must tap before each utterance */
+  isPTT?: boolean;
+  /** Mobile: true until user has tapped mic at least once */
+  needsActivation?: boolean;
 }
 
 interface ActionBtnProps {
@@ -75,6 +79,7 @@ function ActionBtn({ icon, label, onClick, disabled, variant = "default", small 
 export function VoiceControl({
   isSupported, audioState, isListening, interimTranscript, intentHint,
   isPending, isGameOver, isModalOpen, isCombat, command, onCommandChange, onSubmit, onToggleListen,
+  isPTT = false, needsActivation = false,
 }: VoiceControlProps) {
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -101,7 +106,9 @@ export function VoiceControl({
     ? "2px solid rgba(58,134,255,0.55)"
     : "2px solid rgba(255,255,255,0.12)";
 
-  const statusLabel = isListening
+  const statusLabel = needsActivation && isSupported
+    ? (isPTT ? "⬤ Tap mic to speak" : "⬤ Tap mic to activate")
+    : isListening
     ? "● Listening"
     : audioState === "speaking"
     ? "● Speaking"
@@ -109,7 +116,9 @@ export function VoiceControl({
     ? "… Processing"
     : "○ Idle";
 
-  const statusColor = isListening
+  const statusColor = needsActivation && isSupported
+    ? "rgba(200,155,60,0.85)"
+    : isListening
     ? "rgba(248,113,113,0.75)"
     : audioState === "speaking"
     ? "rgba(58,134,255,0.75)"
@@ -129,20 +138,42 @@ export function VoiceControl({
             onClick={onToggleListen}
             disabled={isGameOver}
             whileTap={{ scale: 0.91 }}
+            animate={needsActivation && !isGameOver
+              ? { scale: [1, 1.08, 1], opacity: [0.7, 1, 0.7] }
+              : {}}
+            transition={needsActivation
+              ? { repeat: Infinity, duration: 1.6, ease: "easeInOut" }
+              : {}}
             className={`
               relative rounded-full flex items-center justify-center flex-shrink-0 transition-all
               ${isListening ? "mic-listening" : audioState === "speaking" ? "mic-speaking" : ""}
             `}
             style={{
               width: 54, height: 54,
-              background: micBg,
-              border: micBorder,
-              color: micColor,
+              background: needsActivation
+                ? "radial-gradient(circle, rgba(200,155,60,0.22) 0%, rgba(200,155,60,0.06) 100%)"
+                : micBg,
+              border: needsActivation
+                ? "2px solid rgba(200,155,60,0.65)"
+                : micBorder,
+              color: needsActivation ? "#c89b3c" : micColor,
               opacity: isGameOver ? 0.3 : 1,
               cursor: isGameOver ? "not-allowed" : "pointer",
             }}
-            aria-label={isListening ? "Stop voice input" : "Start voice input"}
-            title={isListening ? "Listening — click to stop" : "Click to speak a command"}
+            aria-label={
+              needsActivation
+                ? (isPTT ? "Tap to speak" : "Tap to activate voice input")
+                : isListening
+                ? "Stop voice input"
+                : "Start voice input"
+            }
+            title={
+              needsActivation
+                ? (isPTT ? "Tap mic to speak your command" : "Tap to activate microphone")
+                : isListening
+                ? "Listening — tap to stop"
+                : "Tap to speak a command"
+            }
           >
             {isListening ? <Mic size={22} /> : <MicOff size={22} />}
           </motion.button>

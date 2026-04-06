@@ -568,6 +568,8 @@ export function GameScreen({
     startListening,
     stopListening,
     toggleListening,
+    isPTT,
+    needsActivation,
   } = useVoiceInput({
     onFinalTranscript: (raw) => {
       if (/^(skip intro|skip|enter)$/i.test(raw.trim())) return;
@@ -1451,6 +1453,8 @@ export function GameScreen({
             onCommandChange={setCommand}
             onSubmit={submitCommand}
             onToggleListen={toggleListening}
+            isPTT={isPTT}
+            needsActivation={needsActivation}
           />
         </div>
       </div>
