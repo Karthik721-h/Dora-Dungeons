@@ -44,6 +44,7 @@ export function AuthScreen({ auth }: AuthScreenProps) {
   const [capturedEmail, setCapturedEmail] = useState("");
   const [capturedName, setCapturedName] = useState("");
   const [voiceError, setVoiceError] = useState("");
+  const [ttsCaption, setTtsCaption] = useState("");
 
   // ── Manual fallback state ─────────────────────────────────────────────────
   const [useManual, setUseManual] = useState(false);
@@ -182,9 +183,13 @@ export function AuthScreen({ auth }: AuthScreenProps) {
 
   // ── speakThenListen helper ────────────────────────────────────────────────
   const speakThenListen = useCallback((msg: string) => {
+    setTtsCaption(msg);
     stopListening();
     AudioManager.speak(msg, { interrupt: true });
-    AudioManager.onQueueDrained(() => startListening());
+    AudioManager.onQueueDrained(() => {
+      setTtsCaption("");
+      startListening();
+    });
   }, [startListening, stopListening]);
 
   speakThenListenRef.current = speakThenListen;
@@ -322,9 +327,11 @@ export function AuthScreen({ auth }: AuthScreenProps) {
   }, [useManual, manualMode]);
 
   // ── Mic indicator colour ──────────────────────────────────────────────────
+  // Idle on mobile = gold (tap prompt). Idle on desktop = gold too (prompt to speak).
+  const micIsIdle = voiceState === "idle" && audioUnlocked && step !== "processing";
   const micColor =
     step === "processing"          ? "rgba(200,155,60,0.6)"
-    : needsActivation              ? "#c89b3c"
+    : needsActivation || micIsIdle ? "#c89b3c"
     : voiceState === "listening"   ? "#34d399"
     : voiceState === "speaking"    ? "#3a86ff"
     : voiceState === "processing"  ? "#c89b3c"
@@ -524,14 +531,17 @@ export function AuthScreen({ auth }: AuthScreenProps) {
             {/* Mic circle + step label */}
             <div className="flex flex-col items-center gap-2">
               <motion.button
-                onClick={(needsActivation || isPTT) ? toggleListening : undefined}
+                onClick={step !== "processing" ? toggleListening : undefined}
                 aria-label={
                   needsActivation
                     ? (isPTT ? "Tap to speak" : "Tap to activate microphone")
-                    : voiceState === "listening" ? "Microphone active" : "Microphone"
+                    : voiceState === "listening" ? "Microphone active — listening"
+                    : voiceState === "speaking"  ? "Assistant speaking"
+                    : micIsIdle                  ? "Tap to speak"
+                    : "Microphone"
                 }
                 animate={{
-                  boxShadow: needsActivation
+                  boxShadow: needsActivation || micIsIdle
                     ? ["0 0 0 0 rgba(200,155,60,0.5)", "0 0 0 16px rgba(200,155,60,0)", "0 0 0 0 rgba(200,155,60,0.5)"]
                     : voiceState === "listening"
                     ? ["0 0 0 0 rgba(52,211,153,0.5)", "0 0 0 14px rgba(52,211,153,0)", "0 0 0 0 rgba(52,211,153,0.5)"]
@@ -547,7 +557,7 @@ export function AuthScreen({ auth }: AuthScreenProps) {
                   border: `2px solid ${micColor}`,
                   display: "flex", alignItems: "center", justifyContent: "center",
                   transition: "border-color 0.3s ease",
-                  cursor: (needsActivation || isPTT) ? "pointer" : "default",
+                  cursor: step !== "processing" ? "pointer" : "default",
                   outline: "none",
                   padding: 0,
                 }}
@@ -560,10 +570,10 @@ export function AuthScreen({ auth }: AuthScreenProps) {
                 }
               </motion.button>
 
-              {/* Step instruction — override with mobile activation prompt */}
+              {/* Step instruction — override with activation / idle prompt */}
               <AnimatePresence mode="wait">
                 <motion.p
-                  key={needsActivation ? "needs-activation" : step}
+                  key={needsActivation ? "needs-activation" : micIsIdle ? "idle" : step}
                   initial={{ opacity: 0, y: 4 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -4 }}
@@ -574,7 +584,7 @@ export function AuthScreen({ auth }: AuthScreenProps) {
                     fontSize: "0.7rem",
                     letterSpacing: "0.18em",
                     textTransform: "uppercase",
-                    color: needsActivation ? "#c89b3c"
+                    color: (needsActivation || micIsIdle) ? "#c89b3c"
                       : step === "processing" ? "rgba(200,155,60,0.7)"
                       : "rgba(200,185,160,0.7)",
                     textAlign: "center",
@@ -582,6 +592,8 @@ export function AuthScreen({ auth }: AuthScreenProps) {
                 >
                   {needsActivation
                     ? (isPTT ? "Tap mic to speak" : "Tap mic to activate")
+                    : micIsIdle
+                    ? "Tap mic to speak"
                     : STEP_LABEL[step]}
                 </motion.p>
               </AnimatePresence>
@@ -605,6 +617,29 @@ export function AuthScreen({ auth }: AuthScreenProps) {
                   }}
                 >
                   "{interimTranscript}"
+                </motion.p>
+              )}
+            </AnimatePresence>
+
+            {/* TTS caption — what the assistant is saying */}
+            <AnimatePresence>
+              {ttsCaption && (
+                <motion.p
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.3 }}
+                  style={{
+                    fontFamily: "'Crimson Text', serif",
+                    fontSize: "0.95rem",
+                    color: "rgba(58,134,255,0.7)",
+                    textAlign: "center",
+                    maxWidth: "100%",
+                    wordBreak: "break-word",
+                    fontStyle: "italic",
+                  }}
+                >
+                  {ttsCaption}
                 </motion.p>
               )}
             </AnimatePresence>

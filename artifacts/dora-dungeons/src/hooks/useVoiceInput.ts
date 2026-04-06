@@ -374,18 +374,25 @@ export function useVoiceInput({
    *
    * On mobile: clears needsActivation so _startRecognition() runs synchronously
    * within the gesture, satisfying browser user-gesture requirements.
+   *
+   * Smart behaviour: if intent is set (wantListening=true) but recognition is
+   * NOT actually running, treat this as a restart request rather than a stop.
+   * This lets users recover from stuck/dead recognition by tapping the mic.
    */
   const toggleListening = useCallback(() => {
-    if (wantListeningRef.current) {
+    const actuallyListening = isListeningRef.current;
+    const wantsToListen     = wantListeningRef.current;
+
+    if (wantsToListen && actuallyListening) {
+      // Recognition is running → user wants to stop
       stopListening();
-      // On mobile, reset so they can tap again
       if (IS_MOBILE) _requireActivation();
     } else {
-      // Clear mobile activation gate — this call IS a user gesture
+      // Either not started yet, or intent set but recognition died → restart.
+      // Clear mobile activation gate — this call IS a user gesture.
       if (needsActivationRef.current) {
         needsActivationRef.current = false;
         setNeedsActivation(false);
-        // Also warm up mic (this is a user gesture context)
         _initMic().catch(() => {});
       }
       // Set intent and start directly (synchronous — gesture is preserved)
