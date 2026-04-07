@@ -179,25 +179,25 @@ const PHRASE_PATTERNS: PhrasePair[] = [
 
   // --- Shop: open ---
   {
-    pattern: /^(?:open|enter|go\s+to|visit|access)\s+(?:the\s+)?shop$/,
+    pattern: /^(?:open|enter|go\s+to|visit|access)\s+(?:the\s+)?shop$|^shop$|^merchant$|^store$/,
     canonical: () => "open_shop",
   },
 
   // --- Shop: buy ---
   {
-    pattern: /^(?:buy|purchase|get|browse)\s+(?:weapons?|arms?|gear|equipment|swords?|blades?|axes?)$/,
+    pattern: /^(?:buy|purchase|get|browse)\s+(?:weapons?|arms?|gear|equipment|swords?|blades?|axes?)$|^buy$/,
     canonical: () => "shop_buy",
   },
 
   // --- Shop: sell ---
   {
-    pattern: /^sell\s+(?:items?|stuff|things?|goods?|my\s+items?)$/,
+    pattern: /^sell\s+(?:items?|stuff|things?|goods?|my\s+items?)$|^sell$/,
     canonical: () => "shop_sell",
   },
 
   // --- Shop: upgrade ---
   {
-    pattern: /^upgrade\s+(?:armou?r|gear|equipment|protection|my\s+armou?r)$/,
+    pattern: /^upgrade\s+(?:armou?r|gear|equipment|protection|my\s+armou?r)$|^upgrade$/,
     canonical: () => "shop_upgrade",
   },
 

@@ -37,11 +37,6 @@ import {
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-function getNewLogs(prev: string[], next: string[]): string[] {
-  if (next.length <= prev.length) return [];
-  return next.slice(prev.length);
-}
-
 function extractDirection(cmd: string): string | null {
   const m = cmd.match(/^move\s+(north|south|east|west|up|down)$/);
   return m ? m[1]! : null;

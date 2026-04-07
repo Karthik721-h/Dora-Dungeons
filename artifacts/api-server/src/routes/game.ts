@@ -346,6 +346,9 @@ router.post("/next-level", async (req: Request, res: Response) => {
     "══════════════════════════════",
     `${newState.player.name} descends deeper into the dark.`,
     `Dungeon ${newLevel} awaits. Your gear and gold remain.`,
+    ...(newLevel >= 3
+      ? [`Tip: Enemies grow stronger at this depth. Visit the shop to upgrade your weapons and armor before pressing on.`]
+      : []),
   );
 
   await saveSession(userId, newState);
