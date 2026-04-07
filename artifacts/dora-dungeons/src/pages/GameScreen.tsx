@@ -438,31 +438,33 @@ export function GameScreen({
       if (trimmed === "open_shop") {
         setShopOpen(true);
         setShopMode("main");
-        speakShopOpen();
+        if (!isMutedRef.current) speakShopOpen();
         return;
       }
 
       if (trimmed === "exit_shop") {
         setShopOpen(false);
         setShopMode("main");
-        speakShopExit();
+        if (!isMutedRef.current) speakShopExit();
         return;
       }
 
       if (trimmed === "shop_buy") {
         if (!shopOpenRef.current) { setShopOpen(true); }
         setShopMode("buy");
-        speakWeaponList(SHOP_WEAPONS);
+        if (!isMutedRef.current) speakWeaponList(SHOP_WEAPONS);
         return;
       }
 
       if (trimmed === "shop_sell") {
         if (!shopOpenRef.current) { setShopOpen(true); }
         setShopMode("sell");
-        if (shopItemsRef.current.length === 0) {
-          speakSellEmpty();
-        } else {
-          speakSellList(shopItemsRef.current);
+        if (!isMutedRef.current) {
+          if (shopItemsRef.current.length === 0) {
+            speakSellEmpty();
+          } else {
+            speakSellList(shopItemsRef.current);
+          }
         }
         return;
       }
@@ -470,10 +472,12 @@ export function GameScreen({
       if (trimmed === "shop_upgrade") {
         if (!shopOpenRef.current) { setShopOpen(true); }
         setShopMode("upgrade");
-        if (shopArmorsRef.current.length === 0) {
-          speakNoArmor();
-        } else {
-          speakArmorList(shopArmorsRef.current);
+        if (!isMutedRef.current) {
+          if (shopArmorsRef.current.length === 0) {
+            speakNoArmor();
+          } else {
+            speakArmorList(shopArmorsRef.current);
+          }
         }
         return;
       }
@@ -485,7 +489,7 @@ export function GameScreen({
         if (mode === "buy") {
           const match = SHOP_WEAPONS.find((w) => fuzzyMatch(trimmed, w.name));
           if (match) {
-            shopBuyApi(match.id).catch(() => speakPurchaseFail());
+            shopBuyApi(match.id).catch(() => { if (!isMutedRef.current) speakPurchaseFail(); });
             return;
           }
         }
@@ -493,7 +497,7 @@ export function GameScreen({
         if (mode === "sell") {
           const match = shopItemsRef.current.find((i) => fuzzyMatch(trimmed, i.name));
           if (match) {
-            shopSellApi(match.id).catch(() => speakShopNoMatch());
+            shopSellApi(match.id).catch(() => { if (!isMutedRef.current) speakShopNoMatch(); });
             return;
           }
         }
@@ -502,15 +506,17 @@ export function GameScreen({
           const match = shopArmorsRef.current.find((a) => fuzzyMatch(trimmed, a.name));
           if (match) {
             shopUpgradeApi(match.id).catch((e) => {
-              if (e?.message === "ARMOR_MAX_LEVEL") speakUpgradeMax();
-              else speakUpgradeFail();
+              if (!isMutedRef.current) {
+                if (e?.message === "ARMOR_MAX_LEVEL") speakUpgradeMax();
+                else speakUpgradeFail();
+              }
             });
             return;
           }
         }
 
         // In shop but no name matched
-        speakShopNoMatch();
+        if (!isMutedRef.current) speakShopNoMatch();
         return;
       }
 
@@ -947,10 +953,10 @@ export function GameScreen({
     patchPlayerFromShopResponse(resp);
     const weaponName = SHOP_WEAPONS.find(w => w.id === weaponId)?.name ?? weaponId;
     if (resp.success) {
-      speakPurchaseSuccess(weaponName, resp.gold);
+      if (!isMutedRef.current) speakPurchaseSuccess(weaponName, resp.gold);
       addShopLog(`✓ ${weaponName} purchased.`);
     } else {
-      speakPurchaseFail();
+      if (!isMutedRef.current) speakPurchaseFail();
       addShopLog(`✗ ${resp.message}`);
     }
     return { success: resp.success, message: resp.message, gold: resp.gold, weapons: (resp.player.weapons ?? []) as ShopWeapon[] };
@@ -964,10 +970,10 @@ export function GameScreen({
     patchPlayerFromShopResponse(resp);
     const itemName = shopItemsRef.current.find(i => i.id === itemId)?.name ?? itemId;
     if (resp.success) {
-      speakSellSuccess(itemName, resp.gold);
+      if (!isMutedRef.current) speakSellSuccess(itemName, resp.gold);
       addShopLog(`✓ ${itemName} sold.`);
     } else {
-      speakShopNoMatch();
+      if (!isMutedRef.current) speakShopNoMatch();
       addShopLog(`✗ ${resp.message}`);
     }
     return { success: resp.success, message: resp.message, gold: resp.gold, items: (resp.player.inventoryItems ?? []) as ShopInventoryItem[] };
@@ -981,11 +987,13 @@ export function GameScreen({
     patchPlayerFromShopResponse(resp);
     const armor = (resp.player.armors ?? []).find((a: ArmorState) => a.id === armorId);
     if (resp.success) {
-      speakUpgradeSuccess(armor?.name ?? armorId, armor?.level ?? 0, resp.gold);
+      if (!isMutedRef.current) speakUpgradeSuccess(armor?.name ?? armorId, armor?.level ?? 0, resp.gold);
       addShopLog(`✓ ${armor?.name ?? armorId} upgraded to level ${armor?.level}.`);
     } else {
-      if (resp.message === "ARMOR_MAX_LEVEL") speakUpgradeMax();
-      else speakUpgradeFail();
+      if (!isMutedRef.current) {
+        if (resp.message === "ARMOR_MAX_LEVEL") speakUpgradeMax();
+        else speakUpgradeFail();
+      }
       addShopLog(`✗ ${resp.message}`);
     }
     return { success: resp.success, message: resp.message, gold: resp.gold, armors: (resp.player.armors ?? []) as ShopArmor[] };
@@ -1409,6 +1417,7 @@ export function GameScreen({
                   onUpgrade={shopUpgradeApi}
                   onLogMessage={addShopLog}
                   onClose={() => { setShopOpen(false); setShopMode("main"); }}
+                  isMuted={isMuted}
                 />
               )}
             </AnimatePresence>

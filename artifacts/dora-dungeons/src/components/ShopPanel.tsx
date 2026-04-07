@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ShoppingBag, Sword, Package, Shield, ChevronLeft, Coins } from "lucide-react";
+import { X, ShoppingBag, Sword, Package, Shield, ChevronLeft, Coins, VolumeX } from "lucide-react";
 import {
   SHOP_WEAPONS,
   ARMOR_UPGRADE_COSTS,
@@ -34,6 +34,8 @@ interface ShopPanelProps {
   onUpgrade: (armorId: string) => Promise<ShopUpgradeResult>;
   onLogMessage: (msg: string) => void;
   onClose: () => void;
+  /** When true, TTS is off — show a visual banner so the player knows voice is silent. */
+  isMuted?: boolean;
 }
 
 // ── Shared button styles ──────────────────────────────────────────────────────
@@ -144,6 +146,7 @@ export function ShopPanel({
   onUpgrade,
   onLogMessage,
   onClose,
+  isMuted = false,
 }: ShopPanelProps) {
   const [feedback, setFeedback] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -322,6 +325,29 @@ export function ShopPanel({
         overflow: "hidden",
       }}
     >
+      {/* ── Silent-mode banner ── */}
+      {isMuted && (
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "0.45rem",
+          padding: "0.35rem 0.9rem",
+          background: "rgba(200,155,60,0.07)",
+          borderBottom: "1px solid rgba(200,155,60,0.18)",
+          flexShrink: 0,
+        }}>
+          <VolumeX size={11} style={{ color: "rgba(200,155,60,0.55)", flexShrink: 0 }} />
+          <span style={{
+            fontFamily: "'Fira Code', monospace",
+            fontSize: "0.65rem",
+            letterSpacing: "0.08em",
+            color: "rgba(200,155,60,0.6)",
+          }}>
+            Voice off — use the buttons or type commands to navigate the shop
+          </span>
+        </div>
+      )}
+
       {/* ── Header ── */}
       <div style={{
         display: "flex",
