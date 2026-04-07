@@ -122,6 +122,15 @@ export function useVoiceInput({
     const RecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!RecognitionCtor) return;
 
+    // Release the warm-up getUserMedia stream before starting recognition.
+    // On Android Chrome, keeping an explicit mic stream alive while SpeechRecognition
+    // also tries to claim the mic can cause the recognition engine to receive no audio.
+    // Freeing it here lets the recognition engine take exclusive access cleanly.
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach(t => t.stop());
+      micStreamRef.current = null;
+    }
+
     // Kill any existing instance to prevent ghost sessions
     if (recognitionRef.current) {
       try { recognitionRef.current.onend = null; recognitionRef.current.stop(); } catch { /* ok */ }
