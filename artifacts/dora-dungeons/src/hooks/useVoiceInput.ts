@@ -96,6 +96,14 @@ export function useVoiceInput({
     typeof window !== "undefined" &&
     !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 
+  // Android Chrome's SpeechRecognition silently zombies with continuous=true:
+  // onstart fires but onend never does, leaving isListeningRef stuck at true.
+  // Using continuous=false lets each utterance end cleanly (onend always fires)
+  // and the existing Scenario B restart loop keeps recognition alive continuously.
+  const isAndroid =
+    typeof navigator !== "undefined" &&
+    /android/i.test(navigator.userAgent);
+
   // ── Stable restart ref used by recognition.onend ──────────────────────────
   // Updated via useEffect so it's never stale inside the onend closure.
   const restartRef = useRef<() => void>(() => {});
@@ -120,7 +128,9 @@ export function useVoiceInput({
     }
 
     const recognition = new RecognitionCtor();
-    recognition.continuous      = true;
+    // Android Chrome zombies silently with continuous=true — use false so onend
+    // always fires and the Scenario B restart loop keeps recognition alive.
+    recognition.continuous      = !isAndroid;
     recognition.interimResults  = true;
     recognition.maxAlternatives = 1;
     recognition.lang            = languageRef.current;
