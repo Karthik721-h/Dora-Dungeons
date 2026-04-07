@@ -1,0 +1,357 @@
+You are a senior QA engineer, accessibility auditor, and game systems reviewer.
+
+Re Conduct a FULL SYSTEM AUDIT of Dora Dungeons.
+
+---
+
+## GOAL
+
+Verify that the entire game is:
+
+* Stable
+* Fully playable via voice
+* Free of progression blockers
+* Balanced and fair
+* Ready for real users
+
+---
+
+## STRICT RULES
+
+* DO NOT modify code
+* DO NOT suggest implementation unless critical
+* ONLY audit, test, and report
+
+---
+
+## SECTION 1 — CORE GAME LOOP
+
+Test full flow:
+
+1. Start game
+2. Explore dungeon
+3. Fight enemies
+4. Defeat boss
+5. Trigger LEVEL_COMPLETED
+6. Choose:
+
+   * Next Level
+   * Replay
+   * Exit
+
+---
+
+Verify:
+
+* No dead ends
+* No stuck states
+* Loop is repeatable infinitely
+
+---
+
+## SECTION 2 — VOICE-FIRST EXPERIENCE (CRITICAL)
+
+Verify FULL voice control:
+
+* Navigation (move north/south/etc.)
+* Combat (attack, defend, abilities)
+* Shop (buy, sell, upgrade)
+* System actions (restart, logout)
+* Level decisions (yes/no)
+* Unknown commands
+
+---
+
+Check:
+
+* Mic auto-starts on game load
+* No button is REQUIRED to play
+* Voice works in ALL game modes:
+
+  * explore
+  * combat
+  * shop
+  * death
+  * levelDecision
+
+---
+
+Verify TTS:
+
+* Every command produces narration
+* No silent responses
+* No missed outputs
+
+---
+
+## SECTION 3 — TTS SYSTEM RELIABILITY
+
+Verify:
+
+* TTS always narrates new terminal output
+* No dropped narration after commands
+* No overlapping speech issues
+* Queue behaves correctly
+
+---
+
+Test:
+
+* Rapid commands
+* Long narration chains
+* Interrupt scenarios
+
+---
+
+Verify special cases:
+
+* Unknown command → proper TTS response
+* Death → only death message plays
+* Victory → banner + decision prompt (correct order)
+
+---
+
+## SECTION 4 — AUDIO INPUT ISOLATION
+
+Verify:
+
+* Microphone captures ONLY user voice
+* Game audio is NOT re-captured
+
+---
+
+Test:
+
+* Speaker ON + mic ON
+* Ensure no feedback loop
+* Ensure recognition accuracy
+
+---
+
+## SECTION 5 — AUTHENTICATION SYSTEM
+
+Verify:
+
+* Signup with @gmail.com ONLY
+* Duplicate emails rejected
+* Login works correctly
+* No password required (voice system)
+
+---
+
+Test:
+
+* Signup flow (voice-driven)
+* Login flow (voice-driven)
+* Logout via voice command
+
+---
+
+Verify:
+
+* Session persistence
+* Returning user resumes correctly
+
+---
+
+## SECTION 6 — LEVEL SYSTEM + PROGRESSION
+
+Verify:
+
+* Infinite levels work
+* dungeonLevel increments correctly
+* dungeonLevelCompleted resets properly
+
+---
+
+Test:
+
+* Level 1 → Level 2 transition
+* Replay level
+* Exit flow
+
+---
+
+Verify:
+
+* No progression blockers
+* No stuck VICTORY state (refresh test)
+
+---
+
+## SECTION 7 — LEVEL SCALING BALANCE
+
+Verify:
+
+* Enemy scaling (0.2 multiplier)
+* Boss scaling (fixed curve)
+
+---
+
+Test:
+
+* Level 1, 3, 5, 8+
+
+---
+
+Check:
+
+* Difficulty increases gradually
+* No impossible fights
+* Combat remains fair
+
+---
+
+## SECTION 8 — SHOP SYSTEM (BLACKSMITH)
+
+Verify:
+
+* Open via button AND voice ("open shop")
+* Buy weapons
+* Sell items
+* Upgrade gear
+
+---
+
+Test:
+
+* Gold deduction works
+* Items added/removed correctly
+* Inventory updates correctly
+
+---
+
+Voice tests:
+
+* Saying weapon name purchases it
+* Saying item name sells it
+* Saying armor upgrades it
+
+---
+
+## SECTION 9 — PLAYER STATE CONSISTENCY
+
+Verify:
+
+* Gold syncs everywhere (status vs shop)
+* Weapons saved correctly
+* Armors saved + levels tracked
+* Inventory persists
+
+---
+
+Test:
+
+* Refresh page
+* Logout/login
+
+---
+
+Ensure:
+
+* No desync issues
+
+---
+
+## SECTION 10 — DEATH + RESTART FLOW
+
+Verify:
+
+* Death triggers correct TTS
+* No extra narration after death message
+* Mic remains active
+
+---
+
+Test:
+
+* Voice "yes" → restart level
+* Voice "no" → logout
+
+---
+
+Verify:
+
+* Restart begins at current level start
+* Not previous level
+
+---
+
+## SECTION 11 — UI + ACCESSIBILITY
+
+Verify:
+
+* UI does NOT block gameplay
+* All actions available via voice
+
+---
+
+Check:
+
+* Navbar layout responsive
+* Dropdowns visible (z-index fixed)
+* Modals accessible
+
+---
+
+Ensure:
+
+* Screen reader friendly text
+* No hidden critical UI
+
+---
+
+## SECTION 12 — ERROR HANDLING
+
+Verify:
+
+* Unknown commands handled
+* Invalid shop actions handled
+* Invalid voice inputs handled
+
+---
+
+Check:
+
+* No crashes
+* No undefined states
+* Graceful recovery
+
+---
+
+## SECTION 13 — PERFORMANCE + STABILITY
+
+Test:
+
+* Long play session (10+ minutes)
+* Multiple level transitions
+* Rapid voice inputs
+
+---
+
+Verify:
+
+* No memory leaks
+* No UI freezing
+* No audio breakdown
+
+---
+
+## FINAL REPORT FORMAT
+
+Return:
+
+1. ✅ What is working correctly
+2. ⚠️ Minor issues
+3. ❌ Critical bugs
+4. 🧠 Final recommendations before monetization
+5. 🚀 GO / NO-GO decision for Phase 4
+
+---
+
+## EXPECTED RESULT
+
+System should be:
+
+* Fully playable via voice
+* Stable across mobile, tablet and desktop preview.
