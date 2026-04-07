@@ -1,28 +1,33 @@
 /**
  * useVoiceInput — Single controlled speak→listen lifecycle
  *
- * MOBILE BEHAVIOUR
- * ────────────────
- * iOS (PTT mode):
- *   Every recognition.start() must be a direct user gesture.
- *   → recognition.continuous = false; user taps mic before each command.
- *   → After each utterance (or timeout), resets to "needs activation" state.
- *   → TTS cooldown also resets to "needs activation" instead of auto-restarting.
+ * LIFECYCLE OWNERSHIP (one path per scenario, no races)
+ * ─────────────────────────────────────────────────────
  *
- * Android (tap-to-activate):
- *   First start requires user gesture (to get mic permission).
- *   → Show "tap mic to activate" on initial render.
- *   → After first tap, auto-restart from onend works normally.
+ * A. Initial auto-start (game load)
+ *    GameScreen calls startListening() inside onQueueDrained.
+ *    At that moment the TTS cooldown is still active (TTS just ended).
+ *    → startListening sets wantListeningRef = true and returns.
+ *    → 400ms cooldown expires → _startRecognition() [SINGLE START PATH for after-TTS]
  *
- * Desktop:
- *   Fully automatic — startListening() called after TTS ends (onQueueDrained).
- *   continuous = true; auto-restarts silently.
+ * B. Natural silence timeout (Chrome stops recognition on its own)
+ *    recognition.onend fires → restartRef() → isSpeaking=false, cooldown=false
+ *    → _startRecognition() after 80ms  [ONLY path for natural restarts]
  *
- * KEY FIX vs old code:
- *   Old code called _initMic().then(() => _startRecognition()). The .then()
- *   microtask breaks the "user gesture" propagation chain that mobile browsers
- *   require for recognition.start().  Now _startRecognition() is always called
- *   SYNCHRONOUSLY from startListening(), preserving the gesture context.
+ * C. TTS starts mid-session
+ *    speakLock(true) → recognition.stop() → recognition.onend fires
+ *    → restartRef() sees isSpeaking=true → does nothing
+ *    TTS ends → speakLock(false) → cooldown 400ms → _startRecognition()  [ONLY path after TTS]
+ *
+ * GUARD FLAGS
+ * ───────────
+ * • wantListeningRef  – user intent (true after startListening is called)
+ * • isListeningRef    – recognition actually running
+ * • isSpeakingRef     – TTS active (speak-lock)
+ * • ttsCooldownRef    – 400ms post-TTS window (transcripts discarded, start deferred)
+ *
+ * _startRecognition blocks on: isListeningRef OR isSpeakingRef OR ttsCooldownRef
+ * startListening defers to cooldown: if ttsCooldownRef is active, set intent and exit.
  */
 
 import { useState, useRef, useCallback, useEffect } from "react";
@@ -45,21 +50,11 @@ interface UseVoiceInputResult {
   startListening: () => void;
   stopListening: () => void;
   toggleListening: () => void;
-  /** True on iOS — user must tap mic before each utterance */
-  isPTT: boolean;
-  /** True until user taps the mic button for the first time on mobile */
-  needsActivation: boolean;
 }
 
-const DEBOUNCE_MS     = 1000;
-const PROCESSING_MS   = 400;
-const TTS_COOLDOWN_MS = 500;
-
-// ── Platform detection (evaluated once at module level) ────────────────────
-const UA = typeof navigator !== "undefined" ? navigator.userAgent : "";
-const IS_IOS     = /iPhone|iPad|iPod/i.test(UA) && !("MSStream" in window);
-const IS_ANDROID = /Android/i.test(UA) && !IS_IOS;
-const IS_MOBILE  = IS_IOS || IS_ANDROID;
+const DEBOUNCE_MS       = 1000; // ignore same command within this window
+const PROCESSING_MS     = 400;  // "processing" badge duration
+const TTS_COOLDOWN_MS   = 500;  // discard buffered TTS transcripts after speech ends
 
 export function useVoiceInput({
   onFinalTranscript,
@@ -68,7 +63,7 @@ export function useVoiceInput({
   language = "en-US",
 }: UseVoiceInputOptions): UseVoiceInputResult {
 
-  // ── Stable callback refs ────────────────────────────────────────────────
+  // ── Stable callback refs — always fresh inside event handlers ─────────────
   const onFinalRef   = useRef(onFinalTranscript);
   const onInterimRef = useRef(onInterimTranscript);
   const onErrorRef   = useRef(onError);
@@ -76,24 +71,21 @@ export function useVoiceInput({
   onInterimRef.current = onInterimTranscript;
   onErrorRef.current   = onError;
 
-  // ── UI state ────────────────────────────────────────────────────────────
+  // ── UI state ───────────────────────────────────────────────────────────────
   const [voiceState, setVoiceState] = useState<VoiceState>("idle");
   const [interimTranscript, setInterimTranscript] = useState("");
-  // Mobile: true until user taps the mic for the first time
-  const [needsActivation, setNeedsActivation] = useState(IS_MOBILE);
 
-  // ── Guard flags ─────────────────────────────────────────────────────────
-  const wantListeningRef   = useRef(false);
-  const isListeningRef     = useRef(false);
-  const isSpeakingRef      = useRef(false);
-  const ttsCooldownRef     = useRef(false);
-  const needsActivationRef = useRef(IS_MOBILE);
+  // ── Guard flags (refs — zero re-renders, always current in callbacks) ──────
+  const wantListeningRef = useRef(false); // user intent
+  const isListeningRef   = useRef(false); // recognition running
+  const isSpeakingRef    = useRef(false); // TTS active
+  const ttsCooldownRef   = useRef(false); // post-TTS transcript discard window
 
-  // ── Timers ──────────────────────────────────────────────────────────────
+  // ── Timers ─────────────────────────────────────────────────────────────────
   const cooldownTimerRef   = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const processingTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  // ── Misc ────────────────────────────────────────────────────────────────
+  // ── Misc ───────────────────────────────────────────────────────────────────
   const lastCommandRef = useRef({ text: "", time: 0 });
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const micStreamRef   = useRef<MediaStream | null>(null);
@@ -104,38 +96,31 @@ export function useVoiceInput({
     typeof window !== "undefined" &&
     !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 
-  // ── PTT mode: iOS requires a user gesture before every start() ──────────
-  const isPTT = IS_IOS;
-
+  // ── Stable restart ref used by recognition.onend ──────────────────────────
+  // Updated via useEffect so it's never stale inside the onend closure.
   const restartRef = useRef<() => void>(() => {});
 
-  // ── Mark as "needs activation again" (mobile tap prompt) ───────────────
-  const _requireActivation = useCallback(() => {
-    if (!IS_MOBILE) return;
-    needsActivationRef.current = true;
-    setNeedsActivation(true);
-    wantListeningRef.current = false;
-    setVoiceState("idle");
-  }, []);
-
-  // ── Core: start a fresh recognition session ────────────────────────────
-  // MUST be called synchronously within a user-gesture handler on mobile.
+  // ── Core: start a fresh recognition session ───────────────────────────────
+  // THREE HARD GUARDS — blocks if any are true:
+  //   isListeningRef  → already running, no duplicate
+  //   isSpeakingRef   → TTS active; cooldown timer will start us after it ends
+  //   ttsCooldownRef  → post-TTS buffer window; cooldown timer will start us after
   const _startRecognition = useCallback(() => {
-    if (!isSupported)           return;
-    if (isListeningRef.current) return;
-    if (isSpeakingRef.current)  return;
-    if (ttsCooldownRef.current) return;
+    if (!isSupported)            return;
+    if (isListeningRef.current)  return; // already running
+    if (isSpeakingRef.current)   return; // TTS active — cooldown handles restart
+    if (ttsCooldownRef.current)  return; // cooldown active — cooldown handles restart
 
     const RecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!RecognitionCtor) return;
 
+    // Kill any existing instance to prevent ghost sessions
     if (recognitionRef.current) {
       try { recognitionRef.current.onend = null; recognitionRef.current.stop(); } catch { /* ok */ }
     }
 
     const recognition = new RecognitionCtor();
-    // iOS PTT: continuous=false stops naturally after one utterance
-    recognition.continuous      = !isPTT;
+    recognition.continuous      = true;
     recognition.interimResults  = true;
     recognition.maxAlternatives = 1;
     recognition.lang            = languageRef.current;
@@ -147,6 +132,7 @@ export function useVoiceInput({
     };
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
+      // Drop anything captured while TTS is active or during the post-TTS buffer window
       if (isSpeakingRef.current || ttsCooldownRef.current) {
         console.log("[useVoiceInput] Transcript discarded (TTS active or cooldown)");
         return;
@@ -171,6 +157,7 @@ export function useVoiceInput({
         setInterimTranscript("");
         const trimmed = finalText.trim();
 
+        // Deduplication — same phrase within 1s is ignored
         const now = Date.now();
         if (
           trimmed === lastCommandRef.current.text &&
@@ -181,6 +168,7 @@ export function useVoiceInput({
         }
         lastCommandRef.current = { text: trimmed, time: now };
 
+        // Brief "processing" badge
         setVoiceState("processing");
         clearTimeout(processingTimerRef.current);
         processingTimerRef.current = setTimeout(() => {
@@ -194,16 +182,16 @@ export function useVoiceInput({
     };
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      if (event.error === "no-speech") return;
-      if (event.error === "aborted")   return;
-      if (isSpeakingRef.current)       return;
+      if (event.error === "no-speech") return; // normal silence
+      if (event.error === "aborted")   return; // expected from .stop()
+      if (isSpeakingRef.current)       return; // TTS stopped recognition — not a real error
 
       console.warn("[useVoiceInput] Error:", event.error);
       isListeningRef.current = false;
 
       const messages: Record<string, string> = {
         "not-allowed":
-          "Microphone access was denied. Please allow microphone permission in your browser settings and try again.",
+          "Microphone access was denied. Please allow microphone permission and try again.",
         "audio-capture":
           "No microphone detected. Please check your microphone and try again.",
         "network":
@@ -212,9 +200,10 @@ export function useVoiceInput({
           "Voice recognition is not available in this browser or context.",
       };
       const msg = messages[event.error] ??
-        "Voice input error. Please tap the mic button to try again.";
+        `Voice input not detected. Please check your microphone.`;
       onErrorRef.current?.(msg);
 
+      // Auto-retry on transient network errors only
       if (event.error === "network" && wantListeningRef.current) {
         setTimeout(() => {
           if (wantListeningRef.current && !isSpeakingRef.current && !ttsCooldownRef.current) {
@@ -222,11 +211,9 @@ export function useVoiceInput({
           }
         }, 2000);
       }
-
-      // On any error on mobile, reset to tap prompt
-      if (IS_MOBILE) _requireActivation();
     };
 
+    // recognition.onend → delegates to restartRef (scenario B: natural silence)
     recognition.onend = () => {
       console.log("[useVoiceInput] Recognition ended");
       isListeningRef.current = false;
@@ -239,36 +226,29 @@ export function useVoiceInput({
       recognition.start();
     } catch (e) {
       console.warn("[useVoiceInput] start() failed:", e);
-      onErrorRef.current?.("Failed to start voice recognition. Please tap the mic to try again.");
+      onErrorRef.current?.("Failed to start voice recognition.");
       wantListeningRef.current = false;
       setVoiceState("idle");
-      if (IS_MOBILE) _requireActivation();
     }
+  // isSupported is constant after mount
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPTT, _requireActivation]);
+  }, []);
 
-  // ── Keep restartRef current ─────────────────────────────────────────────
+  // ── Keep restartRef current without creating stale closures ───────────────
   useEffect(() => {
     restartRef.current = () => {
-      if (isPTT) {
-        // PTT: recognition ended (either after utterance or timeout).
-        // Don't auto-restart — wait for next user tap.
-        // If TTS is about to play, speakLock will handle the cooldown reset.
-        if (!isSpeakingRef.current && !ttsCooldownRef.current) {
-          _requireActivation();
-        }
-        return;
-      }
-      // Desktop / Android continuous mode
+      // Scenario B: natural silence timeout — only restart if not blocked
       if (wantListeningRef.current && !isSpeakingRef.current && !ttsCooldownRef.current) {
         setTimeout(_startRecognition, 80);
       } else if (!wantListeningRef.current) {
         setVoiceState("idle");
       }
+      // isSpeaking=true or cooldown=true: speak-lock/cooldown owns the restart
     };
-  }, [_startRecognition, _requireActivation, isPTT]);
+  }, [_startRecognition]);
 
-  // ── Speak-lock + TTS cooldown ───────────────────────────────────────────
+  // ── Speak-lock + cooldown (scenario C: TTS-triggered restart) ────────────
+  // This is the SINGLE owner of "restart after TTS ends".
   useEffect(() => {
     if (!isSupported) return;
 
@@ -276,6 +256,10 @@ export function useVoiceInput({
       isSpeakingRef.current = speaking;
 
       if (speaking) {
+        // TTS started — pause recognition immediately.
+        // Only call .stop() when recognition is actually running; calling it on
+        // an already-ended session can trigger a spurious onend in Chrome which
+        // perturbs the lifecycle state.
         console.log("[useVoiceInput] Listening paused (TTS started)");
         setVoiceState("speaking");
         setInterimTranscript("");
@@ -290,15 +274,9 @@ export function useVoiceInput({
 
         cooldownTimerRef.current = setTimeout(() => {
           ttsCooldownRef.current = false;
-          console.log("[useVoiceInput] Cooldown cleared");
+          console.log("[useVoiceInput] Cooldown cleared — starting recognition");
 
-          if (isPTT) {
-            // iOS PTT: TTS done → user must tap mic again
-            _requireActivation();
-            return;
-          }
-
-          // Desktop / Android: auto-restart if user wants to listen
+          // Single restart point after TTS: if user wants to listen, start now
           if (wantListeningRef.current && !isSpeakingRef.current) {
             _startRecognition();
           } else if (!wantListeningRef.current) {
@@ -307,10 +285,11 @@ export function useVoiceInput({
         }, TTS_COOLDOWN_MS);
       }
     });
+  // _startRecognition is stable (no deps)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSupported, isPTT, _startRecognition, _requireActivation]);
+  }, [isSupported]);
 
-  // ── Mic warm-up (echo cancellation, background, non-blocking) ─────────
+  // ── Mic warm-up (echo cancellation — best-effort, non-blocking) ───────────
   const _initMic = useCallback(async () => {
     if (micStreamRef.current) return;
     if (!navigator?.mediaDevices?.getUserMedia) return;
@@ -319,41 +298,35 @@ export function useVoiceInput({
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       });
     } catch {
-      // Continue — recognition handles its own mic permission
+      // Continue without explicit constraints — recognition still works
     }
   }, []);
 
-  // ── Public API ──────────────────────────────────────────────────────────
+  // ── Public API ────────────────────────────────────────────────────────────
 
-  /**
-   * startListening — request voice capture.
-   *
-   * On mobile, if called from an async context (e.g. after TTS), recognition
-   * is NOT started immediately (no user gesture). Instead, sets wantListeningRef
-   * so the next user tap will pick it up.
-   *
-   * On desktop, starts recognition synchronously.
-   */
   const startListening = useCallback(() => {
     if (!isSupported) {
       onErrorRef.current?.("Voice input is not supported in this browser.");
       return;
     }
-    if (wantListeningRef.current) return;
-
-    // Mobile: if the user hasn't tapped the mic yet, do NOT set wantListeningRef.
-    // This prevents toggleListening() from thinking we are "listening" and going
-    // into the stop branch instead of the start branch when the user taps the mic.
-    if (needsActivationRef.current) {
-      console.log("[useVoiceInput] Mobile: need user gesture — startListening deferred");
-      return;
-    }
+    if (wantListeningRef.current) return; // already on — prevent double-init
 
     wantListeningRef.current = true;
-    if (isSpeakingRef.current) return;
-    if (ttsCooldownRef.current) return;
-    _startRecognition();
-  }, [_startRecognition, isSupported]);
+
+    // Warm up mic, then start recognition — BUT if the TTS cooldown is still
+    // active (e.g. called from onQueueDrained right after narration ends), defer
+    // to the cooldown timer which will call _startRecognition when it expires.
+    // This is the single controlled lifecycle path for initial auto-start.
+    _initMic().then(() => {
+      if (!wantListeningRef.current || isSpeakingRef.current) return;
+      if (ttsCooldownRef.current) {
+        console.log("[useVoiceInput] startListening deferred — TTS cooldown active");
+        // Cooldown timer will call _startRecognition() when it expires
+        return;
+      }
+      _startRecognition();
+    });
+  }, [_initMic, _startRecognition]);
 
   const stopListening = useCallback(() => {
     console.log("[useVoiceInput] Listening stopped (user request)");
@@ -369,41 +342,12 @@ export function useVoiceInput({
     }
   }, []);
 
-  /**
-   * toggleListening — MUST be called from a direct user-gesture handler (onClick).
-   *
-   * On mobile: clears needsActivation so _startRecognition() runs synchronously
-   * within the gesture, satisfying browser user-gesture requirements.
-   *
-   * Smart behaviour: if intent is set (wantListening=true) but recognition is
-   * NOT actually running, treat this as a restart request rather than a stop.
-   * This lets users recover from stuck/dead recognition by tapping the mic.
-   */
   const toggleListening = useCallback(() => {
-    const actuallyListening = isListeningRef.current;
-    const wantsToListen     = wantListeningRef.current;
+    if (wantListeningRef.current) stopListening();
+    else                          startListening();
+  }, [startListening, stopListening]);
 
-    if (wantsToListen && actuallyListening) {
-      // Recognition is running → user wants to stop
-      stopListening();
-      if (IS_MOBILE) _requireActivation();
-    } else {
-      // Either not started yet, or intent set but recognition died → restart.
-      // Clear mobile activation gate — this call IS a user gesture.
-      if (needsActivationRef.current) {
-        needsActivationRef.current = false;
-        setNeedsActivation(false);
-        _initMic().catch(() => {});
-      }
-      // Set intent and start directly (synchronous — gesture is preserved)
-      wantListeningRef.current = true;
-      if (!isSpeakingRef.current && !ttsCooldownRef.current) {
-        _startRecognition();
-      }
-    }
-  }, [stopListening, _startRecognition, _requireActivation, _initMic]);
-
-  // ── Cleanup on unmount ─────────────────────────────────────────────────
+  // ── Cleanup on unmount ────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
       wantListeningRef.current = false;
@@ -426,7 +370,5 @@ export function useVoiceInput({
     startListening,
     stopListening,
     toggleListening,
-    isPTT,
-    needsActivation,
   };
 }
