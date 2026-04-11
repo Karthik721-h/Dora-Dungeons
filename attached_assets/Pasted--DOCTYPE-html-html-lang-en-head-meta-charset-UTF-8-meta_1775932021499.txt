@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover" />
+    <title>Dora Dungeons</title>
+    <link rel="icon" type="image/png" href="/images/logo.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script type="module" crossorigin src="/assets/index-BgtRpzmQ.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-DVoOtrLQ.css">
+    <style>
+      /* ═══════════════════════════════════════════════════════════
+         SAFE-AREA LAYOUT — iOS notch + home-indicator clearance
+         ═══════════════════════════════════════════════════════════
+         HOW IT WORKS
+         • viewport-fit=cover (meta tag above) lets the app background
+           bleed behind the notch and home bar — full-bleed dark look.
+         • .safe-container pads the CONTENT area away from those
+           system-chrome regions using the iOS env() values.
+         • Apply to your top-level wrapper div in JSX/HTML.
+         ─────────────────────────────────────────────────────────── */
+
+      /* Fill the full screen behind notch/home-bar with game black */
+      html, body {
+        background-color: #07080f;
+        margin: 0;
+        padding: 0;
+      }
+
+      /* ── The global wrapper class ───────────────────────────── */
+      .safe-container {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        height: 100vh;
+
+        /* Background bleeds fully — covers the notch region too */
+        background-color: #07080f;
+
+        box-sizing: border-box;
+        overflow-x: hidden;
+      }
+
+      /* Global safe-area offset for app content */
+      #root {
+        padding-top: env(safe-area-inset-top, 0px);
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+        box-sizing: border-box;
+        min-height: 100vh;
+      }
+
+      /* ── Fluid variant for scrollable screens ───────────────────
+         Use <div class="safe-container scroll-child"> when the
+         content inside needs to scroll independently (e.g. the
+         dungeon narration log). Keeps padding on the inner child
+         instead of the outer shell.
+         ─────────────────────────────────────────────────────────── */
+      .safe-container.scroll-child {
+        padding: 0;
+      }
+      .safe-container.scroll-child > * {
+        padding-top:    env(safe-area-inset-top,    0px);
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+        padding-left:   env(safe-area-inset-left,   0px);
+        padding-right:  env(safe-area-inset-right,  0px);
+      }
+
+      /* Fixed-position top/bottom controls should honor safe-area insets */
+      .fixed.top-0 {
+        top: env(safe-area-inset-top, 0px) !important;
+      }
+      .fixed.bottom-0 {
+        bottom: env(safe-area-inset-bottom, 0px) !important;
+      }
+
+      /* Direct HUD overrides for the top navigation and bottom command bar */
+      header.dd-navbar,
+      .dd-navbar {
+        top: env(safe-area-inset-top, 0px) !important;
+        padding-top: calc(env(safe-area-inset-top, 0px) + 12px) !important;
+      }
+
+      .flex.gap-2.mt-auto,
+      .command-input,
+      .command-input:focus {
+        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 25px) !important;
+      }
+
+
+      /* ═══════════════════════════════════════════════════════════
+         VISUAL DEBUG MODE
+         ═══════════════════════════════════════════════════════════
+         Toggle from DevTools console (no code changes needed):
+
+           document.body.classList.toggle('safe-debug')
+
+         Cyan band  = top safe-area (notch/status bar)
+         Purple band = bottom safe-area (home indicator)
+         Gold outline = full app boundary
+
+         REMOVE before App Store submission.
+         ─────────────────────────────────────────────────────────── */
+      body.safe-debug .safe-container::before,
+      body.safe-debug .safe-container::after {
+        content: '';
+        position: fixed;
+        left: 0;
+        right: 0;
+        z-index: 99999;
+        pointer-events: none;
+      }
+
+      /* Top band — cyan */
+      body.safe-debug .safe-container::before {
+        top: 0;
+        height: 47px;
+        background: rgba(0, 245, 255, 0.28);
+        border-bottom: 1.5px dashed rgba(0, 245, 255, 0.9);
+      }
+
+      /* Bottom band — purple */
+      body.safe-debug .safe-container::after {
+        bottom: 0;
+        height: 34px;
+        background: rgba(191, 0, 255, 0.24);
+        border-top: 1.5px dashed rgba(191, 0, 255, 0.9);
+      }
+
+      /* Gold outline around the safe-container */
+      body.safe-debug .safe-container {
+        outline: 1px dashed rgba(245, 200, 66, 0.4);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="safe-container">
+      <div id="root"></div>
+
+<!-- ═══════════════════════════════════════════════
+     DORA DUNGEONS — PAYWALL / SETTINGS OVERLAY
+     Drop before </body>
+═══════════════════════════════════════════════ -->
+      <div id="dd-overlay" class="dd-overlay hidden" role="dialog" aria-modal="true">
+
+  <!-- ── Backdrop ─────────────────────────────── -->
+  <div class="dd-backdrop" onclick="showOverlay(null)"></div>
+
+  <!-- ════════════════════════════════════════════
+       PAYWALL PANEL
+  ════════════════════════════════════════════ -->
+  <div id="dd-paywall" class="dd-panel dd-paywall-panel">
+
+    <!-- Gear button → opens settings -->
+    <button class="dd-gear-btn" onclick="showOverlay('settings')" aria-label="Open Settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+    </button>
+
+    <!-- Header -->
+    <div class="dd-paywall-header">
+      <div class="dd-neon-badge">UNLOCK FULL ACCESS</div>
+      <h1 class="dd-title">Dora Dungeons</h1>
+      <p class="dd-subtitle">Choose your subscription and descend deeper into the abyss.</p>
+    </div>
+
+    <!-- Pricing Cards Grid -->
+    <div class="dd-cards-grid">
+
+      <!-- Weekly -->
+      <div class="dd-card" onclick="ddInitPurchase('dora_weekly_2', 'Weekly — $2')">
+        <div class="dd-card-accent cyan"></div>
+        <div class="dd-card-tag">WEEKLY</div>
+        <div class="dd-card-price">$2</div>
+        <div class="dd-card-period">per week</div>
+        <div class="dd-card-desc">Try the dungeon. Cancel anytime.</div>
+        <button class="dd-cta-btn cyan">Subscribe</button>
+      </div>
+
+      <!-- Monthly -->
+      <div class="dd-card" onclick="ddInitPurchase('dora_monthly_5', 'Monthly — $5')">
+        <div class="dd-card-accent purple"></div>
+        <div class="dd-card-tag">MONTHLY</div>
+        <div class="dd-card-price">$5</div>
+        <div class="dd-card-period">per month</div>
+        <div class="dd-card-desc">Most popular explorer tier.</div>
+        <button class="dd-cta-btn purple">Subscribe</button>
+      </div>
+
+      <!-- Yearly -->
+      <div class="dd-card" onclick="ddInitPurchase('dora_yearly_20', 'Yearly — $20')">
+        <div class="dd-card-accent cyan"></div>
+        <div class="dd-card-tag">YEARLY</div>
+        <div class="dd-card-price">$20</div>
+        <div class="dd-card-period">per year</div>
+        <div class="dd-card-desc">Save 67% vs monthly.</div>
+        <button class="dd-cta-btn cyan">Subscribe</button>
+      </div>
+
+      <!-- Lifetime — highlighted -->
+      <div class="dd-card dd-card-lifetime" onclick="ddInitPurchase('dora_lifetime_50', 'Lifetime — $50')">
+        <div class="dd-card-accent gold"></div>
+        <div class="dd-lifetime-crown">♛</div>
+        <div class="dd-card-tag gold">LIFETIME</div>
+        <div class="dd-card-price gold">$50</div>
+        <div class="dd-card-period">one-time payment</div>
+        <div class="dd-card-desc">Descend forever. No renewals.</div>
+        <button class="dd-cta-btn gold">Unlock Forever</button>
+      </div>
+
+    </div>
+
+    <!-- Apple-required legal disclosure -->
+    <p class="dd-legal-text">
+      Payment will be charged to your Apple ID account at confirmation of purchase.
+      Subscriptions automatically renew unless cancelled at least 24 hours before the end of the current period.
+      Manage or cancel in your <strong>iPhone Settings → Apple ID → Subscriptions</strong>.
+    </p>
+
+    <!-- Legal links -->
+    <div class="dd-legal-links">
+      <a href="./privacy.html">Privacy Policy</a>
+      <span class="dd-divider">·</span>
+      <a href="./terms.html">Terms of Service</a>
+    </div>
+
+    <!-- Close -->
+    <button class="dd-close-btn" onclick="showOverlay(null)" aria-label="Close">✕</button>
+  </div>
+
+
+  <!-- ════════════════════════════════════════════
+       SETTINGS PANEL
+  ════════════════════════════════════════════ -->
+  <div id="dd-settings" class="dd-panel dd-settings-panel hidden">
+
+    <div class="dd-settings-header">
+      <button class="dd-back-btn" onclick="showOverlay('paywall')" aria-label="Back to paywall">
+        ← Back
+      </button>
+      <h2 class="dd-settings-title">Settings</h2>
+    </div>
+
+    <div class="dd-settings-body">
+
+      <!-- Restore Purchases -->
+      <button class="dd-settings-btn restore" onclick="ddRestorePurchases()">
+        <span class="dd-btn-icon">↺</span>
+        Restore Purchases
+      </button>
+
+      <!-- Divider -->
+      <div class="dd-settings-divider"></div>
+
+      <!-- Privacy Policy -->
+      <a class="dd-settings-btn link" href="./privacy.html">
+        <span class="dd-btn-icon">🔒</span>
+        Privacy Policy
+      </a>
+
+      <!-- Terms of Service -->
+      <a class="dd-settings-btn link" href="./terms.html">
+        <span class="dd-btn-icon">📄</span>
+        Terms of Service
+      </a>
+
+      <!-- Divider -->
+      <div class="dd-settings-divider"></div>
+
+      <!-- Delete Account -->
+      <a class="dd-settings-btn danger"
+         href="mailto:support@doradungeons.com?subject=Delete%20My%20Account&body=Please%20delete%20my%20Dora%20Dungeons%20account%20and%20all%20associated%20data."
+         onclick="ddConfirmDelete(event)">
+        <span class="dd-btn-icon">⚠</span>
+        Delete Account
+      </a>
+
+    </div>
+
+    <!-- Close -->
+    <button class="dd-close-btn" onclick="showOverlay(null)" aria-label="Close">✕</button>
+  </div>
+
+</div>
+<!-- end #dd-overlay -->
+    </div>
+  <script src="/js/app.js"></script>
+  </body>
+</html>
