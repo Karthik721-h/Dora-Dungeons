@@ -6,3 +6,9 @@ id = "l74q9qPdMXcvBD1LWH9H7"
 uri = "file://dora-dungeons-source.tar.gz"
 type = "unspecified"
 title = "Dora Dungeons — Full Source Code"
+
+[[outputs]]
+id = "06xYpGadECAlQ09-DjcB3"
+uri = "file://www-build.zip"
+type = "unspecified"
+title = "Dora Dungeons — Built Web Assets"
