@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { getGetGameStateQueryKey } from "@workspace/api-client-react";
 import {
   Map, Skull, TerminalSquare, Volume2, VolumeX, Plus, Minus,
-  Eye, Info, LogOut, Swords, ChevronDown, ShoppingBag,
+  Eye, Info, LogOut, Swords, ChevronDown, ShoppingBag, Trash2,
 } from "lucide-react";
 
 import { AudioManager } from "@/audio/AudioManager";
@@ -66,9 +66,11 @@ function exitsAlreadySpoken(lines: string[]): boolean {
 export function GameScreen({
   gameState,
   onLogout,
+  onDeleteAccount,
 }: {
   gameState: GameStateResponse;
   onLogout?: () => void;
+  onDeleteAccount?: () => void;
 }) {
   const [command, setCommand] = useState("");
   const [speechRate, setSpeechRateState] = useState(1.0);
@@ -1233,6 +1235,21 @@ export function GameScreen({
             <TerminalSquare size={10} />
             {gameState.sessionId.slice(0, 8)}
           </div>
+
+          {/* Delete Account */}
+          {onDeleteAccount && (
+            <button
+              onClick={onDeleteAccount}
+              className="flex items-center gap-1.5 transition-colors p-1 rounded"
+              style={{ color: "rgba(200,190,180,0.3)" }}
+              onMouseEnter={e => (e.currentTarget.style.color = "rgba(248,113,113,0.9)")}
+              onMouseLeave={e => (e.currentTarget.style.color = "rgba(200,190,180,0.3)")}
+              aria-label="Delete account"
+              title="Delete account"
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
 
           {/* Logout */}
           {onLogout && (

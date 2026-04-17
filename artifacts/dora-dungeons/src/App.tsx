@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { GameScreen } from "@/pages/GameScreen";
 import { AuthScreen } from "@/pages/AuthScreen";
 import { IntroVideo } from "@/components/IntroVideo";
+import { PrivacyPolicyScreen } from "@/pages/PrivacyPolicyScreen";
 import { useGetGameState, useStartGame, getGetGameStateQueryKey } from "@workspace/api-client-react";
 import { useJwtAuth } from "@/hooks/useJwtAuth";
 import { Loader2 } from "lucide-react";
@@ -33,7 +34,7 @@ const LOAD_STAGES = [
 const STAGE_INTERVAL_MS = 2500;  // advance label every 2.5 s
 const TIMEOUT_MS         = 8000; // hard timeout before showing retry UI
 
-function GameOrchestrator({ onLogout, playerFirstName }: { onLogout: () => void; playerFirstName?: string | null }) {
+function GameOrchestrator({ onLogout, onDeleteAccount, playerFirstName }: { onLogout: () => void; onDeleteAccount?: () => void; playerFirstName?: string | null }) {
   const queryClient = useQueryClient();
   const hasStartedRef = useRef(false);
 
@@ -220,7 +221,7 @@ function GameOrchestrator({ onLogout, playerFirstName }: { onLogout: () => void;
         transition={{ duration: 0.7 }}
         className="h-screen"
       >
-        <GameScreen gameState={gameState!} onLogout={onLogout} />
+        <GameScreen gameState={gameState!} onLogout={onLogout} onDeleteAccount={onDeleteAccount} />
       </motion.div>
     </AnimatePresence>
   );
@@ -257,6 +258,40 @@ function App() {
     AudioManager.stop();
   }, [auth]);
 
+  // Delete account handler — callable from any authenticated screen.
+  const handleDeleteAccount = useCallback(async () => {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete your account? This action is permanent and cannot be undone."
+    );
+    if (!confirmed) return;
+
+    const email =
+      auth.user?.email ||
+      window.prompt("Enter your email address to confirm account deletion:") ||
+      "";
+
+    if (!email.trim()) return;
+
+    const BASE = import.meta.env.BASE_URL.replace(/\/+$/, "");
+    try {
+      const res = await fetch(`${BASE}/api/auth/account`, {
+        method: "DELETE",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+      });
+      if (res.ok) {
+        window.alert("Your account has been permanently deleted.");
+      } else {
+        const data = await res.json().catch(() => ({}));
+        window.alert(data.message ?? "Could not delete account. Please try again.");
+      }
+    } catch {
+      window.alert("Network error. Please try again.");
+    }
+    handleLogout();
+  }, [auth.user?.email, handleLogout]);
+
   useEffect(() => {
     AudioManager.initializeVoices();
   }, []);
@@ -274,6 +309,8 @@ function App() {
     prevUserIdRef.current = currentId;
   }, [auth.user?.id]);
 
+  const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+
   if (auth.isLoading) {
     return (
       <div
@@ -285,33 +322,40 @@ function App() {
     );
   }
 
-  if (!auth.isAuthenticated) {
-    // Cinematic intro video plays before the tap-anywhere / login screen.
-    // IntroVideo never renders for authenticated users.
-    if (!hasSeenIntro) {
-      return <IntroVideo onComplete={() => setHasSeenIntro(true)} />;
-    }
-    return <AuthScreen auth={auth} />;
-  }
-
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <div className="scanline-overlay" />
-        <motion.div
-          key="main"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.35 }}
-          className="h-screen"
-        >
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-            <Switch>
-              <Route path="/" component={() => <GameOrchestrator onLogout={handleLogout} playerFirstName={auth.user?.firstName} />} />
-              <Route component={() => <GameOrchestrator onLogout={handleLogout} playerFirstName={auth.user?.firstName} />} />
-            </Switch>
-          </WouterRouter>
-        </motion.div>
+        <WouterRouter base={base}>
+          <Switch>
+            {/* Privacy policy accessible from anywhere — auth or not */}
+            <Route path="/privacy" component={() => <PrivacyPolicyScreen />} />
+
+            {/* All other routes — auth-gated */}
+            <Route>
+              {!auth.isAuthenticated ? (
+                !hasSeenIntro ? (
+                  <IntroVideo onComplete={() => setHasSeenIntro(true)} />
+                ) : (
+                  <AuthScreen auth={auth} />
+                )
+              ) : (
+                <motion.div
+                  key="main"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.35 }}
+                  className="h-screen"
+                >
+                  <Switch>
+                    <Route path="/" component={() => <GameOrchestrator onLogout={handleLogout} onDeleteAccount={handleDeleteAccount} playerFirstName={auth.user?.firstName} />} />
+                    <Route component={() => <GameOrchestrator onLogout={handleLogout} onDeleteAccount={handleDeleteAccount} playerFirstName={auth.user?.firstName} />} />
+                  </Switch>
+                </motion.div>
+              )}
+            </Route>
+          </Switch>
+        </WouterRouter>
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>
