@@ -132,9 +132,9 @@ export function AuthScreen({ auth }: AuthScreenProps) {
         if (isYes(lower)) {
           doSignupRef.current();
         } else if (isNo(lower)) {
-          setCapturedEmail(""); setCapturedName("");
-          setStep("welcome");
-          s("Account creation cancelled. Say create account to try again, or log in to enter the dungeon.");
+          setCapturedEmail("");
+          setStep("signup_email");
+          s("No problem. Please say your email address again.");
         } else {
           s("Please say yes to create your account, or no to cancel and start over.");
         }
@@ -162,8 +162,8 @@ export function AuthScreen({ auth }: AuthScreenProps) {
           doLoginRef.current();
         } else if (isNo(lower)) {
           setCapturedEmail("");
-          setStep("welcome");
-          s("Login cancelled. Say log in to try again, or create account to begin a new adventure.");
+          setStep("login_email");
+          s("No problem. Please say your email address again.");
         } else {
           s("Please say yes to enter the dungeon, or no to cancel.");
         }
