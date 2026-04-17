@@ -254,17 +254,39 @@ function App() {
   // hasCompletedOnboarding flips to true the moment the user enters the game.
   // Only commands issued AFTER onboarding count toward the free-trial limit.
   const hasCompletedOnboardingRef = useRef(false);
-  const [dungeonCommandCount, setDungeonCommandCount] = useState(0);
+
+  // dungeonCommandCount and isPremium are persisted to localStorage so the
+  // free-trial counter survives page refreshes and premium status is never lost.
+  const [dungeonCommandCount, setDungeonCommandCount] = useState<number>(() => {
+    try { return parseInt(localStorage.getItem("dora_commandCount") ?? "0", 10) || 0; }
+    catch { return 0; }
+  });
+  const [isPremium, setIsPremium] = useState<boolean>(() => {
+    try { return localStorage.getItem("dora_isPremium") === "true"; }
+    catch { return false; }
+  });
   const [showSubscription, setShowSubscription] = useState(false);
 
   // Called by GameScreen every time a real game command hits the backend.
   const handleCommandExecuted = useCallback(() => {
     if (!hasCompletedOnboardingRef.current) return;
+    if (isPremium) return; // premium users have unlimited commands
     setDungeonCommandCount(prev => {
       const next = prev + 1;
+      try { localStorage.setItem("dora_commandCount", String(next)); } catch { /* ok */ }
       if (next === 6) setShowSubscription(true);
       return next;
     });
+  }, [isPremium]);
+
+  // Called when the user completes a subscription purchase (any tier).
+  const handlePurchase = useCallback((tier: string) => {
+    try {
+      localStorage.setItem("dora_isPremium", "true");
+      localStorage.setItem("dora_premiumTier", tier);
+    } catch { /* ok */ }
+    setIsPremium(true);
+    setShowSubscription(false);
   }, []);
 
   // Logout handler: skip the intro both for THIS render (setHasSeenIntro) and
@@ -274,6 +296,10 @@ function App() {
     setHasSeenIntro(true);   // immediate — no intro flash within this React tree
     auth.logout();
     AudioManager.stop();
+    // Reset per-session command counter on logout (premium flag is kept so it
+    // survives even if the user signs back in on the same device).
+    setDungeonCommandCount(0);
+    try { localStorage.removeItem("dora_commandCount"); } catch { /* ok */ }
   }, [auth]);
 
   // Delete account handler — callable from any authenticated screen.
@@ -384,7 +410,10 @@ function App() {
                     </Route>
                   </Switch>
                   {showSubscription && (
-                    <SubscriptionOverlay onClose={() => setShowSubscription(false)} />
+                    <SubscriptionOverlay
+                      onClose={() => setShowSubscription(false)}
+                      onPurchase={handlePurchase}
+                    />
                   )}
                 </motion.div>
               )}

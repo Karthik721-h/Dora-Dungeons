@@ -61,23 +61,36 @@ const FEATURES = [
 
 interface SubscriptionOverlayProps {
   onClose?: () => void;
+  /** Fired after a successful purchase with the tier id (e.g. "lifetime"). */
+  onPurchase?: (tier: string) => void;
 }
 
-export function SubscriptionOverlay({ onClose }: SubscriptionOverlayProps) {
+export function SubscriptionOverlay({ onClose, onPurchase }: SubscriptionOverlayProps) {
   const [selectedId, setSelectedId] = useState<Tier["id"]>("lifetime");
   const [, navigate] = useLocation();
 
   const selected = TIERS.find(t => t.id === selectedId)!;
+
+  function completePurchase(tierId: string) {
+    // Persist premium status so it survives page refreshes.
+    try {
+      localStorage.setItem("dora_isPremium", "true");
+      localStorage.setItem("dora_premiumTier", tierId);
+    } catch { /* localStorage unavailable */ }
+    onPurchase?.(tierId);
+    onClose?.();
+  }
 
   function handlePurchase() {
     // @ts-ignore — CdvPurchase is injected by Capacitor In-App Purchases plugin
     if (typeof CdvPurchase !== "undefined") {
       // @ts-ignore
       CdvPurchase.store.order(selectedId);
+      // Real purchase: completePurchase is called from the CdvPurchase approved event
     } else {
       console.log("Mock Purchase triggered for", selectedId);
       alert(`Premium Unlocked: ${selected.title} (Web Simulation)`);
-      onClose?.();
+      completePurchase(selectedId);
     }
   }
 

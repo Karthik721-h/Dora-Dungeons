@@ -1,0 +1,61 @@
+I need to implement a robust state persistence layer so the app remembers the user's account, game progress, and premium status between sessions. Please update the JavaScript logic with these exact specifications without breaking the existing voice or paywall logic:
+
+1. The Storage Utility:
+Create a clean utility object to handle saving and loading data using localStorage:
+
+JavaScript
+const StorageManager = {
+    save: function(key, data) {
+        localStorage.setItem('dora_' + key, JSON.stringify(data));
+    },
+    load: function(key) {
+        const data = localStorage.getItem('dora_' + key);
+        return data ? JSON.parse(data) : null;
+    }
+};
+2. Define the State Object:
+Group the existing scattered variables into a single global state object that gets updated and saved:
+
+JavaScript
+let AppState = StorageManager.load('gameState') || {
+    hasCompletedOnboarding: false,
+    characterName: '',
+    email: '',
+    dungeonCommandCount: 0,
+    isPremium: false,
+    premiumTier: null
+};
+3. Update the Triggers (When to Save):
+
+Onboarding Complete: When the user successfully finishes voice registration OR manual text registration, update AppState, set hasCompletedOnboarding = true, and call StorageManager.save('gameState', AppState);.
+
+Game Commands: Every time dungeonCommandCount increments, update AppState and save it.
+
+Mock Payment Complete: When the user clicks a paywall button, update AppState.isPremium = true, set AppState.premiumTier to the selected tier, and save it.
+
+4. The Smart Boot Sequence (Bypass Onboarding):
+Refactor the initial app load sequence. When the splash screen hides and hasAppBooted is set to true:
+
+Check if (AppState.hasCompletedOnboarding).
+
+If TRUE: Completely bypass the 'Say Create Account' onboarding UI and TTS. Instantly show the main Dungeon UI. Trigger a new TTS greeting: 'Welcome back, ' + AppState.characterName + '. The dungeon awaits your command.'
+
+If FALSE: Proceed with the normal 'Say Create Account' voice onboarding flow.
+
+5. Paywall Logic Update:
+Update the 6-command paywall check:
+if (AppState.dungeonCommandCount >= 6 && !AppState.isPremium) { showSubscriptionOverlay(); }
+This ensures premium users never see the paywall again."
+
+How to test the Memory Bank 🧪
+Once Replit writes this code, this is how you test it like a Senior QA tester right there on your ThinkPad:
+
+Fresh Start: Open the preview. Go through the voice onboarding. Say your name, say your email. Get into the dungeon.
+
+The Murder Test: Refresh the browser tab. (This simulates force-closing the app on an iPhone).
+
+The Resurrection: When the page reloads, it should NOT ask you to create an account. The intro voice should immediately say, "Welcome back, [Your Name]."
+
+The Premium Test: Issue 6 commands to trigger the paywall. Click the Lifetime mock purchase button. Refresh the browser again. Issue 5 more commands. The paywall should remain completely hidden because the app remembers you secured the bag.
+
+Drop this in and let me know if it successfully remembers you after a hard refresh!

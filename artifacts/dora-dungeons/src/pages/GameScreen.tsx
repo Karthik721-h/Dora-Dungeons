@@ -206,16 +206,19 @@ export function GameScreen({
         const enemySummary = living.length > 0
           ? living.map(e => `${e.name} with ${e.hp} of ${e.maxHp} health`).join(", and ")
           : "unknown enemies";
+        const playerName = gameState.player.name;
         AudioManager.speak(
-          `Resuming your adventure. You are in combat with ${enemySummary}. What will you do?`,
+          `Welcome back, ${playerName}. You are in combat with ${enemySummary}. What will you do?`,
           { interrupt: true }
         );
       } else {
         // ── Restore: exploring ─────────────────────────────────────────────
-        // Speak room name + description → exits only.
-        // Terminal logs are intentionally omitted to avoid replaying stale
-        // engine output to the player on refresh.
-        AudioManager.speak(`${room.name}. ${room.description}`, { interrupt: true });
+        const playerName = gameState.player.name;
+        AudioManager.speak(
+          `Welcome back, ${playerName}. The dungeon awaits your command.`,
+          { interrupt: true }
+        );
+        AudioManager.speak(`${room.name}. ${room.description}`, { interrupt: false });
         AudioManager.speak(buildExitsAnnouncement(room.exits), { interrupt: false });
       }
       AudioManager.onQueueDrained(() => {
