@@ -1086,7 +1086,7 @@ export function GameScreen({
         <div className="dd-navbar-controls">
           {/* Audio state indicator */}
           <span
-            className="font-code hidden md:block"
+            className="font-code hidden xl:block"
             style={{
               fontSize: "10px",
               letterSpacing: "0.18em",
@@ -1129,7 +1129,7 @@ export function GameScreen({
               aria-expanded={voiceDropdownOpen}
             >
               <span>{voiceGender === "female" ? "♀" : "♂"}</span>
-              <span className="hidden sm:inline">Voice</span>
+              <span className="hidden xl:inline">Voice</span>
               <ChevronDown size={9} />
             </button>
             {/* Portal: outside AnimatePresence so createPortal target is always document.body */}
@@ -1194,7 +1194,7 @@ export function GameScreen({
           </div>
 
           {/* Rate control */}
-          <div className="hidden sm:flex items-center gap-0.5" style={{ color: "rgba(200,190,180,0.35)" }}>
+          <div className="hidden xl:flex items-center gap-0.5" style={{ color: "rgba(200,190,180,0.35)" }}>
             <button
               onClick={() => adjustRate(-0.1)}
               className="p-1 hover:text-white transition-colors rounded"
@@ -1263,7 +1263,7 @@ export function GameScreen({
               title="Log out"
             >
               <LogOut size={14} />
-              <span className="font-code hidden sm:inline" style={{ fontSize: "10px", letterSpacing: "0.14em" }}>
+              <span className="font-code hidden xl:inline" style={{ fontSize: "10px", letterSpacing: "0.14em" }}>
                 EXIT
               </span>
             </button>
