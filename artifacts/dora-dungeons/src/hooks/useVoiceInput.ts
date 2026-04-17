@@ -322,6 +322,10 @@ export function useVoiceInput({
         }, TTS_COOLDOWN_MS);
       }
     });
+
+    // De-register on unmount / re-render so a stale closure cannot fire
+    // after the hook has torn down its refs and timers.
+    return () => AudioManager.onSpeakLock(null);
   // _startRecognition is stable (no deps)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSupported]);

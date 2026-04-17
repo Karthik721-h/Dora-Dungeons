@@ -273,9 +273,10 @@ class AudioManagerClass {
    * Called with `true` when TTS starts (mic should pause)
    * and `false` when TTS finishes (mic may resume).
    * Only one subscriber is supported (the voice hook).
+   * Pass null to de-register (e.g. on unmount).
    */
-  onSpeakLock(cb: (isSpeaking: boolean) => void) {
-    this.speakLockCallback = cb;
+  onSpeakLock(cb: ((isSpeaking: boolean) => void) | null) {
+    this.speakLockCallback = cb ?? undefined;
   }
 
   /**
@@ -579,10 +580,6 @@ class AudioManagerClass {
 
     utterance.onstart = () => {
       console.log("[AudioManager] TTS started:", entry.text.slice(0, 60));
-      this.isSpeaking = true;
-      // Speak-lock fires FIRST so the hook stops recognition before UI repaints
-      this.speakLockCallback?.(true);
-      this.onSpeakingChange?.(true);
     };
 
     utterance.onend = () => {
@@ -646,6 +643,14 @@ class AudioManagerClass {
     if (window.speechSynthesis.paused) {
       window.speechSynthesis.resume();
     }
+
+    // Set state synchronously before speak() — this closes the race window where
+    // _flush() could be called again between speak() and the async onstart event,
+    // seeing isSpeaking=false and double-starting the next queued utterance.
+    this.isSpeaking = true;
+    this.speakLockCallback?.(true);
+    this.onSpeakingChange?.(true);
+
     window.speechSynthesis.speak(utterance);
   }
 
