@@ -517,6 +517,61 @@ export function AuthScreen({ auth }: AuthScreenProps) {
                 src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA="
               />
             </div>
+
+            {/* ── Compliance footer pinned to bottom of splash ── */}
+            <div
+              style={{
+                position: "absolute",
+                bottom: "max(env(safe-area-inset-bottom, 0px), 20px)",
+                left: 0, right: 0,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: "0.6rem",
+                paddingBottom: "0.5rem",
+                zIndex: 1,
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              <a
+                href="https://doradungeons.com/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  fontFamily: "'Fira Code', monospace",
+                  fontSize: "0.65rem",
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  color: "rgba(200,155,60,0.4)",
+                  textDecoration: "underline",
+                  textUnderlineOffset: "3px",
+                }}
+              >
+                Privacy Policy
+              </a>
+              <button
+                type="button"
+                onClick={handleDeleteAccount}
+                style={{
+                  fontFamily: "'Cinzel', serif",
+                  fontSize: "0.65rem",
+                  fontWeight: 700,
+                  letterSpacing: "0.12em",
+                  textTransform: "uppercase",
+                  color: "#fff",
+                  background: "#8b1e1e",
+                  border: "1px solid rgba(200,60,60,0.45)",
+                  borderRadius: "5px",
+                  padding: "0.5rem 1.2rem",
+                  cursor: "pointer",
+                  minHeight: "44px",
+                  minWidth: "160px",
+                  boxShadow: "0 0 10px rgba(139,30,30,0.4)",
+                }}
+              >
+                ⚠ Delete Account
+              </button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
