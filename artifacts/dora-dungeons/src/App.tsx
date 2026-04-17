@@ -266,7 +266,16 @@ function App() {
     try { return localStorage.getItem("dora_isPremium") === "true"; }
     catch { return false; }
   });
-  const [showSubscription, setShowSubscription] = useState(false);
+  // showSubscription is derived from persisted state on mount so the paywall
+  // re-appears immediately if the user refreshes after hitting the free-trial
+  // limit (rather than only when the counter transitions 5→6 mid-session).
+  const [showSubscription, setShowSubscription] = useState<boolean>(() => {
+    try {
+      const count = parseInt(localStorage.getItem("dora_commandCount") ?? "0", 10) || 0;
+      const premium = localStorage.getItem("dora_isPremium") === "true";
+      return count >= 6 && !premium;
+    } catch { return false; }
+  });
 
   // Called by GameScreen every time a real game command hits the backend.
   const handleCommandExecuted = useCallback(() => {
@@ -275,7 +284,7 @@ function App() {
     setDungeonCommandCount(prev => {
       const next = prev + 1;
       try { localStorage.setItem("dora_commandCount", String(next)); } catch { /* ok */ }
-      if (next === 6) setShowSubscription(true);
+      if (next >= 6) setShowSubscription(true);
       return next;
     });
   }, [isPremium]);
