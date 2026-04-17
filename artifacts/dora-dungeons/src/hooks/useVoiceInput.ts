@@ -76,10 +76,11 @@ export function useVoiceInput({
   const [interimTranscript, setInterimTranscript] = useState("");
 
   // ── Guard flags (refs — zero re-renders, always current in callbacks) ──────
-  const wantListeningRef = useRef(false); // user intent
-  const isListeningRef   = useRef(false); // recognition running
-  const isSpeakingRef    = useRef(false); // TTS active
-  const ttsCooldownRef   = useRef(false); // post-TTS transcript discard window
+  const wantListeningRef        = useRef(false); // user intent
+  const isListeningRef          = useRef(false); // recognition running
+  const isSpeakingRef           = useRef(false); // TTS active
+  const ttsCooldownRef          = useRef(false); // post-TTS transcript discard window
+  const isProcessingCommandRef  = useRef(false); // final transcript received, awaiting TTS response
 
   // ── Timers ─────────────────────────────────────────────────────────────────
   const cooldownTimerRef   = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -156,6 +157,8 @@ export function useVoiceInput({
         console.log("[useVoiceInput] Transcript discarded (TTS active or cooldown)");
         return;
       }
+      // Gate 1: if a command is already in-flight, discard interim/duplicate results
+      if (isProcessingCommandRef.current) return;
 
       let interim = "";
       let finalText = "";
@@ -196,6 +199,8 @@ export function useVoiceInput({
           }
         }, PROCESSING_MS);
 
+        // Lock: command is now in-flight — block onresult and onend restart until TTS responds
+        isProcessingCommandRef.current = true;
         onFinalRef.current(trimmed);
       }
     };
@@ -236,6 +241,10 @@ export function useVoiceInput({
     recognition.onend = () => {
       console.log("[useVoiceInput] Recognition ended");
       isListeningRef.current = false;
+      // Safety Net: if TTS is active or a command is still in-flight, the
+      // speak-lock/cooldown path owns the restart — do not race it.
+      if (isSpeakingRef.current) return;
+      if (isProcessingCommandRef.current) return;
       restartRef.current();
     };
 
@@ -257,12 +266,17 @@ export function useVoiceInput({
   useEffect(() => {
     restartRef.current = () => {
       // Scenario B: natural silence timeout — only restart if not blocked
-      if (wantListeningRef.current && !isSpeakingRef.current && !ttsCooldownRef.current) {
-        setTimeout(_startRecognition, 80);
+      if (wantListeningRef.current && !isSpeakingRef.current && !ttsCooldownRef.current && !isProcessingCommandRef.current) {
+        setTimeout(() => {
+          // Double-check all guards still clear after the delay
+          if (!isSpeakingRef.current && !isProcessingCommandRef.current) {
+            _startRecognition();
+          }
+        }, 500);
       } else if (!wantListeningRef.current) {
         setVoiceState("idle");
       }
-      // isSpeaking=true or cooldown=true: speak-lock/cooldown owns the restart
+      // isSpeaking=true, cooldown=true, or isProcessingCommand=true: owning path handles restart
     };
   }, [_startRecognition]);
 
@@ -280,6 +294,8 @@ export function useVoiceInput({
         // an already-ended session can trigger a spurious onend in Chrome which
         // perturbs the lifecycle state.
         console.log("[useVoiceInput] Listening paused (TTS started)");
+        // Gate 2: TTS has taken the command response — release the processing lock
+        isProcessingCommandRef.current = false;
         setVoiceState("speaking");
         setInterimTranscript("");
         if (recognitionRef.current && isListeningRef.current) {
@@ -288,6 +304,8 @@ export function useVoiceInput({
       } else {
         // TTS ended — start cooldown window
         console.log("[useVoiceInput] TTS ended — cooldown started");
+        // Safety: ensure command lock is clear before cooldown starts
+        isProcessingCommandRef.current = false;
         ttsCooldownRef.current = true;
         clearTimeout(cooldownTimerRef.current);
 
@@ -349,9 +367,10 @@ export function useVoiceInput({
 
   const stopListening = useCallback(() => {
     console.log("[useVoiceInput] Listening stopped (user request)");
-    wantListeningRef.current = false;
-    isListeningRef.current   = false;
-    ttsCooldownRef.current   = false;
+    wantListeningRef.current       = false;
+    isListeningRef.current         = false;
+    ttsCooldownRef.current         = false;
+    isProcessingCommandRef.current = false;
     setVoiceState("idle");
     setInterimTranscript("");
     clearTimeout(processingTimerRef.current);
@@ -369,9 +388,10 @@ export function useVoiceInput({
   // ── Cleanup on unmount ────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
-      wantListeningRef.current = false;
-      isListeningRef.current   = false;
-      ttsCooldownRef.current   = false;
+      wantListeningRef.current       = false;
+      isListeningRef.current         = false;
+      ttsCooldownRef.current         = false;
+      isProcessingCommandRef.current = false;
       clearTimeout(processingTimerRef.current);
       clearTimeout(cooldownTimerRef.current);
       if (recognitionRef.current) {
