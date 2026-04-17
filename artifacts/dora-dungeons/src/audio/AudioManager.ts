@@ -53,6 +53,13 @@ class AudioManagerClass {
   // ── Narration ──────────────────────────────────────────────────────────────
   private narrationQueue: QueueEntry[] = [];
   private isSpeaking = false;
+  /**
+   * Tracks whether speakLockCallback(true) has been fired without a matching (false).
+   * This is separate from isSpeaking because isSpeaking is reset to false between
+   * sentences (so _flush() can proceed) while the lock should stay held for the
+   * entire multi-sentence narration without re-firing the callback each sentence.
+   */
+  private speakLockHeld = false;
   private lastText = "";
   /**
    * Monotonically increasing counter — incremented each time a new utterance
@@ -187,6 +194,7 @@ class AudioManagerClass {
 
         // If the queue is empty but we're stuck in "speaking" → release lock
         if (!this.narrationQueue.length) {
+          this.speakLockHeld = false;
           this.speakLockCallback?.(false);
           this.onSpeakingChange?.(false);
         }
@@ -397,6 +405,7 @@ class AudioManagerClass {
     if ("speechSynthesis" in window) window.speechSynthesis.cancel();
     this.narrationQueue     = [];
     this.isSpeaking         = false;
+    this.speakLockHeld      = false;
     this.queueDrainedCallback = undefined; // prevent stale one-shot callbacks
     this.speakLockCallback?.(false);       // tell useVoiceInput speak-lock is released
     this.onSpeakingChange?.(false);
@@ -596,10 +605,11 @@ class AudioManagerClass {
 
       if (queueNowEmpty) {
         // ── Queue fully drained ─────────────────────────────────────────────
-        // Only NOW release the speak-lock so the voice-input hook starts the
-        // cooldown.  Releasing between sentences would cause a race where the
-        // cooldown timer fires at the same moment the next utterance starts.
+        // Release speak-lock exactly ONCE here — the ONLY place speakLockHeld
+        // transitions true→false for a normal narration sequence, keeping the
+        // lock held for the entire multi-sentence run without spurious releases.
         console.log("[AudioManager] TTS ended");
+        this.speakLockHeld = false;
         this.speakLockCallback?.(false);
         this.onSpeakingChange?.(false);
 
@@ -630,12 +640,28 @@ class AudioManagerClass {
 
       // Also guard stale error events from old utterances.
       if (mySeq !== this.utteranceSeq) return;
-      console.log("[AudioManager] TTS error —", event.error, "— releasing speak-lock");
+
       this.isSpeaking = false;
-      this.speakLockCallback?.(false);
-      this.onSpeakingChange?.(false);
-      // Try to continue with whatever remains in the queue.
-      this._flush();
+
+      const queueNowEmpty = this.narrationQueue.length === 0;
+      if (queueNowEmpty) {
+        // Nothing left to say — fully release the speak-lock and fire drain callback
+        // so the voice hook and GameScreen can resume listening normally.
+        console.log("[AudioManager] TTS error —", event.error, "— queue empty, releasing speak-lock");
+        this.speakLockHeld = false;
+        this.speakLockCallback?.(false);
+        this.onSpeakingChange?.(false);
+        const cb = this.queueDrainedCallback;
+        this.queueDrainedCallback = undefined;
+        cb?.();
+      } else {
+        // More sentences remain — skip the failed one and retry the next WITHOUT
+        // releasing the speak-lock.  Releasing mid-narration would cause the
+        // voice hook to start a cooldown timer and the speaking indicator to
+        // flash to "listening" then back to "speaking" when the next sentence starts.
+        console.log("[AudioManager] TTS error —", event.error, "— retrying next sentence");
+        this._flush();
+      }
     };
 
     // Chrome / Edge fix: the synthesis engine can enter a paused state
@@ -644,12 +670,19 @@ class AudioManagerClass {
       window.speechSynthesis.resume();
     }
 
-    // Set state synchronously before speak() — this closes the race window where
-    // _flush() could be called again between speak() and the async onstart event,
-    // seeing isSpeaking=false and double-starting the next queued utterance.
+    // Set isSpeaking synchronously before speak() — closes the race window where
+    // _flush() could be re-entered between speak() and the async onstart event.
+    // Only fire speakLockCallback(true) on the FIRST sentence of a narration
+    // sequence (speakLockHeld = false → true transition).  Between sentences,
+    // onend resets isSpeaking=false to let _flush() proceed, but speakLockHeld
+    // stays true so we don't re-fire the callback and cause a false
+    // speaking→listening→speaking flicker in the voice hook.
     this.isSpeaking = true;
-    this.speakLockCallback?.(true);
-    this.onSpeakingChange?.(true);
+    if (!this.speakLockHeld) {
+      this.speakLockHeld = true;
+      this.speakLockCallback?.(true);
+      this.onSpeakingChange?.(true);
+    }
 
     window.speechSynthesis.speak(utterance);
   }
