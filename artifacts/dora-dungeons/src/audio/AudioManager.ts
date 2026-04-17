@@ -516,7 +516,7 @@ class AudioManagerClass {
 
         const t0 = now + startOffset;
         gain.gain.setValueAtTime(0, t0);
-        gain.gain.linearRampToValueAtTime(0.10, t0 + 0.008); // 8 ms attack
+        gain.gain.linearRampToValueAtTime(0.45, t0 + 0.010); // 10 ms attack
         gain.gain.exponentialRampToValueAtTime(0.001, t0 + duration);
 
         osc.connect(gain);
@@ -525,8 +525,8 @@ class AudioManagerClass {
         osc.stop(t0 + duration);
       };
 
-      beep(880,  0,     0.065); // A5 — first tone
-      beep(1108, 0.075, 0.065); // C#6 — second tone (rising = "open")
+      beep(880,  0,     0.120); // A5 — first tone
+      beep(1108, 0.135, 0.120); // C#6 — second tone (rising = "open")
     } catch {
       // Web Audio not available — silently continue
     }
