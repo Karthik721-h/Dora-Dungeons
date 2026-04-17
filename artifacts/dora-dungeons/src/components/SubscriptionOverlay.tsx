@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
+import { IAP_IDS } from "@/config/iap";
+import { AudioManager } from "@/audio/AudioManager";
 
 interface Tier {
   id: "weekly" | "monthly" | "yearly" | "lifetime";
@@ -63,9 +65,11 @@ interface SubscriptionOverlayProps {
   onClose?: () => void;
   /** Fired after a successful purchase with the tier id (e.g. "lifetime"). */
   onPurchase?: (tier: string) => void;
+  /** Triggered when the user taps "Restore Purchases". Provided by useIAP. */
+  onRestorePurchases?: () => void;
 }
 
-export function SubscriptionOverlay({ onClose, onPurchase }: SubscriptionOverlayProps) {
+export function SubscriptionOverlay({ onClose, onPurchase, onRestorePurchases }: SubscriptionOverlayProps) {
   const [selectedId, setSelectedId] = useState<Tier["id"]>("lifetime");
   const [, navigate] = useLocation();
 
@@ -84,13 +88,25 @@ export function SubscriptionOverlay({ onClose, onPurchase }: SubscriptionOverlay
   function handlePurchase() {
     // @ts-ignore — CdvPurchase is injected by Capacitor In-App Purchases plugin
     if (typeof CdvPurchase !== "undefined") {
+      // Use the full Apple product ID, not the short tier key.
       // @ts-ignore
-      CdvPurchase.store.order(selectedId);
-      // Real purchase: completePurchase is called from the CdvPurchase approved event
+      CdvPurchase.store.order(IAP_IDS[selectedId]);
+      // Unlock happens in the useIAP `approved` listener → onPurchase callback.
     } else {
-      console.log("Mock Purchase triggered for", selectedId);
+      // Web / dev mock path.
+      console.log("Mock Purchase triggered for", selectedId, IAP_IDS[selectedId]);
       alert(`Premium Unlocked: ${selected.title} (Web Simulation)`);
       completePurchase(selectedId);
+    }
+  }
+
+  function handleRestore() {
+    if (onRestorePurchases) {
+      // useIAP handles TTS + native store.restorePurchases().
+      onRestorePurchases();
+    } else {
+      // Fallback for web / dev: speak feedback directly.
+      AudioManager.speak("Checking for previous purchases.", { interrupt: true });
     }
   }
 
@@ -384,11 +400,7 @@ export function SubscriptionOverlay({ onClose, onPurchase }: SubscriptionOverlay
             }}
           >
             {[
-              { label: "Restore Purchases", action: () => {
-                // @ts-ignore
-                if (typeof CdvPurchase !== "undefined") CdvPurchase.store.restorePurchases();
-                else alert("Restore Purchases (Web Simulation)");
-              }},
+              { label: "Restore Purchases", action: handleRestore },
               { label: "Terms of Service", action: () => window.open("https://doradungeons.com/terms", "_blank") },
               { label: "Privacy Policy", action: () => navigate("/privacy") },
             ].map(link => (

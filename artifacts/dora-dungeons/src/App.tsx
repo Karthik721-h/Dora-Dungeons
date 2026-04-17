@@ -13,6 +13,7 @@ import { Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AudioManager } from "@/audio/AudioManager";
 import { SubscriptionOverlay } from "@/components/SubscriptionOverlay";
+import { useIAP } from "@/hooks/useIAP";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -289,6 +290,10 @@ function App() {
     setShowSubscription(false);
   }, []);
 
+  // Initialise the native IAP store (no-op on web / dev).
+  // restorePurchases is passed down to the paywall footer.
+  const { restorePurchases } = useIAP(handlePurchase);
+
   // Logout handler: skip the intro both for THIS render (setHasSeenIntro) and
   // for any same-tab page reload that follows (sessionStorage key).
   const handleLogout = useCallback(() => {
@@ -413,6 +418,7 @@ function App() {
                     <SubscriptionOverlay
                       onClose={() => setShowSubscription(false)}
                       onPurchase={handlePurchase}
+                      onRestorePurchases={restorePurchases}
                     />
                   )}
                 </motion.div>
