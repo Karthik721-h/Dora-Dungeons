@@ -12,3 +12,9 @@ id = "06xYpGadECAlQ09-DjcB3"
 uri = "file://www-build.zip"
 type = "unspecified"
 title = "Dora Dungeons — Native-Ready www Build"
+
+[[outputs]]
+id = "oxVM8Pn6NCFQ_XAs-ffu3"
+uri = "file://dora-dungeons-voltbuilder.zip"
+type = "unspecified"
+title = "Dora Dungeons — VoltBuilder Package"
