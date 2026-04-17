@@ -12,6 +12,7 @@ import { useJwtAuth } from "@/hooks/useJwtAuth";
 import { Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AudioManager } from "@/audio/AudioManager";
+import { SubscriptionOverlay } from "@/components/SubscriptionOverlay";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -34,7 +35,7 @@ const LOAD_STAGES = [
 const STAGE_INTERVAL_MS = 2500;  // advance label every 2.5 s
 const TIMEOUT_MS         = 8000; // hard timeout before showing retry UI
 
-function GameOrchestrator({ onLogout, onDeleteAccount, playerFirstName }: { onLogout: () => void; onDeleteAccount?: () => void; playerFirstName?: string | null }) {
+function GameOrchestrator({ onLogout, onDeleteAccount, onCommandExecuted, playerFirstName }: { onLogout: () => void; onDeleteAccount?: () => void; onCommandExecuted?: () => void; playerFirstName?: string | null }) {
   const queryClient = useQueryClient();
   const hasStartedRef = useRef(false);
 
@@ -221,7 +222,7 @@ function GameOrchestrator({ onLogout, onDeleteAccount, playerFirstName }: { onLo
         transition={{ duration: 0.7 }}
         className="h-screen"
       >
-        <GameScreen gameState={gameState!} onLogout={onLogout} onDeleteAccount={onDeleteAccount} />
+        <GameScreen gameState={gameState!} onLogout={onLogout} onDeleteAccount={onDeleteAccount} onCommandExecuted={onCommandExecuted} />
       </motion.div>
     </AnimatePresence>
   );
@@ -248,6 +249,23 @@ function App() {
     if (skip) sessionStorage.removeItem(SKIP_INTRO_KEY);
     return skip;
   });
+
+  // ── Monetisation tracking ──────────────────────────────────────────────────
+  // hasCompletedOnboarding flips to true the moment the user enters the game.
+  // Only commands issued AFTER onboarding count toward the free-trial limit.
+  const hasCompletedOnboardingRef = useRef(false);
+  const [dungeonCommandCount, setDungeonCommandCount] = useState(0);
+  const [showSubscription, setShowSubscription] = useState(false);
+
+  // Called by GameScreen every time a real game command hits the backend.
+  const handleCommandExecuted = useCallback(() => {
+    if (!hasCompletedOnboardingRef.current) return;
+    setDungeonCommandCount(prev => {
+      const next = prev + 1;
+      if (next === 6) setShowSubscription(true);
+      return next;
+    });
+  }, []);
 
   // Logout handler: skip the intro both for THIS render (setHasSeenIntro) and
   // for any same-tab page reload that follows (sessionStorage key).
@@ -298,13 +316,23 @@ function App() {
 
   // Wipe the React Query cache whenever the logged-in user changes so a
   // newly-signed-up or switched user never sees a stale game session from
-  // the previous user.
+  // the previous user.  Also flip the onboarding gate: once authenticated the
+  // player is "in the game" so subsequent commands start counting.
   const prevUserIdRef = useRef<string | null | undefined>(undefined);
   useEffect(() => {
     const currentId = auth.user?.id ?? null;
     if (prevUserIdRef.current !== undefined && prevUserIdRef.current !== currentId) {
       queryClient.clear();
       AudioManager.stop();
+      if (currentId) {
+        // User just logged in — mark onboarding complete so commands count.
+        hasCompletedOnboardingRef.current = true;
+      } else {
+        // User logged out — reset everything for next session.
+        hasCompletedOnboardingRef.current = false;
+        setDungeonCommandCount(0);
+        setShowSubscription(false);
+      }
     }
     prevUserIdRef.current = currentId;
   }, [auth.user?.id]);
@@ -348,9 +376,12 @@ function App() {
                   className="h-screen"
                 >
                   <Switch>
-                    <Route path="/" component={() => <GameOrchestrator onLogout={handleLogout} onDeleteAccount={handleDeleteAccount} playerFirstName={auth.user?.firstName} />} />
-                    <Route component={() => <GameOrchestrator onLogout={handleLogout} onDeleteAccount={handleDeleteAccount} playerFirstName={auth.user?.firstName} />} />
+                    <Route path="/" component={() => <GameOrchestrator onLogout={handleLogout} onDeleteAccount={handleDeleteAccount} onCommandExecuted={handleCommandExecuted} playerFirstName={auth.user?.firstName} />} />
+                    <Route component={() => <GameOrchestrator onLogout={handleLogout} onDeleteAccount={handleDeleteAccount} onCommandExecuted={handleCommandExecuted} playerFirstName={auth.user?.firstName} />} />
                   </Switch>
+                  {showSubscription && (
+                    <SubscriptionOverlay onClose={() => setShowSubscription(false)} />
+                  )}
                 </motion.div>
               )}
             </Route>

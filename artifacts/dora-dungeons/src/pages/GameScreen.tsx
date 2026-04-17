@@ -67,10 +67,12 @@ export function GameScreen({
   gameState,
   onLogout,
   onDeleteAccount,
+  onCommandExecuted,
 }: {
   gameState: GameStateResponse;
   onLogout?: () => void;
   onDeleteAccount?: () => void;
+  onCommandExecuted?: () => void;
 }) {
   const [command, setCommand] = useState("");
   const [speechRate, setSpeechRateState] = useState(1.0);
@@ -131,6 +133,7 @@ export function GameScreen({
   const startListeningRef   = useRef<() => void>(() => {});
   const gameModeRef         = useRef<"explore" | "levelDecision" | "replayPrompt">("explore");
   const onLogoutRef = useRef(onLogout);
+  const onCommandExecutedRef = useRef(onCommandExecuted);
   const voiceGenderRef = useRef(voiceGender);
   const voiceDropdownRef = useRef<HTMLDivElement>(null);
   const voiceButtonRef  = useRef<HTMLButtonElement>(null);
@@ -548,6 +551,7 @@ export function GameScreen({
       }
 
       if (trimmed === "look" || trimmed === "status") {
+        onCommandExecutedRef.current?.();
         sendAction({ data: { command: trimmed } });
         return;
       }
@@ -557,6 +561,7 @@ export function GameScreen({
         AudioManager.playDirectionalTone(directionToPan(dir), { frequency: 520, duration: 0.14 });
       }
 
+      onCommandExecutedRef.current?.();
       sendAction({ data: { command: trimmed } });
     },
     [isPending, isMuted, sendAction]
@@ -697,6 +702,7 @@ export function GameScreen({
   // Keep refs fresh so submitCommand (a useCallback) always has current values
   stopListeningRef.current = stopListening;
   onLogoutRef.current = onLogout;
+  onCommandExecutedRef.current = onCommandExecuted;
   voiceGenderRef.current = voiceGender;
   isMutedRef.current = isMuted;
   gameStateRef.current = gameState;

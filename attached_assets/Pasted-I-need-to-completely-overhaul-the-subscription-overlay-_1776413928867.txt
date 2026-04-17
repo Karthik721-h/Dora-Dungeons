@@ -1,0 +1,55 @@
+I need to completely overhaul the subscription overlay in my application to create a high-converting, 4-tier premium paywall. Please update index.html, the main CSS file, and the JavaScript logic with these exact specifications:
+
+1. Premium 'Stealth' Aesthetic (CSS):
+
+The paywall modal must cover the full screen using a glassmorphism backdrop (background: rgba(10, 10, 15, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);).
+
+Use a clean, minimalist dark-mode layout with subtle borders (border: 1px solid rgba(255, 255, 255, 0.1)).
+
+Ensure the text uses high-contrast, futuristic typography.
+
+2. The 4-Tier Selection Grid (HTML/CSS):
+
+Create a responsive container for the pricing cards. On desktop, they can sit side-by-side. On mobile/small screens, they MUST stack vertically or use a 2x2 grid so the text is not squished.
+
+Card 1 (Weekly): Title: 'Weekly'. Price: '$1.99'.
+
+Card 2 (Monthly): Title: 'Monthly'. Price: '$4.99'. Subtext: '7-Day Free Trial'.
+
+Card 3 (Yearly): Title: 'Yearly'. Price: '$19.99'.
+
+Card 4 (Lifetime): Title: 'Lifetime'. Price: '$49.99'. Subtext: 'Pay once, play forever'.
+
+Add a distinct 'MOST POPULAR' badge (e.g., an accent color or subtle glow) specifically to the Lifetime card.
+
+3. Interactive State Management (JS):
+
+The Lifetime card must be visually selected/active by default when the modal opens.
+
+Write JavaScript logic so that tapping a card adds an 'active' CSS class (making it brighter or adding a border highlight) and removes the active class from the others.
+
+4. Dynamic Call-to-Action (CTA) Button:
+
+Create a massive, highly visible primary button below the grid.
+
+The button's text and subtext MUST update dynamically via JavaScript based on which card is active:
+
+Weekly: 'SUBSCRIBE FOR $1.99' (Subtext: 'Auto-renews weekly')
+
+Monthly: 'START 7-DAY FREE TRIAL' (Subtext: 'Then $4.99/mo. Cancel anytime')
+
+Yearly: 'SUBSCRIBE FOR $19.99' (Subtext: 'Auto-renews yearly')
+
+Lifetime (Default): 'UNLOCK FOREVER' (Subtext: 'One-time secure payment')
+
+5. The Value Proposition & Compliance:
+
+Above the pricing grid, add a clean vertical list of features: '⚡ Zero Voice Latency', '♾️ Unlimited Dungeon Commands', '🛡️ Unrestricted Archive Access'.
+
+At the absolute bottom of the modal, add muted text links for 'Restore Purchases', 'Terms of Service', and 'Privacy Policy'.
+
+6. Mock Payment Logic (Safety Bridge):
+
+Attach a click event to the main CTA button.
+
+Wrap the logic in a safety check: if (typeof CdvPurchase !== 'undefined') { /* Call Native StoreKit */ } else { console.log('Mock Purchase triggered for ' + selectedTier); alert('Premium Unlocked: ' + selectedTier + ' (Web Simulation)'); }
