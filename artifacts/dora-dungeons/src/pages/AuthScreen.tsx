@@ -297,6 +297,41 @@ export function AuthScreen({ auth }: AuthScreenProps) {
   // Cleanup TTS on unmount
   useEffect(() => () => { AudioManager.stop(); }, []);
 
+  // ── Delete account ────────────────────────────────────────────────────────
+  const handleDeleteAccount = useCallback(async () => {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete your account? This action is permanent and cannot be undone."
+    );
+    if (!confirmed) return;
+
+    const email =
+      capturedEmailRef.current ||
+      manualEmail ||
+      window.prompt("Enter your email address to confirm account deletion:") ||
+      "";
+
+    if (!email.trim()) return;
+
+    const BASE = import.meta.env.BASE_URL.replace(/\/+$/, "");
+    try {
+      const res = await fetch(`${BASE}/api/auth/account`, {
+        method: "DELETE",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+      });
+      if (res.ok) {
+        window.alert("Your account has been permanently deleted.");
+      } else {
+        const data = await res.json().catch(() => ({}));
+        window.alert(data.message ?? "Could not find an account with that email.");
+      }
+    } catch {
+      window.alert("Network error. Please try again.");
+    }
+    auth.logout?.();
+  }, [manualEmail, auth]);
+
   // ── Manual submit ─────────────────────────────────────────────────────────
   async function handleManualSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -765,6 +800,72 @@ export function AuthScreen({ auth }: AuthScreenProps) {
             )}
           </form>
         )}
+        {/* ── Compliance footer — Privacy Policy + Delete Account ── */}
+        <div style={{
+          marginTop: "1.75rem",
+          paddingTop: "1rem",
+          borderTop: "1px solid rgba(200,155,60,0.1)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: "0.75rem",
+        }}>
+          {/* Privacy Policy link */}
+          <a
+            href="https://doradungeons.com/privacy"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              fontFamily: "'Fira Code', monospace",
+              fontSize: "0.68rem",
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              color: "rgba(200,155,60,0.45)",
+              textDecoration: "underline",
+              textUnderlineOffset: "3px",
+              transition: "color 0.2s",
+            }}
+            onMouseEnter={e => (e.currentTarget.style.color = "rgba(200,155,60,0.85)")}
+            onMouseLeave={e => (e.currentTarget.style.color = "rgba(200,155,60,0.45)")}
+          >
+            Privacy Policy
+          </a>
+
+          {/* Delete Account — Apple Guideline 5.1.1 required */}
+          <button
+            type="button"
+            onClick={handleDeleteAccount}
+            style={{
+              fontFamily: "'Cinzel', serif",
+              fontSize: "0.72rem",
+              fontWeight: 700,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              color: "#fff",
+              background: "#8b1e1e",
+              border: "1px solid rgba(200,60,60,0.5)",
+              borderRadius: "6px",
+              padding: "0.6rem 1.4rem",
+              cursor: "pointer",
+              minHeight: "44px",
+              width: "100%",
+              maxWidth: "260px",
+              boxShadow: "0 0 12px rgba(139,30,30,0.35)",
+              transition: "background 0.2s, box-shadow 0.2s",
+            }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLButtonElement).style.background = "#a52020";
+              (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 20px rgba(139,30,30,0.6)";
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLButtonElement).style.background = "#8b1e1e";
+              (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 12px rgba(139,30,30,0.35)";
+            }}
+          >
+            ⚠ Delete Account
+          </button>
+        </div>
+
       </motion.div>
     </div>
   );

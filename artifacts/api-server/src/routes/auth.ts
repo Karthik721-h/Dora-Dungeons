@@ -82,4 +82,28 @@ router.get("/auth/me", requireAuth, (req: Request, res: Response) => {
   res.json({ user: req.user });
 });
 
+router.delete("/auth/account", async (req: Request, res: Response) => {
+  const { email } = req.body ?? {};
+
+  if (typeof email !== "string" || !email.includes("@")) {
+    res.status(400).json({ error: "INVALID_EMAIL", message: "A valid email is required." });
+    return;
+  }
+
+  const [user] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.email, email.toLowerCase()))
+    .limit(1);
+
+  if (!user) {
+    res.status(404).json({ error: "NOT_FOUND", message: "No account found with that email address." });
+    return;
+  }
+
+  await db.delete(usersTable).where(eq(usersTable.email, email.toLowerCase()));
+
+  res.json({ success: true, message: "Account and all associated data have been permanently deleted." });
+});
+
 export default router;
