@@ -376,8 +376,12 @@ function App() {
                   className="h-screen"
                 >
                   <Switch>
-                    <Route path="/" component={() => <GameOrchestrator onLogout={handleLogout} onDeleteAccount={handleDeleteAccount} onCommandExecuted={handleCommandExecuted} playerFirstName={auth.user?.firstName} />} />
-                    <Route component={() => <GameOrchestrator onLogout={handleLogout} onDeleteAccount={handleDeleteAccount} onCommandExecuted={handleCommandExecuted} playerFirstName={auth.user?.firstName} />} />
+                    <Route path="/">
+                      <GameOrchestrator onLogout={handleLogout} onDeleteAccount={handleDeleteAccount} onCommandExecuted={handleCommandExecuted} playerFirstName={auth.user?.firstName} />
+                    </Route>
+                    <Route>
+                      <GameOrchestrator onLogout={handleLogout} onDeleteAccount={handleDeleteAccount} onCommandExecuted={handleCommandExecuted} playerFirstName={auth.user?.firstName} />
+                    </Route>
                   </Switch>
                   {showSubscription && (
                     <SubscriptionOverlay onClose={() => setShowSubscription(false)} />
