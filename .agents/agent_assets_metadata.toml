@@ -12,9 +12,3 @@ id = "06xYpGadECAlQ09-DjcB3"
 uri = "file://www-build.zip"
 type = "unspecified"
 title = "Dora Dungeons — Native-Ready www Build"
-
-[[outputs]]
-id = "BWcA1rIyRQMKW1MhfxmJm"
-uri = "file://screenshots/paywall_mobile.jpeg"
-type = "image"
-title = "Dora Dungeons — Paywall (iPhone 390×844)"
