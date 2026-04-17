@@ -375,7 +375,8 @@ export function AuthScreen({ auth }: AuthScreenProps) {
             <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "2rem" }}>
               <motion.img
                 src={`${import.meta.env.BASE_URL}images/logo.png`}
-                alt="Dora Dungeons"
+                alt=""
+                aria-hidden="true"
                 initial={{ opacity: 0, scale: 0.88 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
@@ -534,7 +535,8 @@ export function AuthScreen({ auth }: AuthScreenProps) {
         <div className="flex flex-col items-center mb-5">
           <img
             src={`${import.meta.env.BASE_URL}images/logo.png`}
-            alt="Dora Dungeons"
+            alt=""
+            aria-hidden="true"
             className="auth-logo w-24 h-24 object-contain mb-3"
           />
           <p style={{

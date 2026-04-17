@@ -1039,7 +1039,8 @@ export function GameScreen({
         <div className="dd-navbar-brand">
           <img
             src={`${import.meta.env.BASE_URL}images/logo.png`}
-            alt="Dora Dungeons"
+            alt=""
+            aria-hidden="true"
             style={{ width: 36, height: 36, objectFit: "contain", flexShrink: 0 }}
           />
           <span className="dd-navbar-title hidden sm:block">Dora Dungeons</span>
