@@ -492,6 +492,46 @@ class AudioManagerClass {
     setTimeout(() => this.playDirectionalTone(0, { frequency: 784, duration: 0.15 }), 250);
   }
 
+  /**
+   * A soft "mic hot" beep — played the instant the TTS queue drains to signal
+   * to the player that the microphone is now listening.
+   *
+   * Two-tone sequence (880 Hz → 1108 Hz, 65 ms each) chosen to be clearly
+   * audible but not jarring.  Implemented via the already-unlocked AudioContext
+   * so it works reliably on iOS without requiring a new user gesture.
+   */
+  playListeningBeep() {
+    try {
+      const ctx = this._getAudioContext();
+      if (!ctx) return;
+      if (ctx.state === "suspended") ctx.resume();
+
+      const now = ctx.currentTime;
+      const beep = (freq: number, startOffset: number, duration: number) => {
+        const osc  = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = "sine";
+        osc.frequency.value = freq;
+
+        const t0 = now + startOffset;
+        gain.gain.setValueAtTime(0, t0);
+        gain.gain.linearRampToValueAtTime(0.10, t0 + 0.008); // 8 ms attack
+        gain.gain.exponentialRampToValueAtTime(0.001, t0 + duration);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t0);
+        osc.stop(t0 + duration);
+      };
+
+      beep(880,  0,     0.065); // A5 — first tone
+      beep(1108, 0.075, 0.065); // C#6 — second tone (rising = "open")
+    } catch {
+      // Web Audio not available — silently continue
+    }
+  }
+
   // ── Private ─────────────────────────────────────────────────────────────────
 
   /** Wait for voices to be available, then flush the queue. */
@@ -565,6 +605,12 @@ class AudioManagerClass {
         console.log("[AudioManager] TTS ended");
         this.speakLockCallback?.(false);
         this.onSpeakingChange?.(false);
+
+        // ── "Mic hot" beep ─────────────────────────────────────────────────
+        // A soft A5 tone (880 Hz, 80 ms) fires the instant TTS ends so the
+        // visually-impaired user knows the microphone is now listening.
+        // Uses the already-unlocked AudioContext — safe on iOS.
+        this.playListeningBeep();
 
         const cb = this.queueDrainedCallback;
         this.queueDrainedCallback = undefined; // self-clear — one-shot
