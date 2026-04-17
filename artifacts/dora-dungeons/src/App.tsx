@@ -390,6 +390,22 @@ function App() {
     );
   }
 
+  // ── Demo / screenshot mode ──────────────────────────────────────────────────
+  // ?demo=paywall renders the subscription overlay standalone so it can be
+  // screenshotted for the App Store without needing an authenticated session.
+  const isPaywallDemo = new URLSearchParams(window.location.search).get("demo") === "paywall";
+  if (isPaywallDemo) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <div style={{ width: "100vw", height: "100vh", background: "#060810", position: "relative" }} />
+          <SubscriptionOverlay onClose={() => {}} onPurchase={() => {}} onRestorePurchases={() => {}} />
+          <Toaster />
+        </TooltipProvider>
+      </QueryClientProvider>
+    );
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
