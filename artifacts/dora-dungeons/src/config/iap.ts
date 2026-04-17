@@ -1,13 +1,15 @@
 /**
- * Central Apple App Store product ID configuration.
- * Update these placeholders with your real App Store Connect product IDs
- * before submitting to the App Store.
+ * Finalised Apple App Store product IDs.
+ * Keys are UPPERCASE to match the App Store Connect convention.
+ * Used in useIAP.ts for store registration and in SubscriptionOverlay.tsx
+ * for order() calls. The UI tier keys (weekly/monthly/yearly/lifetime) are
+ * kept lowercase internally and mapped to these IDs at the call site.
  */
 export const IAP_IDS = {
-  weekly:   "com.doradungeons.weekly.placeholder",
-  monthly:  "com.doradungeons.monthly.placeholder",
-  yearly:   "com.doradungeons.yearly.placeholder",
-  lifetime: "com.doradungeons.lifetime.placeholder",
+  WEEKLY:   "com.doradungeons.weekly",
+  MONTHLY:  "com.doradungeons.monthly",
+  YEARLY:   "com.doradungeons.yearly",
+  LIFETIME: "com.doradungeons.lifetime",
 } as const;
 
 export type IapTierId = keyof typeof IAP_IDS;

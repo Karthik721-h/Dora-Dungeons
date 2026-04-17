@@ -76,22 +76,22 @@ export function useIAP(onPurchase: (tier: string) => void) {
     // Register all 4 products.
     CdvPurchase.store.register([
       {
-        id:       IAP_IDS.weekly,
+        id:       IAP_IDS.WEEKLY,
         type:     CdvPurchase.ProductType.PAID_SUBSCRIPTION,
         platform: CdvPurchase.Platform.APPLE_APPSTORE,
       },
       {
-        id:       IAP_IDS.monthly,
+        id:       IAP_IDS.MONTHLY,
         type:     CdvPurchase.ProductType.PAID_SUBSCRIPTION,
         platform: CdvPurchase.Platform.APPLE_APPSTORE,
       },
       {
-        id:       IAP_IDS.yearly,
+        id:       IAP_IDS.YEARLY,
         type:     CdvPurchase.ProductType.PAID_SUBSCRIPTION,
         platform: CdvPurchase.Platform.APPLE_APPSTORE,
       },
       {
-        id:       IAP_IDS.lifetime,
+        id:       IAP_IDS.LIFETIME,
         type:     CdvPurchase.ProductType.NON_CONSUMABLE,
         platform: CdvPurchase.Platform.APPLE_APPSTORE,
       },
