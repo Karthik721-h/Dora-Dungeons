@@ -249,6 +249,13 @@
   align-items: center;
   gap: 0.625rem;
   flex-shrink: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.dd-navbar-controls::-webkit-scrollbar {
+  display: none;
 }
 
 /* ─── Status badge ───────────────────────────────────────── */
@@ -276,7 +283,14 @@
   background: rgba(6,8,16,0.72);
   border-bottom: 1px solid rgba(200,155,60,0.1);
   backdrop-filter: blur(8px);
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.location-strip::-webkit-scrollbar {
+  display: none;
 }
 
 /* ─── Terminal (narration feed) ──────────────────────────── */
