@@ -385,9 +385,15 @@ export function GameScreen({
           unknownHandledLocallyRef.current = false; // always reset after checking
 
           if (!alreadyHandled) {
+            // When .destroy was confirmed used by the LLM, suppress the deterministic
+            // engine's "You don't know 'destroy'" lines — they'd undercut the narration.
+            // The LLM's cinematic destroy narration is already in newLines and will play.
+            const filteredLines = usedDestroy
+              ? newLines.filter(l => !/you don't know|unknown spell/i.test(l))
+              : newLines;
             const linesToSpeak = isUnknownCommand
               ? ["Say help to hear the available voice commands."]
-              : newLines;
+              : filteredLines;
             AudioManager.speakLines(linesToSpeak, { interrupt: true });
           }
           // Queue exits after narration so visually impaired users always
@@ -417,6 +423,10 @@ export function GameScreen({
           if (newData.event === "LEVEL_COMPLETED") {
             gameModeRef.current = "levelDecision";
             setGameMode("levelDecision");
+            // Close any open overlays so the level-decision modal has exclusive focus.
+            setInventoryOpen(false);
+            setShopOpen(false);
+            setShopMode("main");
             if (!isMutedRef.current) {
               AudioManager.speak(
                 `Congratulations! Dungeon level ${newData.player.dungeonLevel} complete. You defeated the boss. Would you like to advance to the next level? Say yes to continue, or say no to replay the dungeon.`,
@@ -857,7 +867,10 @@ export function GameScreen({
 
   // True whenever any modal is covering the screen — used to visually disable
   // all interactive controls that sit behind the portal overlay.
-  const isModalOpen = isGameOver || gameMode !== "explore";
+  // isModalOpen = true whenever any blocking overlay is active.
+  // Covers: death screen, level decision, and the shop/inventory overlays.
+  // Consumed by VoiceControl to disable all action buttons when focus is elsewhere.
+  const isModalOpen = isGameOver || gameMode !== "explore" || inventoryOpen || shopOpen;
 
   // ── Restore decision mode if the page was refreshed during a VICTORY ────────
   // gameMode is React state and resets to "explore" on every mount. If the DB

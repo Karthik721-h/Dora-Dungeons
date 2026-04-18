@@ -127,7 +127,7 @@ export function VoiceControl({
         {isSupported && (
           <motion.button
             onClick={onToggleListen}
-            disabled={isGameOver}
+            disabled={isGameOver || isPending}
             whileTap={{ scale: 0.91 }}
             className={`
               relative rounded-full flex items-center justify-center flex-shrink-0 transition-all
@@ -138,8 +138,8 @@ export function VoiceControl({
               background: micBg,
               border: micBorder,
               color: micColor,
-              opacity: isGameOver ? 0.3 : 1,
-              cursor: isGameOver ? "not-allowed" : "pointer",
+              opacity: isGameOver || isPending ? 0.3 : 1,
+              cursor: isGameOver || isPending ? "not-allowed" : "pointer",
             }}
             aria-label={isListening ? "Stop voice input" : "Start voice input"}
             title={isListening ? "Listening — click to stop" : "Click to speak a command"}

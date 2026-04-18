@@ -1,0 +1,29 @@
+We are experiencing integration instability. We recently merged a new LLM Game Master, an RPG State Context, and a Voice Recognition engine into our existing deterministic game architecture. We are now seeing state desyncs, overlapping UI behaviors, and lifecycle bugs.
+
+Please execute a rigorous System Alignment Pass across the entire codebase. Do not write new features; focus entirely on reconciling the old architecture with the new additions. Target these four specific pillars:
+
+1. State Reconciliation (The Single Source of Truth):
+
+Audit how player.hp and the deterministic engineLogs merge with the LLM's hp_change, xp_awarded, and narration.
+
+Ensure there are no race conditions where the React UI updates with the engine's response before the LLM's response arrives.
+
+Verify that useRPGProgression state never falls out of sync with what is being passed to the callGameMaster payload.
+
+2. The Input Lifecycle (Voice vs. Manual):
+
+Audit the exclusivity of inputs. If the user is typing manually, the voice recognition debounce must be paused or completely killed. If the voice engine is actively listening, the manual input should ideally be locked or synchronized.
+
+Ensure the isPending / isLoading state of the sendAction mutation strictly disables both the microphone and the text input until the entire Hybrid engine cycle (Deterministic + LLM) completes.
+
+3. UI / Modal Exclusivity:
+
+Audit GameScreen.tsx. We have multiple game modes (Shop, Inventory overlay, Combat).
+
+Implement strict modal exclusivity: If inventoryOpen or shopOpen is true, the core game loop (movement, attacking, voice commands targeted at enemies) must be blocked or intercepted. The user cannot accidentally attack a goblin while looking at their Armor tab.
+
+4. API & Routing Consistency:
+
+Perform a final sweep of all fetch or Axios calls in the frontend. Ensure 100% of them utilize the centralized API_BASE_URL wrapper we implemented to prevent 404s when the www folder is decoupled.
+
+Please walk through your findings for each pillar, explain the root causes of the friction, and show me the exact code modifications to align the system.
