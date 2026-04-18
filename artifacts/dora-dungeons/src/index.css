@@ -248,16 +248,7 @@
   display: flex;
   align-items: center;
   gap: 0.625rem;
-  /* Allow the controls strip to shrink relative to the center badge so it
-     never crushes the room-name / level badge on narrow screens. Overflow
-     is hidden by scrolling, not wrapping. */
-  flex-shrink: 1;
-  min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: none; /* Firefox */
-}
-.dd-navbar-controls::-webkit-scrollbar {
-  display: none; /* Chrome / Safari / iOS */
+  flex-shrink: 0;
 }
 
 /* ─── Status badge ───────────────────────────────────────── */
@@ -285,9 +276,7 @@
   background: rgba(6,8,16,0.72);
   border-bottom: 1px solid rgba(200,155,60,0.1);
   backdrop-filter: blur(8px);
-  /* No wrapping — the right-side button group scrolls horizontally instead */
-  flex-wrap: nowrap;
-  overflow: hidden;
+  flex-wrap: wrap;
 }
 
 /* ─── Terminal (narration feed) ──────────────────────────── */
