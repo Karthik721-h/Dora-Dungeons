@@ -1160,7 +1160,7 @@ export function GameScreen({
           </span>
 
           {/* Voice gender switcher */}
-          <div ref={voiceDropdownRef}>
+          <div ref={voiceDropdownRef} className="shrink-0">
             <button
               ref={voiceButtonRef}
               onClick={() => {
@@ -1295,7 +1295,7 @@ export function GameScreen({
           {onDeleteAccount && (
             <button
               onClick={onDeleteAccount}
-              className="flex items-center gap-1.5 transition-colors p-1 rounded"
+              className="flex shrink-0 items-center gap-1.5 transition-colors p-1 rounded"
               style={{ color: "rgba(200,190,180,0.3)" }}
               onMouseEnter={e => (e.currentTarget.style.color = "rgba(248,113,113,0.9)")}
               onMouseLeave={e => (e.currentTarget.style.color = "rgba(200,190,180,0.3)")}
@@ -1310,7 +1310,7 @@ export function GameScreen({
           {onLogout && (
             <button
               onClick={onLogout}
-              className="flex items-center gap-1.5 transition-colors p-1 rounded group"
+              className="flex shrink-0 items-center gap-1.5 transition-colors p-1 rounded group"
               style={{ color: "rgba(200,190,180,0.3)" }}
               onMouseEnter={e => (e.currentTarget.style.color = "rgba(248,113,113,0.7)")}
               onMouseLeave={e => (e.currentTarget.style.color = "rgba(200,190,180,0.3)")}
@@ -1346,8 +1346,8 @@ export function GameScreen({
           </>
         )}
 
-        {/* Exit buttons + quick actions */}
-        <div className="ml-auto flex gap-1.5 flex-wrap justify-end">
+        {/* Exit buttons + quick actions — horizontal scroll instead of wrapping */}
+        <div className="ml-auto flex flex-row items-center gap-2 overflow-x-auto shrink-0" style={{ scrollbarWidth: "none" }}>
           {Object.keys(currentRoom.exits).map(dir => (
             <motion.button
               key={dir}
@@ -1420,7 +1420,7 @@ export function GameScreen({
             whileTap={{ scale: isModalOpen ? 1 : 0.94 }}
             onClick={() => { if (!isModalOpen) setShopOpen(v => !v); }}
             disabled={isModalOpen}
-            className="flex items-center gap-1 font-code text-xs uppercase px-2.5 py-1 transition-all"
+            className="flex shrink-0 items-center gap-1 font-code text-xs uppercase px-2.5 py-1 transition-all"
             style={{
               border: shopOpen
                 ? "1px solid rgba(200,155,60,0.55)"
@@ -1445,7 +1445,7 @@ export function GameScreen({
             whileHover={{ scale: 1.06 }}
             whileTap={{ scale: 0.94 }}
             onClick={() => setInventoryOpen(v => !v)}
-            className="flex items-center gap-1 font-code text-xs uppercase px-2.5 py-1 transition-all"
+            className="flex shrink-0 items-center gap-1 font-code text-xs uppercase px-2.5 py-1 transition-all"
             style={{
               border: inventoryOpen
                 ? "1px solid rgba(58,134,255,0.55)"
