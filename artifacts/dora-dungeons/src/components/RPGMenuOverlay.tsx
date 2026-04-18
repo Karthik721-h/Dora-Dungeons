@@ -329,7 +329,7 @@ export function RPGMenuOverlay({ onClose }: RPGMenuOverlayProps) {
   const { playerXP, unlockedWeapons, equippedWeapon, unlockedArmor, equippedArmor, unlockedAbilities } = state;
 
   return (
-    <AnimatePresence>
+    <>
       <motion.div
         key="rpg-overlay-backdrop"
         initial={{ opacity: 0 }}
@@ -631,6 +631,6 @@ export function RPGMenuOverlay({ onClose }: RPGMenuOverlayProps) {
           </div>
         </motion.div>
       </motion.div>
-    </AnimatePresence>
+    </>
   );
 }

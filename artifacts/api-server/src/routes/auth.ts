@@ -82,7 +82,7 @@ router.get("/auth/me", requireAuth, (req: Request, res: Response) => {
   res.json({ user: req.user });
 });
 
-router.delete("/auth/account", async (req: Request, res: Response) => {
+router.delete("/auth/account", requireAuth, async (req: Request, res: Response) => {
   const { email } = req.body ?? {};
 
   if (typeof email !== "string" || !email.includes("@")) {

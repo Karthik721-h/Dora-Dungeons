@@ -3,6 +3,7 @@ import {
   useContext,
   useReducer,
   useEffect,
+  useCallback,
   ReactNode,
 } from "react";
 
@@ -178,14 +179,21 @@ export function RPGProgressionProvider({ children }: { children: ReactNode }) {
     saveState(state);
   }, [state]);
 
-  const addXP = (amount: number) =>
-    dispatch({ type: "ADD_XP", payload: amount });
+  const addXP = useCallback(
+    (amount: number) => dispatch({ type: "ADD_XP", payload: amount }),
+    [],
+  );
 
-  const spendXP = (amount: number) =>
-    dispatch({ type: "SPEND_XP", payload: amount });
+  const spendXP = useCallback(
+    (amount: number) => dispatch({ type: "SPEND_XP", payload: amount }),
+    [],
+  );
 
-  const equipItem = (kind: "weapon" | "armor", id: string) =>
-    dispatch({ type: "EQUIP_ITEM", payload: { kind, id } });
+  const equipItem = useCallback(
+    (kind: "weapon" | "armor", id: string) =>
+      dispatch({ type: "EQUIP_ITEM", payload: { kind, id } }),
+    [],
+  );
 
   return (
     <RPGProgressionContext.Provider value={{ state, addXP, spendXP, equipItem }}>
