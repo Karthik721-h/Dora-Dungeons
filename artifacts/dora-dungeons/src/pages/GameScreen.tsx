@@ -93,13 +93,15 @@ export function GameScreen({
   const [inventoryOpen, setInventoryOpen] = useState(false);
 
   // ── RPG Progression context (read state + dispatch actions) ──────────────────
-  const { state: rpgState, addXP } = useRPGProgression();
+  const { state: rpgState, addXP, removeAbility } = useRPGProgression();
   // Refs so the mutation's onSuccess and submitCommand callbacks always see
   // the latest values without being recreated on every render.
-  const rpgStateRef = useRef(rpgState);
-  const addXPRef    = useRef(addXP);
-  useEffect(() => { rpgStateRef.current = rpgState; }, [rpgState]);
-  useEffect(() => { addXPRef.current    = addXP;    }, [addXP]);
+  const rpgStateRef      = useRef(rpgState);
+  const addXPRef         = useRef(addXP);
+  const removeAbilityRef = useRef(removeAbility);
+  useEffect(() => { rpgStateRef.current      = rpgState;      }, [rpgState]);
+  useEffect(() => { addXPRef.current         = addXP;         }, [addXP]);
+  useEffect(() => { removeAbilityRef.current = removeAbility; }, [removeAbility]);
 
   // ── Death / restart state ────────────────────────────────────────────────────
   const [restartPending, setRestartPending] = useState(false);
@@ -309,6 +311,14 @@ export function GameScreen({
         if (xpAwarded > 0) {
           addXPRef.current(xpAwarded);
           console.log(`[RPG] xp_awarded from Game Master: +${xpAwarded}`);
+        }
+
+        // ── .destroy ability: one-time use — remove after first invocation ────
+        const usedDestroy =
+          (newData as unknown as Record<string, unknown>).used_destroy_ability === true;
+        if (usedDestroy) {
+          removeAbilityRef.current(".destroy (1 Charge)");
+          console.log("[RPG] .destroy ability consumed — removed from abilities");
         }
 
         // ── Death guard: block ALL narration when transitioning into GAME_OVER ──

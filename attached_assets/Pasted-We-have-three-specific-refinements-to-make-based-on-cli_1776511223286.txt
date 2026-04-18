@@ -1,0 +1,23 @@
+We have three specific refinements to make based on client testing on iOS. Please execute these in parallel:
+
+1. RPG Starter Kit & One-Time '.destroy' Ability:
+
+Update RPGProgressionContext.tsx initial state: The player should start with a basic weapon (e.g., 'Wooden Sword', 2 DMG), simple armor (e.g., 'Peasant Tunic', 1 DEF), and one unlocked ability: '.destroy (1 Charge)'.
+
+Add a new reducer action: REMOVE_ABILITY that takes an ability name and filters it out of the unlockedAbilities array.
+
+2. LLM Narrative Rules & State Sync:
+
+In gameMaster.ts, update the system prompt. Tell the LLM: 'The beginning of the game features simple enemies. If the player uses the '.destroy' ability, they instantly and brutally obliterate the opponent in a god-like display of power. This is a one-time use ability.'
+
+Update the JSON response schema in the prompt to include a boolean flag: "used_destroy_ability": boolean.
+
+In GameScreen.tsx, inside the mutation's onSuccess handler, check if used_destroy_ability is true. If it is, dispatch the REMOVE_ABILITY action for '.destroy (1 Charge)' so the player loses it after the first use.
+
+3. iOS Button Bug & Loud Beep Fix:
+
+The Button: On the Intro/Landing screen component, the 'TAP TO ENTER' button is failing to register taps on physical iPhones. Update its CSS/Tailwind classes to include cursor-pointer, relative, and z-50. Ensure any background animations, particles, or overlays on that screen have pointer-events-none so they don't block touches. If it is a <div>, change it to a standard HTML <button> element to ensure native iOS tap handling.
+
+The Beep: Locate the audio playback logic for the voice recognition start/stop beep. If it uses new Audio(), ensure .volume = 1.0. If the source file is too quiet, implement a Web Audio API GainNode to amplify the volume by 3x (or manually synthesize a loud, high-pitched oscillator beep if we are currently synthesizing it).
+
+Audit the files, implement these changes, and show me the final code adjustments.

@@ -525,8 +525,11 @@ class AudioManagerClass {
         osc.frequency.value = freq;
 
         const t0 = now + startOffset;
+        // Peak gain of 1.35 (≈3× the original 0.45) for clear audibility on
+        // device speakers. The WebAudio destination compresses at the system
+        // level so we won't get digital clipping on modern iOS / Android.
         gain.gain.setValueAtTime(0, t0);
-        gain.gain.linearRampToValueAtTime(0.45, t0 + 0.010); // 10 ms attack
+        gain.gain.linearRampToValueAtTime(1.35, t0 + 0.010); // 10 ms attack
         gain.gain.exponentialRampToValueAtTime(0.001, t0 + duration);
 
         osc.connect(gain);

@@ -50,7 +50,8 @@ export function IntroVideo({ onComplete }: IntroVideoProps) {
         overflow: "hidden",
       }}
     >
-      {/* Video — contain ensures the full frame is always visible on all screen sizes */}
+      {/* Video — pointer-events disabled so the video layer never intercepts
+          touches meant for the buttons above it (critical for iOS Safari). */}
       <video
         ref={videoRef}
         src={`${import.meta.env.BASE_URL}videos/intro.mp4`}
@@ -63,11 +64,13 @@ export function IntroVideo({ onComplete }: IntroVideoProps) {
           display: "block",
           maxWidth: "100vw",
           maxHeight: "100vh",
+          pointerEvents: "none",
         }}
         aria-hidden="true"
       />
 
-      {/* Skip button — responsive: smaller on mobile, positioned to avoid subtitle area */}
+      {/* Skip button — responsive: smaller on mobile, positioned to avoid subtitle area.
+          position:relative + high z-index ensure it is always above the video on iOS. */}
       <button
         onClick={finish}
         aria-label="Skip intro"
@@ -85,8 +88,10 @@ export function IntroVideo({ onComplete }: IntroVideoProps) {
           letterSpacing: "0.12em",
           cursor: "pointer",
           transition: "background 0.15s, color 0.15s",
-          zIndex: 1,
+          zIndex: 50,
           whiteSpace: "nowrap",
+          touchAction: "manipulation",
+          WebkitTapHighlightColor: "transparent",
         }}
         onMouseEnter={e => {
           (e.currentTarget as HTMLButtonElement).style.background = "rgba(0,0,0,0.8)";
@@ -133,6 +138,8 @@ export function IntroVideo({ onComplete }: IntroVideoProps) {
             }}
             aria-label="Play intro video"
             style={{
+              position: "relative",
+              zIndex: 50,
               background: "rgba(139,30,30,0.18)",
               border: "1px solid rgba(139,30,30,0.55)",
               color: "#f87171",
@@ -143,14 +150,18 @@ export function IntroVideo({ onComplete }: IntroVideoProps) {
               letterSpacing: "0.14em",
               cursor: "pointer",
               marginBottom: "0.75rem",
+              touchAction: "manipulation",
+              WebkitTapHighlightColor: "transparent",
             }}
           >
-            PLAY
+            TAP TO ENTER
           </button>
           <button
             onClick={finish}
             aria-label="Skip intro"
             style={{
+              position: "relative",
+              zIndex: 50,
               background: "transparent",
               border: "none",
               color: "rgba(200,190,180,0.35)",
@@ -158,6 +169,8 @@ export function IntroVideo({ onComplete }: IntroVideoProps) {
               fontFamily: "inherit",
               letterSpacing: "0.1em",
               cursor: "pointer",
+              touchAction: "manipulation",
+              WebkitTapHighlightColor: "transparent",
             }}
           >
             SKIP

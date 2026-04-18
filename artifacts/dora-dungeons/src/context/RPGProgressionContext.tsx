@@ -34,16 +34,16 @@ export interface RPGState {
 // ─── Starter defaults ─────────────────────────────────────────────────────────
 
 export const STARTER_WEAPON: Weapon = {
-  id: "rusty-sword",
-  name: "Rusty Sword",
-  damage: 5,
+  id: "wooden-sword",
+  name: "Wooden Sword",
+  damage: 2,
   specialAbility: "None",
 };
 
 export const STARTER_ARMOR: Armor = {
-  id: "tattered-robe",
-  name: "Tattered Robe",
-  defense: 2,
+  id: "peasant-tunic",
+  name: "Peasant Tunic",
+  defense: 1,
 };
 
 const DEFAULT_STATE: RPGState = {
@@ -52,7 +52,7 @@ const DEFAULT_STATE: RPGState = {
   equippedWeapon: STARTER_WEAPON,
   unlockedArmor: [STARTER_ARMOR],
   equippedArmor: STARTER_ARMOR,
-  unlockedAbilities: [],
+  unlockedAbilities: [".destroy (1 Charge)"],
 };
 
 // ─── Actions ──────────────────────────────────────────────────────────────────
@@ -60,7 +60,8 @@ const DEFAULT_STATE: RPGState = {
 export type RPGAction =
   | { type: "ADD_XP"; payload: number }
   | { type: "SPEND_XP"; payload: number }
-  | { type: "EQUIP_ITEM"; payload: { kind: "weapon" | "armor"; id: string } };
+  | { type: "EQUIP_ITEM"; payload: { kind: "weapon" | "armor"; id: string } }
+  | { type: "REMOVE_ABILITY"; payload: string };
 
 // ─── Reducer ─────────────────────────────────────────────────────────────────
 
@@ -120,6 +121,16 @@ function rpgReducer(state: RPGState, action: RPGAction): RPGState {
       }
     }
 
+    case "REMOVE_ABILITY": {
+      console.log(`[RPG] REMOVE_ABILITY "${action.payload}" — consumed`);
+      return {
+        ...state,
+        unlockedAbilities: state.unlockedAbilities.filter(
+          (a) => a !== action.payload,
+        ),
+      };
+    }
+
     default:
       return state;
   }
@@ -165,6 +176,7 @@ interface RPGContextValue {
   addXP: (amount: number) => void;
   spendXP: (amount: number) => void;
   equipItem: (kind: "weapon" | "armor", id: string) => void;
+  removeAbility: (name: string) => void;
 }
 
 const RPGProgressionContext = createContext<RPGContextValue | null>(null);
@@ -195,8 +207,15 @@ export function RPGProgressionProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const removeAbility = useCallback(
+    (name: string) => dispatch({ type: "REMOVE_ABILITY", payload: name }),
+    [],
+  );
+
   return (
-    <RPGProgressionContext.Provider value={{ state, addXP, spendXP, equipItem }}>
+    <RPGProgressionContext.Provider
+      value={{ state, addXP, spendXP, equipItem, removeAbility }}
+    >
       {children}
     </RPGProgressionContext.Provider>
   );

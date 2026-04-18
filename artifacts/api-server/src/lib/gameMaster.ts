@@ -6,8 +6,10 @@ const SYSTEM_PROMPT = `You are the Game Master of Dora Dungeons, a premium, stor
 TONE & NARRATIVE: Your pacing and world-building should feel like a cinematic trilogy, heavily inspired by the emotional weight of God of War. You must expertly balance moments of intense combat, profound seriousness, and sadness with moments of genuine, laugh-out-loud comedy (especially if the player attempts something absurd).
 MECHANICS: The user payload will include their currently equippedWeapon, equippedArmor, and unlockedAbilities. You MUST factor these stats and items into your calculation of their success or failure in combat and puzzles.
 PROGRESSION: You have the authority to award XP. Award XP (e.g., 10 to 100) for defeating enemies, clever problem-solving, or highly entertaining interactions.
+DESTROY ABILITY: If the player invokes the special '.destroy (1 Charge)' ability, they instantly and brutally obliterate their opponent in a god-like display of overwhelming power — describe it as a catastrophic, awe-inspiring annihilation befitting a divine being. This ability is one-time use only. When it is used, set "used_destroy_ability": true in your response and award maximum XP.
+EARLY GAME: The beginning of the game features simple, low-level enemies such as goblins and rats.
 OUTPUT FORMAT: You must ONLY return a valid JSON object matching this exact schema, with no markdown formatting outside the JSON:
-{ "narration": "The story text to be read to the user...", "xp_awarded": <number>, "hp_change": <number> }`;
+{ "narration": "The story text to be read to the user...", "xp_awarded": <number>, "hp_change": <number>, "used_destroy_ability": <boolean> }`;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -22,9 +24,15 @@ export interface GameMasterResponse {
   narration: string;
   xp_awarded: number;
   hp_change: number;
+  used_destroy_ability: boolean;
 }
 
-const FALLBACK: GameMasterResponse = { narration: "", xp_awarded: 0, hp_change: 0 };
+const FALLBACK: GameMasterResponse = {
+  narration: "",
+  xp_awarded: 0,
+  hp_change: 0,
+  used_destroy_ability: false,
+};
 
 // ─── Singleton OpenAI client (lazy-initialised) ───────────────────────────────
 
@@ -98,9 +106,10 @@ export async function callGameMaster(
     try {
       const parsed = JSON.parse(cleaned) as Partial<GameMasterResponse>;
       return {
-        narration:  typeof parsed.narration  === "string" ? parsed.narration : "",
-        xp_awarded: typeof parsed.xp_awarded === "number" ? Math.max(0, Math.floor(parsed.xp_awarded)) : 0,
-        hp_change:  typeof parsed.hp_change  === "number" ? Math.floor(parsed.hp_change) : 0,
+        narration:            typeof parsed.narration            === "string"  ? parsed.narration : "",
+        xp_awarded:           typeof parsed.xp_awarded           === "number"  ? Math.max(0, Math.floor(parsed.xp_awarded)) : 0,
+        hp_change:            typeof parsed.hp_change            === "number"  ? Math.floor(parsed.hp_change) : 0,
+        used_destroy_ability: parsed.used_destroy_ability        === true,
       };
     } catch (parseErr) {
       console.error("[gameMaster] JSON parse failed. Raw LLM output:", raw);
