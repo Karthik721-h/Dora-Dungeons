@@ -8,8 +8,13 @@ MECHANICS: The user payload will include their currently equippedWeapon, equippe
 PROGRESSION: You have the authority to award XP. Award XP (e.g., 10 to 100) for defeating enemies, clever problem-solving, or highly entertaining interactions.
 DESTROY ABILITY: If the player invokes the special '.destroy (1 Charge)' ability, they instantly and brutally obliterate their opponent in a god-like display of overwhelming power — describe it as a catastrophic, awe-inspiring annihilation befitting a divine being. This ability is one-time use only. When it is used, set "used_destroy_ability": true in your response and award maximum XP.
 EARLY GAME: The beginning of the game features simple, low-level enemies such as goblins and rats.
+UI COMMANDS: You may trigger React UI overlays by setting the "ui_command" field. Rules:
+- If the player's intent is to check their gear, inspect their bag, view their inventory, or see their equipped items/abilities, set "ui_command" to "open_inventory".
+- If the player wants to buy, sell, trade, or visit the merchant/shop/store, set "ui_command" to "open_shop".
+- If the player wants to close, exit, or dismiss any menu, set "ui_command" to "close_menus".
+- For all other commands, set "ui_command" to "none".
 OUTPUT FORMAT: You must ONLY return a valid JSON object matching this exact schema, with no markdown formatting outside the JSON:
-{ "narration": "The story text to be read to the user...", "xp_awarded": <number>, "hp_change": <number>, "used_destroy_ability": <boolean> }`;
+{ "narration": "The story text to be read to the user...", "xp_awarded": <number>, "hp_change": <number>, "used_destroy_ability": <boolean>, "ui_command": "open_inventory" | "open_shop" | "close_menus" | "none" }`;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -25,6 +30,7 @@ export interface GameMasterResponse {
   xp_awarded: number;
   hp_change: number;
   used_destroy_ability: boolean;
+  ui_command: "open_inventory" | "open_shop" | "close_menus" | "none";
 }
 
 const FALLBACK: GameMasterResponse = {
@@ -32,6 +38,7 @@ const FALLBACK: GameMasterResponse = {
   xp_awarded: 0,
   hp_change: 0,
   used_destroy_ability: false,
+  ui_command: "none",
 };
 
 // ─── Singleton OpenAI client (lazy-initialised) ───────────────────────────────
@@ -105,11 +112,14 @@ export async function callGameMaster(
     // ── Inner try: JSON-parse errors log the raw LLM output for debugging ──
     try {
       const parsed = JSON.parse(cleaned) as Partial<GameMasterResponse>;
+      const validUiCommands = new Set(["open_inventory", "open_shop", "close_menus", "none"]);
+      const rawUiCommand = typeof parsed.ui_command === "string" ? parsed.ui_command : "none";
       return {
         narration:            typeof parsed.narration            === "string"  ? parsed.narration : "",
         xp_awarded:           typeof parsed.xp_awarded           === "number"  ? Math.max(0, Math.floor(parsed.xp_awarded)) : 0,
         hp_change:            typeof parsed.hp_change            === "number"  ? Math.floor(parsed.hp_change) : 0,
         used_destroy_ability: parsed.used_destroy_ability        === true,
+        ui_command:           validUiCommands.has(rawUiCommand) ? rawUiCommand as GameMasterResponse["ui_command"] : "none",
       };
     } catch (parseErr) {
       console.error("[gameMaster] JSON parse failed. Raw LLM output:", raw);

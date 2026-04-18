@@ -94,14 +94,17 @@ export function GameScreen({
 
   // ── RPG Progression context (read state + dispatch actions) ──────────────────
   const { state: rpgState, addXP, removeAbility } = useRPGProgression();
-  // Refs so the mutation's onSuccess and submitCommand callbacks always see
-  // the latest values without being recreated on every render.
-  const rpgStateRef      = useRef(rpgState);
-  const addXPRef         = useRef(addXP);
-  const removeAbilityRef = useRef(removeAbility);
-  useEffect(() => { rpgStateRef.current      = rpgState;      }, [rpgState]);
-  useEffect(() => { addXPRef.current         = addXP;         }, [addXP]);
-  useEffect(() => { removeAbilityRef.current = removeAbility; }, [removeAbility]);
+  // Single ref tracking { equippedWeapon, equippedArmor, unlockedAbilities, playerXP }.
+  // Updated in one effect so submitCommand always reads the exact, current values
+  // without being recreated on every render (avoids stale-closure bugs).
+  const currentRpgStateRef = useRef(rpgState);
+  const addXPRef           = useRef(addXP);
+  const removeAbilityRef   = useRef(removeAbility);
+  useEffect(() => {
+    currentRpgStateRef.current = rpgState;
+    addXPRef.current           = addXP;
+    removeAbilityRef.current   = removeAbility;
+  }, [rpgState, addXP, removeAbility]);
 
   // ── Death / restart state ────────────────────────────────────────────────────
   const [restartPending, setRestartPending] = useState(false);
@@ -130,9 +133,10 @@ export function GameScreen({
   // without requiring a backend round-trip.
   const [localExtraLogs, setLocalExtraLogs] = useState<string[]>([]);
 
-  // Refs so submitCommand (a useCallback) always sees fresh shop state
-  const shopOpenRef    = useRef(shopOpen);
-  const shopModeRef    = useRef(shopMode);
+  // Refs so submitCommand (a useCallback) always sees fresh overlay state
+  const shopOpenRef      = useRef(shopOpen);
+  const shopModeRef      = useRef(shopMode);
+  const inventoryOpenRef = useRef(inventoryOpen);
   // No shopGoldRef — gold is read from gameStateRef.current.gold
   const shopWeaponsRef = useRef(shopWeapons);
   const shopArmorsRef  = useRef(shopArmors);
@@ -321,6 +325,22 @@ export function GameScreen({
           console.log("[RPG] .destroy ability consumed — removed from abilities");
         }
 
+        // ── Voice-to-UI bridge: LLM can open/close React overlays ─────────────
+        // The Game Master sets ui_command based on the player's intent so voice
+        // commands like "check my gear" or "open inventory" open the right panel
+        // without any client-side pattern matching on the raw transcript.
+        const uiCmd = (newData as unknown as Record<string, unknown>).ui_command as string | undefined;
+        if (uiCmd === "open_inventory") {
+          setInventoryOpen(true);
+        } else if (uiCmd === "open_shop") {
+          setShopOpen(true);
+          setShopMode("main");
+        } else if (uiCmd === "close_menus") {
+          setInventoryOpen(false);
+          setShopOpen(false);
+          setShopMode("main");
+        }
+
         // ── Death guard: block ALL narration when transitioning into GAME_OVER ──
         // The death TTS useEffect handles the only speech in this state.
         // Allowing combat/log narration here would overlap with the death message.
@@ -494,6 +514,31 @@ export function GameScreen({
         return;
       }
 
+      // ── Inventory overlay ──────────────────────────────────────────────────────
+      if (trimmed === "open_inventory") {
+        setInventoryOpen(true);
+        if (!isMutedRef.current) {
+          AudioManager.speak(
+            "Inventory open. Here is your current gear and abilities.",
+            { interrupt: true }
+          );
+        }
+        return;
+      }
+
+      // ── Close menus (inventory, shop, or both) — also fired by LLM ui_command ──
+      if (trimmed === "close_menus") {
+        const shopWasOpen = shopOpenRef.current;
+        setInventoryOpen(false);
+        setShopOpen(false);
+        setShopMode("main");
+        if (!isMutedRef.current) {
+          if (shopWasOpen) speakShopExit();
+          else AudioManager.speak("Menu closed.", { interrupt: true });
+        }
+        return;
+      }
+
       if (trimmed === "shop_buy") {
         if (!shopOpenRef.current) { setShopOpen(true); }
         setShopMode("buy");
@@ -590,12 +635,28 @@ export function GameScreen({
         return;
       }
 
-      // Build RPG context from the stable ref — always fresh inside this callback
+      // ── Overlay guard: block backend game commands while any overlay is open ──
+      // Movement, combat, and exploration should not be processed while the player
+      // has a UI overlay open — the overlay intercepts voice input for its own flow.
+      if (inventoryOpenRef.current || shopOpenRef.current) {
+        if (!isMutedRef.current) {
+          AudioManager.speak(
+            inventoryOpenRef.current
+              ? "Your inventory is open. Say close to dismiss it first."
+              : "The shop is open. Say exit shop to leave first.",
+            { interrupt: false }
+          );
+        }
+        return;
+      }
+
+      // Build RPG context from the dedicated ref — always millisecond-fresh
+      // because currentRpgStateRef is updated in the same effect that tracks rpgState.
       const rpgCtx = {
-        equippedWeapon:    rpgStateRef.current.equippedWeapon,
-        equippedArmor:     rpgStateRef.current.equippedArmor,
-        unlockedAbilities: rpgStateRef.current.unlockedAbilities,
-        playerXP:          rpgStateRef.current.playerXP,
+        equippedWeapon:    currentRpgStateRef.current.equippedWeapon,
+        equippedArmor:     currentRpgStateRef.current.equippedArmor,
+        unlockedAbilities: currentRpgStateRef.current.unlockedAbilities,
+        playerXP:          currentRpgStateRef.current.playerXP,
       };
 
       if (trimmed === "look" || trimmed === "status") {
@@ -754,11 +815,12 @@ export function GameScreen({
   voiceGenderRef.current = voiceGender;
   isMutedRef.current = isMuted;
   gameStateRef.current = gameState;
-  shopOpenRef.current    = shopOpen;
-  shopModeRef.current    = shopMode;
-  shopWeaponsRef.current = shopWeapons;
-  shopArmorsRef.current  = shopArmors;
-  shopItemsRef.current   = shopItems;
+  shopOpenRef.current      = shopOpen;
+  shopModeRef.current      = shopMode;
+  inventoryOpenRef.current = inventoryOpen;
+  shopWeaponsRef.current   = shopWeapons;
+  shopArmorsRef.current    = shopArmors;
+  shopItemsRef.current     = shopItems;
   gameModeRef.current    = gameMode;
   startListeningRef.current = startListening;
 

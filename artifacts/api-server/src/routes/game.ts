@@ -218,7 +218,15 @@ router.post("/action", async (req: Request, res: Response) => {
     );
   }
 
-  // Build final newLogs: engine lines + GM narration (if any)
+  // Push the GM narration into the live log so it appears in the visual
+  // terminal (logs are serialized from updatedState.logs).  Without this,
+  // narration is spoken via TTS but never rendered on screen ("Ghost Text").
+  if (gmResult.narration) {
+    updatedState.logs.push(gmResult.narration);
+  }
+
+  // Build final newLogs: engine lines + GM narration (if any).
+  // These are sent separately so the client can diff exactly what changed.
   const newLogs = gmResult.narration
     ? [...engineNewLogs, gmResult.narration]
     : engineNewLogs;
@@ -227,8 +235,14 @@ router.post("/action", async (req: Request, res: Response) => {
 
   const serialized = serializeGameState(updatedState);
   const response = ProcessActionResponse.parse({ ...serialized, newLogs });
-  // Append xp_awarded after Zod serialization so it doesn't require schema changes
-  res.json({ ...response, xp_awarded: gmResult.xp_awarded });
+  // Append GM fields after Zod serialization (avoids schema changes to the
+  // generated OpenAPI contract while still delivering all data to the client).
+  res.json({
+    ...response,
+    xp_awarded:           gmResult.xp_awarded,
+    used_destroy_ability: gmResult.used_destroy_ability,
+    ui_command:           gmResult.ui_command,
+  });
 });
 
 /**

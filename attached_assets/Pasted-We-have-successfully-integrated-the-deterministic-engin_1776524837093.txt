@@ -1,0 +1,29 @@
+We have successfully integrated the deterministic engine, the LLM narrative layer, the RPG Context, and the Voice controls. However, the system is now experiencing state desyncs, game mode overlaps, and UI update failures.
+
+Please execute a ruthless, comprehensive codebase audit and stabilization pass targeting the following areas:
+
+1. The 'Ghost Text' Bug (Voice-to-Screen Desync):
+
+Issue: When a voice command is processed, the TTS engine successfully speaks the LLM's narration, but the text fails to append to the visual game log on the screen.
+
+Fix: Audit the onSuccess handler of the action mutation in GameScreen.tsx. Ensure that setLogs (or equivalent state updater) uses the functional updater pattern setLogs(prevLogs => [...prevLogs, newLog]) rather than relying on a potentially stale closure of the logs array. Verify that the LLM's narration string is correctly extracted and pushed to this array alongside the engine logs.
+
+2. Game Mode Overlaps & Input Blocking:
+
+Issue: Overlaps between Shop, Inventory, Combat, and Voice states.
+
+Fix: Ensure strict state exclusivity. If the user is in the Shop or the RPGMenuOverlay is open, physical and voice movement/combat inputs should be ignored or paused.
+
+Audit the submitCommand function: If an overlay is open, early return or alert the user to close the menu first.
+
+3. Race Conditions & Double-Firing:
+
+Issue: The new 1.5s voice debounce/silence detector might be conflicting with manual text inputs or double-firing API calls.
+
+Fix: Audit the voice recognition cleanup logic. Ensure that manually typing a command completely clears the voice timeout. Ensure the mutation has an isLoading or isPending guard that entirely disables the input field and voice submission until the backend completely finishes responding.
+
+4. General UX & Prop Drilling:
+
+Review all useEffect and useCallback dependencies related to game state to ensure we have no missing dependencies or infinite re-render loops.
+
+Please audit the code, explain the root causes of the desyncs you find, and show me the exact, clean file modifications to stabilize the app

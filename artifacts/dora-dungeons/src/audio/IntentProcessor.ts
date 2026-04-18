@@ -177,6 +177,18 @@ const PHRASE_PATTERNS: PhrasePair[] = [
     canonical: (m) => `use ${m[1]!.trim()}`,
   },
 
+  // --- Inventory: open ---
+  {
+    pattern: /^(?:open|show|view|check|see|display)\s+(?:my\s+)?(?:inventory|bag|pack|backpack|gear|items|equipment|loadout)$|^inventory$|^bag$|^gear$/,
+    canonical: () => "open_inventory",
+  },
+
+  // --- Inventory / menus: close ---
+  {
+    pattern: /^(?:close|exit|leave|shut|dismiss|back)\s+(?:(?:the\s+)?(?:inventory|bag|menu|overlay|panel|shop))?$|^close$/,
+    canonical: () => "close_menus",
+  },
+
   // --- Shop: open ---
   {
     pattern: /^(?:open|enter|go\s+to|visit|access)\s+(?:the\s+)?shop$|^shop$|^merchant$|^store$/,
@@ -230,7 +242,8 @@ const KNOWN_COMMAND_HINTS: Array<{ keywords: string[]; suggestion: string }> = [
   { keywords: ["defend", "block", "guard", "shield", "parry"], suggestion: "defend" },
   { keywords: ["flee", "run", "escape", "retreat"], suggestion: "flee" },
   { keywords: ["look", "examine", "inspect", "observe", "describe", "where"], suggestion: "look" },
-  { keywords: ["status", "stats", "health", "hp", "inventory", "abilities"], suggestion: "status" },
+  { keywords: ["inventory", "bag", "gear", "pack", "backpack", "equipment", "loadout", "items"], suggestion: "open inventory" },
+  { keywords: ["status", "stats", "health", "hp", "abilities"], suggestion: "status" },
   { keywords: ["take", "grab", "pick", "loot", "collect"], suggestion: "take [item]" },
   { keywords: ["use", "drink", "eat", "equip", "wield", "wear"], suggestion: "use [item]" },
   { keywords: ["cast", "spell", "fireball", "lightning", "heal", "freeze", "inferno", "meteor", "poison"], suggestion: "cast [spell]" },
