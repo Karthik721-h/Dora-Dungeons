@@ -29,7 +29,10 @@ export interface RPGState {
   unlockedArmor: Armor[];
   equippedArmor: Armor;
   unlockedAbilities: string[];
-  /** Permanently true after the player invokes and consumes .destroy. */
+  /**
+   * True when ALL charges of .destroy have been consumed this level.
+   * Reset to false on RESTORE_DESTROY (level-up).
+   */
   destroyConsumed: boolean;
 }
 
@@ -54,7 +57,8 @@ const DEFAULT_STATE: RPGState = {
   equippedWeapon: STARTER_WEAPON,
   unlockedArmor: [STARTER_ARMOR],
   equippedArmor: STARTER_ARMOR,
-  unlockedAbilities: [".destroy (1 Charge)"],
+  // 2 charges per level — decrements to 1 on first use, removed on second use.
+  unlockedAbilities: [".destroy (2 Charges)"],
   destroyConsumed: false,
 };
 
@@ -65,11 +69,17 @@ export type RPGAction =
   | { type: "SPEND_XP"; payload: number }
   | { type: "EQUIP_ITEM"; payload: { kind: "weapon" | "armor"; id: string } }
   | { type: "REMOVE_ABILITY"; payload: string }
+  /**
+   * Consume one .destroy charge:
+   *   .destroy (2 Charges) → .destroy (1 Charge)  (decrement)
+   *   .destroy (1 Charge)  → removed               (all charges spent)
+   */
+  | { type: "USE_DESTROY" }
   /** Unlock a new weapon from the shop and auto-equip it (best weapon wins). */
   | { type: "ADD_WEAPON"; payload: Weapon }
   /** Add or update an armor in the roster and auto-equip it. */
   | { type: "SYNC_ARMOR"; payload: Armor }
-  /** Restore the .destroy charge — awarded once per dungeon level cleared. */
+  /** Recharge .destroy to 2 Charges — awarded once per dungeon level cleared. */
   | { type: "RESTORE_DESTROY" };
 
 // ─── Reducer ─────────────────────────────────────────────────────────────────
@@ -132,26 +142,62 @@ function rpgReducer(state: RPGState, action: RPGAction): RPGState {
 
     case "REMOVE_ABILITY": {
       console.log(`[RPG] REMOVE_ABILITY "${action.payload}" — consumed`);
-      const destroyConsumed =
-        state.destroyConsumed ||
-        action.payload === ".destroy (1 Charge)";
       return {
         ...state,
-        destroyConsumed,
         unlockedAbilities: state.unlockedAbilities.filter(
           (a) => a !== action.payload,
         ),
       };
     }
 
+    case "USE_DESTROY": {
+      const has2 = state.unlockedAbilities.includes(".destroy (2 Charges)");
+      const has1 = state.unlockedAbilities.includes(".destroy (1 Charge)");
+      if (!has2 && !has1) {
+        console.warn("[RPG] USE_DESTROY — no charges remaining, ignoring");
+        return state;
+      }
+      if (has2) {
+        // Decrement: 2 → 1 charge
+        console.log("[RPG] USE_DESTROY — charge spent: 2 → 1 remaining");
+        return {
+          ...state,
+          unlockedAbilities: state.unlockedAbilities.map((a) =>
+            a === ".destroy (2 Charges)" ? ".destroy (1 Charge)" : a,
+          ),
+        };
+      }
+      // has1: last charge — remove entirely, mark fully consumed
+      console.log("[RPG] USE_DESTROY — last charge consumed, ability exhausted");
+      return {
+        ...state,
+        destroyConsumed: true,
+        unlockedAbilities: state.unlockedAbilities.filter(
+          (a) => a !== ".destroy (1 Charge)",
+        ),
+      };
+    }
+
     case "RESTORE_DESTROY": {
-      const alreadyHas = state.unlockedAbilities.includes(".destroy (1 Charge)");
-      if (alreadyHas) return state;
-      console.log("[RPG] RESTORE_DESTROY — .destroy (1 Charge) recharged");
+      // Already at full charges → no-op
+      if (state.unlockedAbilities.includes(".destroy (2 Charges)")) return state;
+      // Lingering 1-charge from previous level → upgrade to 2
+      if (state.unlockedAbilities.includes(".destroy (1 Charge)")) {
+        console.log("[RPG] RESTORE_DESTROY — upgraded 1 → 2 Charges");
+        return {
+          ...state,
+          destroyConsumed: false,
+          unlockedAbilities: state.unlockedAbilities.map((a) =>
+            a === ".destroy (1 Charge)" ? ".destroy (2 Charges)" : a,
+          ),
+        };
+      }
+      // Normal recharge after both charges spent
+      console.log("[RPG] RESTORE_DESTROY — .destroy (2 Charges) recharged");
       return {
         ...state,
         destroyConsumed: false,
-        unlockedAbilities: [".destroy (1 Charge)", ...state.unlockedAbilities],
+        unlockedAbilities: [".destroy (2 Charges)", ...state.unlockedAbilities],
       };
     }
 
@@ -211,14 +257,24 @@ function loadState(): RPGState {
 
     const destroyConsumed = parsed.destroyConsumed === true;
 
-    // Migration: restore .destroy ability if it was never explicitly consumed
-    // (handles old saves that predated the destroyConsumed flag).
-    const savedAbilities = parsed.unlockedAbilities ?? [];
-    const hasDestroy = savedAbilities.includes(".destroy (1 Charge)");
-    const unlockedAbilities =
-      !destroyConsumed && !hasDestroy
-        ? [".destroy (1 Charge)", ...savedAbilities]
-        : savedAbilities;
+    // ── Migration ──────────────────────────────────────────────────────────
+    // v1 saves used ".destroy (1 Charge)" as the per-level ability.
+    // v2 changes the system to 2 charges per level.
+    // Rules:
+    //   • Old ".destroy (1 Charge)" + destroyConsumed=false  → upgrade to 2 Charges
+    //     (player hadn't fired it yet this level; give them the full 2-charge grant)
+    //   • Old ".destroy (1 Charge)" + destroyConsumed=true   → inconsistent state,
+    //     treat as fully spent (remove it; RESTORE_DESTROY will recharge on level-up)
+    //   • No destroy variant + destroyConsumed=false          → add 2 Charges
+    //     (pre-flag saves that never stored the ability explicitly)
+    //   • ".destroy (2 Charges)" already present             → no-op
+    let abilities = (parsed.unlockedAbilities ?? []).filter(
+      (a) => a !== ".destroy (1 Charge)", // strip v1 entries unconditionally
+    );
+    const hasV2 = abilities.includes(".destroy (2 Charges)");
+    if (!hasV2 && !destroyConsumed) {
+      abilities = [".destroy (2 Charges)", ...abilities];
+    }
 
     return {
       playerXP:        parsed.playerXP        ?? DEFAULT_STATE.playerXP,
@@ -226,7 +282,7 @@ function loadState(): RPGState {
       equippedWeapon:  parsed.equippedWeapon   ?? DEFAULT_STATE.equippedWeapon,
       unlockedArmor:   parsed.unlockedArmor    ?? DEFAULT_STATE.unlockedArmor,
       equippedArmor:   parsed.equippedArmor    ?? DEFAULT_STATE.equippedArmor,
-      unlockedAbilities,
+      unlockedAbilities: abilities,
       destroyConsumed,
     };
   } catch {
@@ -250,11 +306,16 @@ interface RPGContextValue {
   spendXP: (amount: number) => void;
   equipItem: (kind: "weapon" | "armor", id: string) => void;
   removeAbility: (name: string) => void;
+  /**
+   * Consume one .destroy charge.
+   * 2 Charges → 1 Charge (first use) → removed entirely (second use).
+   */
+  useDestroy: () => void;
   /** Unlock a weapon purchased in the shop and auto-equip it. */
   addWeapon: (weapon: Weapon) => void;
   /** Add or update an armor (e.g. after shop upgrade) and auto-equip it. */
   syncArmor: (armor: Armor) => void;
-  /** Recharge .destroy (1 Charge) — called on level-up or to fix accidental use. */
+  /** Recharge .destroy to 2 Charges — called on level-up. */
   restoreDestroy: () => void;
 }
 
@@ -291,6 +352,11 @@ export function RPGProgressionProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const useDestroy = useCallback(
+    () => dispatch({ type: "USE_DESTROY" }),
+    [],
+  );
+
   const addWeapon = useCallback(
     (weapon: Weapon) => dispatch({ type: "ADD_WEAPON", payload: weapon }),
     [],
@@ -308,7 +374,7 @@ export function RPGProgressionProvider({ children }: { children: ReactNode }) {
 
   return (
     <RPGProgressionContext.Provider
-      value={{ state, addXP, spendXP, equipItem, removeAbility, addWeapon, syncArmor, restoreDestroy }}
+      value={{ state, addXP, spendXP, equipItem, removeAbility, useDestroy, addWeapon, syncArmor, restoreDestroy }}
     >
       {children}
     </RPGProgressionContext.Provider>

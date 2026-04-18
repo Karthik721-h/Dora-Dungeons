@@ -604,7 +604,7 @@ export function RPGMenuOverlay({ onClose }: RPGMenuOverlayProps) {
                   ) : (
                     <div style={{ display: "flex", flexDirection: "column", gap: "0.625rem", padding: "0.25rem 0" }}>
                       {unlockedAbilities.map((ability, idx) => {
-                        const isDestroy = ability === ".destroy (1 Charge)";
+                        const isDestroy = ability.startsWith(".destroy");
                         return (
                           <motion.div
                             key={idx}
@@ -648,7 +648,7 @@ export function RPGMenuOverlay({ onClose }: RPGMenuOverlayProps) {
                                   lineHeight: 1.5,
                                 }}
                               >
-                                Say <em>"use destroy"</em> or <em>"obliterate"</em> in combat to unleash. One-time use — gone after firing.
+                                Say <em>"use destroy"</em> or <em>"obliterate"</em> in combat to unleash. Two charges per level — each use depletes one charge.
                               </span>
                             )}
                           </motion.div>

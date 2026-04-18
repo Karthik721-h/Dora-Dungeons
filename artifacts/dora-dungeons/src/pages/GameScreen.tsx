@@ -93,13 +93,14 @@ export function GameScreen({
   const [inventoryOpen, setInventoryOpen] = useState(false);
 
   // ── RPG Progression context (read state + dispatch actions) ──────────────────
-  const { state: rpgState, addXP, removeAbility, addWeapon, syncArmor, restoreDestroy } = useRPGProgression();
+  const { state: rpgState, addXP, removeAbility, useDestroy, addWeapon, syncArmor, restoreDestroy } = useRPGProgression();
   // Single ref tracking { equippedWeapon, equippedArmor, unlockedAbilities, playerXP }.
   // Written synchronously in the render body (see below) so submitCommand always
   // reads the exact, current values without stale-closure bugs.
   const currentRpgStateRef = useRef(rpgState);
   const addXPRef           = useRef(addXP);
   const removeAbilityRef   = useRef(removeAbility);
+  const useDestroyRef      = useRef(useDestroy);
   const addWeaponRef       = useRef(addWeapon);
   const syncArmorRef       = useRef(syncArmor);
   const restoreDestroyRef  = useRef(restoreDestroy);
@@ -107,10 +108,11 @@ export function GameScreen({
     currentRpgStateRef.current = rpgState;
     addXPRef.current           = addXP;
     removeAbilityRef.current   = removeAbility;
+    useDestroyRef.current      = useDestroy;
     addWeaponRef.current       = addWeapon;
     syncArmorRef.current       = syncArmor;
     restoreDestroyRef.current  = restoreDestroy;
-  }, [rpgState, addXP, removeAbility, addWeapon, syncArmor, restoreDestroy]);
+  }, [rpgState, addXP, removeAbility, useDestroy, addWeapon, syncArmor, restoreDestroy]);
 
   // ── One-time backend → RPGProgressionContext bootstrap ───────────────────────
   // When the game loads the backend may already have weapons/armors the player
@@ -340,12 +342,13 @@ export function GameScreen({
           console.log(`[RPG] xp_awarded from Game Master: +${xpAwarded}`);
         }
 
-        // ── .destroy ability: one-time use — remove after first invocation ────
+        // ── .destroy ability: 2 charges per level — decrement on each use ────
         const usedDestroy =
           (newData as unknown as Record<string, unknown>).used_destroy_ability === true;
         if (usedDestroy) {
-          removeAbilityRef.current(".destroy (1 Charge)");
-          console.log("[RPG] .destroy ability consumed — removed from abilities");
+          // Decrement charge counter: 2 → 1 (first use) or 1 → gone (second use).
+          useDestroyRef.current();
+          console.log("[RPG] .destroy ability — charge consumed via USE_DESTROY");
         }
 
         // ── Voice-to-UI bridge: LLM can open/close React overlays ─────────────
@@ -855,6 +858,7 @@ export function GameScreen({
   // submitCommand always reads the freshest data, not a stale effect-cycle copy.
   currentRpgStateRef.current   = rpgState;
   removeAbilityRef.current     = removeAbility;
+  useDestroyRef.current        = useDestroy;
   isPendingRef.current         = isPending;
   shopOpenRef.current          = shopOpen;
   shopModeRef.current      = shopMode;
@@ -1052,7 +1056,7 @@ export function GameScreen({
       // Recharge .destroy for the new level
       restoreDestroyRef.current();
       AudioManager.speak(
-        `Entering dungeon level ${data.player.dungeonLevel}. A new dungeon awaits. Prepare yourself. Your destroy ability has recharged.`,
+        `Entering dungeon level ${data.player.dungeonLevel}. A new dungeon awaits. Prepare yourself. Your destroy ability has recharged to 2 charges.`,
         { interrupt: true }
       );
       speakRoomNarration(data.currentRoom);
