@@ -12,6 +12,7 @@ import {
 import { AudioManager } from "@/audio/AudioManager";
 import { processIntent, directionToPan } from "@/audio/IntentProcessor";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
+import { useRPGProgression } from "@/context/RPGProgressionContext";
 import { NarrationFeed } from "@/components/NarrationFeed";
 import { PlayerHUD } from "@/components/PlayerHUD";
 import { VoiceControl } from "@/components/VoiceControl";
@@ -90,6 +91,15 @@ export function GameScreen({
 
   // ── RPG Inventory overlay ─────────────────────────────────────────────────────
   const [inventoryOpen, setInventoryOpen] = useState(false);
+
+  // ── RPG Progression context (read state + dispatch actions) ──────────────────
+  const { state: rpgState, addXP } = useRPGProgression();
+  // Refs so the mutation's onSuccess and submitCommand callbacks always see
+  // the latest values without being recreated on every render.
+  const rpgStateRef = useRef(rpgState);
+  const addXPRef    = useRef(addXP);
+  useEffect(() => { rpgStateRef.current = rpgState; }, [rpgState]);
+  useEffect(() => { addXPRef.current    = addXP;    }, [addXP]);
 
   // ── Death / restart state ────────────────────────────────────────────────────
   const [restartPending, setRestartPending] = useState(false);
@@ -287,6 +297,13 @@ export function GameScreen({
         const newLines: string[] = (newData.newLogs ?? []).filter(
           l => l.trim() && !l.startsWith(">")
         );
+
+        // ── RPG Progression: award XP granted by the LLM Game Master ─────────
+        const xpAwarded = (newData as unknown as Record<string, unknown>).xp_awarded;
+        if (typeof xpAwarded === "number" && xpAwarded > 0) {
+          addXPRef.current(xpAwarded);
+          console.log(`[RPG] xp_awarded from Game Master: +${xpAwarded}`);
+        }
 
         // ── Death guard: block ALL narration when transitioning into GAME_OVER ──
         // The death TTS useEffect handles the only speech in this state.
@@ -557,9 +574,17 @@ export function GameScreen({
         return;
       }
 
+      // Build RPG context from the stable ref — always fresh inside this callback
+      const rpgCtx = {
+        equippedWeapon:    rpgStateRef.current.equippedWeapon,
+        equippedArmor:     rpgStateRef.current.equippedArmor,
+        unlockedAbilities: rpgStateRef.current.unlockedAbilities,
+        playerXP:          rpgStateRef.current.playerXP,
+      };
+
       if (trimmed === "look" || trimmed === "status") {
         onCommandExecutedRef.current?.();
-        sendAction({ data: { command: trimmed } });
+        sendAction({ data: { command: trimmed, rpgContext: rpgCtx } as Parameters<typeof sendAction>[0]["data"] });
         return;
       }
 
@@ -569,7 +594,7 @@ export function GameScreen({
       }
 
       onCommandExecutedRef.current?.();
-      sendAction({ data: { command: trimmed } });
+      sendAction({ data: { command: trimmed, rpgContext: rpgCtx } as Parameters<typeof sendAction>[0]["data"] });
     },
     [isPending, isMuted, sendAction]
   );

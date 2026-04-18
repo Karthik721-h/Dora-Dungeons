@@ -22,6 +22,7 @@ import {
   ShopActionResponse,
 } from "@workspace/api-zod";
 import { loadSession, saveSession, deleteSession } from "../lib/gameSession.js";
+import { callGameMaster, type RPGContext } from "../lib/gameMaster.js";
 
 const router: IRouter = Router();
 
@@ -171,6 +172,20 @@ router.post("/action", async (req: Request, res: Response) => {
 
   const body = ProcessActionBody.parse(req.body);
 
+  // ── Optional RPG context forwarded by the frontend ────────────────────────
+  // Zod strips unknown keys from ProcessActionBody, so we read directly from
+  // req.body. All fields are optional — missing context falls back gracefully.
+  const rpgContext: RPGContext = {
+    equippedWeapon: req.body?.rpgContext?.equippedWeapon ?? {
+      id: "rusty-sword", name: "Rusty Sword", damage: 5, specialAbility: "None",
+    },
+    equippedArmor: req.body?.rpgContext?.equippedArmor ?? {
+      id: "tattered-robe", name: "Tattered Robe", defense: 2,
+    },
+    unlockedAbilities: req.body?.rpgContext?.unlockedAbilities ?? [],
+    playerXP: req.body?.rpgContext?.playerXP ?? 0,
+  };
+
   // Capture log count BEFORE the command so we can extract exactly which lines
   // were added by this command (the server caps logs at 80 in the serializer,
   // so comparing array lengths client-side breaks after 80 total log lines).
@@ -178,15 +193,42 @@ router.post("/action", async (req: Request, res: Response) => {
 
   const updatedState = engine.processCommand(body.command);
 
-  // Lines genuinely added by this command — used by the client for TTS so it
-  // knows exactly what to narrate regardless of the 80-line display cap.
-  const newLogs = updatedState.logs.slice(logCountBefore);
+  // Lines genuinely added by this command — used by the client for TTS and
+  // also forwarded to the LLM as the "engine outcome" context.
+  const engineNewLogs = updatedState.logs.slice(logCountBefore);
+
+  // ── LLM Game Master narration ─────────────────────────────────────────────
+  const room = updatedState.dungeon.rooms.get(updatedState.currentRoomId)!;
+  const gmResult = await callGameMaster(
+    body.command,
+    engineNewLogs,
+    updatedState.gameStatus,
+    updatedState.player.hp,
+    updatedState.player.maxHp,
+    room.name,
+    room.description,
+    rpgContext,
+  );
+
+  // Apply LLM-awarded HP change (clamped to valid range)
+  if (gmResult.hp_change !== 0) {
+    updatedState.player.hp = Math.max(
+      0,
+      Math.min(updatedState.player.maxHp, updatedState.player.hp + gmResult.hp_change),
+    );
+  }
+
+  // Build final newLogs: engine lines + GM narration (if any)
+  const newLogs = gmResult.narration
+    ? [...engineNewLogs, gmResult.narration]
+    : engineNewLogs;
 
   await saveSession(userId, updatedState);
 
   const serialized = serializeGameState(updatedState);
   const response = ProcessActionResponse.parse({ ...serialized, newLogs });
-  res.json(response);
+  // Append xp_awarded after Zod serialization so it doesn't require schema changes
+  res.json({ ...response, xp_awarded: gmResult.xp_awarded });
 });
 
 /**

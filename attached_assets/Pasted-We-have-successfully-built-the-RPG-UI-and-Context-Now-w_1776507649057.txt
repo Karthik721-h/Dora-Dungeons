@@ -1,0 +1,27 @@
+We have successfully built the RPG UI and Context. Now we need to update the core LLM communication to read this state and execute the client's narrative vision.
+
+Please make the following three structural changes:
+
+1. Frontend API Call Update:
+Locate the function where the frontend sends the user's prompt to the LLM backend (likely in a useGame or combat hook). Update the request payload to include the current RPG state from useRPGProgression (specifically equippedWeapon, equippedArmor, unlockedAbilities, and playerXP).
+
+2. Backend System Prompt Update:
+Locate the server-side LLM configuration and completely rewrite the system_prompt to the following:
+
+'You are the Game Master of Dora Dungeons, a premium, story-driven text-and-audio RPG.
+TONE & NARRATIVE: Your pacing and world-building should feel like a cinematic trilogy, heavily inspired by the emotional weight of God of War. You must expertly balance moments of intense combat, profound seriousness, and sadness with moments of genuine, laugh-out-loud comedy (especially if the player attempts something absurd).
+MECHANICS: The user payload will include their currently equippedWeapon, equippedArmor, and unlockedAbilities. You MUST factor these stats and items into your calculation of their success or failure in combat and puzzles.
+PROGRESSION: You have the authority to award XP. Award XP (e.g., 10 to 100) for defeating enemies, clever problem-solving, or highly entertaining interactions.
+OUTPUT FORMAT: You must ONLY return a valid JSON object matching this exact schema, with no markdown formatting outside the JSON:
+{ "narration": "The story text to be read to the user...", "xp_awarded": <number>, "hp_change": <number> }'
+
+3. Response Parsing:
+Update the frontend logic that receives the LLM response. It must now parse the JSON.
+
+Append the narration string to the game log.
+
+If xp_awarded > 0, trigger the addXP action from our context.
+
+If hp_change !== 0, apply that change to the player's health state.
+
+Show me the exact file modifications to implement this.
