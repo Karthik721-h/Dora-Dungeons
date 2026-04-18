@@ -14,11 +14,6 @@ router.post("/auth/signup", async (req: Request, res: Response) => {
     return;
   }
 
-  if (!email.toLowerCase().endsWith("@gmail.com")) {
-    res.status(400).json({ error: "INVALID_DOMAIN", message: "Only Gmail addresses are supported." });
-    return;
-  }
-
   const [existing] = await db
     .select()
     .from(usersTable)
@@ -52,11 +47,6 @@ router.post("/auth/login", async (req: Request, res: Response) => {
 
   if (typeof email !== "string" || !email.includes("@")) {
     res.status(400).json({ error: "INVALID_EMAIL", message: "A valid email is required." });
-    return;
-  }
-
-  if (!email.toLowerCase().endsWith("@gmail.com")) {
-    res.status(400).json({ error: "INVALID_DOMAIN", message: "Only Gmail addresses are supported." });
     return;
   }
 
