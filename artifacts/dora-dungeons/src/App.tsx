@@ -331,12 +331,16 @@ function App() {
 
     if (!email.trim()) return;
 
-    const BASE = import.meta.env.BASE_URL.replace(/\/+$/, "");
+    const apiOrigin = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
+    const base = apiOrigin || import.meta.env.BASE_URL.replace(/\/+$/, "");
+    const token = localStorage.getItem("dd_jwt") ?? "";
     try {
-      const res = await fetch(`${BASE}/api/auth/account`, {
+      const res = await fetch(`${base}/api/auth/account`, {
         method: "DELETE",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ email: email.trim().toLowerCase() }),
       });
       if (res.ok) {
