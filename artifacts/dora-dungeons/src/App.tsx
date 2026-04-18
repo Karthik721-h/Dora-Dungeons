@@ -9,6 +9,7 @@ import { IntroVideo } from "@/components/IntroVideo";
 import { PrivacyPolicyScreen } from "@/pages/PrivacyPolicyScreen";
 import { useGetGameState, useStartGame, getGetGameStateQueryKey } from "@workspace/api-client-react";
 import { useJwtAuth } from "@/hooks/useJwtAuth";
+import { API_BASE_URL } from "@/lib/config";
 import { Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AudioManager } from "@/audio/AudioManager";
@@ -331,11 +332,9 @@ function App() {
 
     if (!email.trim()) return;
 
-    const apiOrigin = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
-    const base = apiOrigin || import.meta.env.BASE_URL.replace(/\/+$/, "");
     const token = localStorage.getItem("dd_jwt") ?? "";
     try {
-      const res = await fetch(`${base}/api/auth/account`, {
+      const res = await fetch(`${API_BASE_URL}/api/auth/account`, {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",

@@ -1,14 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
+import { API_BASE_URL } from "@/lib/config";
 
 const TOKEN_KEY = "dd_jwt";
 
-// In Capacitor builds, VITE_API_BASE_URL is the deployed API origin
-// (e.g. "https://your-app.replit.app").  On web it is absent, so we fall
-// back to the Vite BASE_URL-relative path which the Replit proxy handles.
-const API_ORIGIN: string =
-  (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
-const VITE_BASE = import.meta.env.BASE_URL.replace(/\/+$/, "");
-const BASE = API_ORIGIN || VITE_BASE;
+// Always use the absolute backend URL so auth calls work in Capacitor (no proxy)
+// and in all web contexts.
+const BASE = API_BASE_URL;
 
 export interface AuthUser {
   id: string;
