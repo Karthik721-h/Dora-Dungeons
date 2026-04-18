@@ -55,6 +55,7 @@ interface UseVoiceInputResult {
 const DEBOUNCE_MS       = 1000; // ignore same command within this window
 const PROCESSING_MS     = 400;  // "processing" badge duration
 const TTS_COOLDOWN_MS   = 500;  // discard buffered TTS transcripts after speech ends
+const SILENCE_TIMEOUT_MS = 1500; // auto-submit after 1.5 s of silence with interim text
 
 export function useVoiceInput({
   onFinalTranscript,
@@ -85,6 +86,12 @@ export function useVoiceInput({
   // ── Timers ─────────────────────────────────────────────────────────────────
   const cooldownTimerRef   = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const processingTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // Silence detection: fires 1.5 s after the last onresult event so we can
+  // auto-submit interim text if the browser never delivers a final result.
+  const silenceTimerRef    = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // Tracks the most-recent interim transcript across onresult calls so the
+  // silence timeout can submit it even though the original closure is gone.
+  const currentTranscriptRef = useRef<string>("");
 
   // ── Misc ───────────────────────────────────────────────────────────────────
   const lastCommandRef = useRef({ text: "", time: 0 });
@@ -160,6 +167,10 @@ export function useVoiceInput({
       // Gate 1: if a command is already in-flight, discard interim/duplicate results
       if (isProcessingCommandRef.current) return;
 
+      // ── Silence detection: reset the timer on every onresult event ───────────
+      // Any speech activity postpones the timeout by another 1.5 s.
+      clearTimeout(silenceTimerRef.current);
+
       let interim = "";
       let finalText = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -173,9 +184,49 @@ export function useVoiceInput({
       if (interim) {
         setInterimTranscript(interim);
         onInterimRef.current?.(interim);
+        // Keep a stable ref so the silence-timeout callback can access it even
+        // after this closure has returned.
+        currentTranscriptRef.current = interim;
+
+        // Arm the 1.5 s silence timer.  If no more speech comes in and the
+        // browser never delivers a final result, auto-submit what we heard.
+        silenceTimerRef.current = setTimeout(() => {
+          const pending = currentTranscriptRef.current.trim();
+          if (!pending || isProcessingCommandRef.current || isSpeakingRef.current) return;
+
+          currentTranscriptRef.current = "";
+          setInterimTranscript("");
+          console.log("[useVoiceInput] Silence timeout — auto-submitting:", pending);
+
+          // Deduplication
+          const now = Date.now();
+          if (
+            pending === lastCommandRef.current.text &&
+            now - lastCommandRef.current.time < DEBOUNCE_MS
+          ) return;
+          lastCommandRef.current = { text: pending, time: now };
+
+          // Stop the mic so it doesn't keep listening after we submit
+          if (recognitionRef.current && isListeningRef.current) {
+            try { recognitionRef.current.stop(); } catch { /* ok */ }
+          }
+
+          setVoiceState("processing");
+          clearTimeout(processingTimerRef.current);
+          processingTimerRef.current = setTimeout(() => {
+            if (wantListeningRef.current && !isSpeakingRef.current) setVoiceState("listening");
+          }, PROCESSING_MS);
+
+          isProcessingCommandRef.current = true;
+          onFinalRef.current(pending);
+        }, SILENCE_TIMEOUT_MS);
       }
 
       if (finalText.trim()) {
+        // Final result received — clear the silence timer and the buffered text;
+        // the normal submission path below handles everything.
+        clearTimeout(silenceTimerRef.current);
+        currentTranscriptRef.current = "";
         setInterimTranscript("");
         const trimmed = finalText.trim();
 
@@ -375,10 +426,12 @@ export function useVoiceInput({
     isListeningRef.current         = false;
     ttsCooldownRef.current         = false;
     isProcessingCommandRef.current = false;
+    currentTranscriptRef.current   = "";
     setVoiceState("idle");
     setInterimTranscript("");
     clearTimeout(processingTimerRef.current);
     clearTimeout(cooldownTimerRef.current);
+    clearTimeout(silenceTimerRef.current);
     if (recognitionRef.current) {
       try { recognitionRef.current.onend = null; recognitionRef.current.stop(); } catch { /* ok */ }
     }
@@ -396,8 +449,10 @@ export function useVoiceInput({
       isListeningRef.current         = false;
       ttsCooldownRef.current         = false;
       isProcessingCommandRef.current = false;
+      currentTranscriptRef.current   = "";
       clearTimeout(processingTimerRef.current);
       clearTimeout(cooldownTimerRef.current);
+      clearTimeout(silenceTimerRef.current);
       if (recognitionRef.current) {
         try { recognitionRef.current.onend = null; recognitionRef.current.stop(); } catch { /* ok */ }
       }

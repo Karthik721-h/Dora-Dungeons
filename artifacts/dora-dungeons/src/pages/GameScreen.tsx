@@ -299,8 +299,14 @@ export function GameScreen({
         );
 
         // ── RPG Progression: award XP granted by the LLM Game Master ─────────
-        const xpAwarded = (newData as unknown as Record<string, unknown>).xp_awarded;
-        if (typeof xpAwarded === "number" && xpAwarded > 0) {
+        // Safely coerce: guard against undefined, non-number, and NaN coming
+        // back from the API so the RPGContext reducer never receives a bad value.
+        const rawXp = (newData as unknown as Record<string, unknown>).xp_awarded;
+        const xpAwarded: number =
+          typeof rawXp === "number" && !Number.isNaN(rawXp) ? rawXp : 0;
+        // hp_change is applied server-side and reflected in newData.player.hp —
+        // no client-side hp manipulation needed (avoids double-apply bugs).
+        if (xpAwarded > 0) {
           addXPRef.current(xpAwarded);
           console.log(`[RPG] xp_awarded from Game Master: +${xpAwarded}`);
         }

@@ -74,6 +74,7 @@ export async function callGameMaster(
     player_xp: rpgContext.playerXP,
   });
 
+  let raw = "";
   try {
     const completion = await client.chat.completions.create({
       model: "gpt-5.2",
@@ -84,19 +85,32 @@ export async function callGameMaster(
       ],
     });
 
-    const raw     = completion.choices[0]?.message?.content ?? "";
+    raw = completion.choices[0]?.message?.content ?? "";
+
+    // Strip markdown code fences the LLM sometimes wraps around the JSON.
+    // Handles ```json ... ```, ``` ... ```, and leading/trailing whitespace.
     const cleaned = raw
       .replace(/^```(?:json)?\s*/i, "")
       .replace(/\s*```\s*$/, "")
       .trim();
 
-    const parsed = JSON.parse(cleaned) as Partial<GameMasterResponse>;
-    return {
-      narration:  typeof parsed.narration   === "string" ? parsed.narration : "",
-      xp_awarded: typeof parsed.xp_awarded  === "number" ? Math.max(0, Math.floor(parsed.xp_awarded)) : 0,
-      hp_change:  typeof parsed.hp_change   === "number" ? Math.floor(parsed.hp_change) : 0,
-    };
+    // ── Inner try: JSON-parse errors log the raw LLM output for debugging ──
+    try {
+      const parsed = JSON.parse(cleaned) as Partial<GameMasterResponse>;
+      return {
+        narration:  typeof parsed.narration  === "string" ? parsed.narration : "",
+        xp_awarded: typeof parsed.xp_awarded === "number" ? Math.max(0, Math.floor(parsed.xp_awarded)) : 0,
+        hp_change:  typeof parsed.hp_change  === "number" ? Math.floor(parsed.hp_change) : 0,
+      };
+    } catch (parseErr) {
+      console.error("[gameMaster] JSON parse failed. Raw LLM output:", raw);
+      console.error("[gameMaster] Cleaned string:", cleaned);
+      console.error("[gameMaster] Parse error:", parseErr);
+      return FALLBACK;
+    }
   } catch (err) {
+    // Outer catch: network / API-level failure
+    if (raw) console.error("[gameMaster] API error after receiving raw:", raw);
     console.error("[gameMaster] LLM call failed:", err);
     return FALLBACK;
   }
