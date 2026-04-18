@@ -381,7 +381,9 @@ function App() {
     prevUserIdRef.current = currentId;
   }, [auth.user?.id]);
 
-  const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+  // Strip trailing slash AND leading './' so Capacitor's BASE_URL of './'
+  // becomes '' (root) rather than '.' which would confuse the router.
+  const base = import.meta.env.BASE_URL.replace(/\/$/, "").replace(/^\.$/, "");
 
   if (auth.isLoading) {
     return (

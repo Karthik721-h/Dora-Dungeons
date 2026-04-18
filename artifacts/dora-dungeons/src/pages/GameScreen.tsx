@@ -888,7 +888,7 @@ export function GameScreen({
     setRestartPending(true);
     try {
       const data = await customFetch<GameStateResponse>(
-        `${import.meta.env.BASE_URL}api/game/restart`,
+        `/api/game/restart`,
         { method: "POST" }
       );
       // Flush local log buffers and sync cache with fresh server state
@@ -933,7 +933,7 @@ export function GameScreen({
     setProgressionPending(true);
     try {
       const data = await customFetch<GameStateResponse>(
-        `${import.meta.env.BASE_URL}api/game/next-level`,
+        `/api/game/next-level`,
         { method: "POST" }
       );
       setShopExtraLogs([]);
@@ -969,7 +969,7 @@ export function GameScreen({
     setProgressionPending(true);
     try {
       const data = await customFetch<GameStateResponse>(
-        `${import.meta.env.BASE_URL}api/game/replay-level`,
+        `/api/game/replay-level`,
         { method: "POST" }
       );
       setShopExtraLogs([]);
@@ -1003,7 +1003,7 @@ export function GameScreen({
 
   const shopBuyApi = async (weaponId: string): Promise<ShopBuyResult> => {
     const resp = await customFetch<{ success: boolean; message: string; gold: number; player: GameStateResponse["player"] }>(
-      `${import.meta.env.BASE_URL}api/game/shop/buy`,
+      `/api/game/shop/buy`,
       { method: "POST", body: JSON.stringify({ weaponId }), headers: { "Content-Type": "application/json" } }
     );
     patchPlayerFromShopResponse(resp);
@@ -1020,7 +1020,7 @@ export function GameScreen({
 
   const shopSellApi = async (itemId: string): Promise<ShopSellResult> => {
     const resp = await customFetch<{ success: boolean; message: string; gold: number; player: GameStateResponse["player"] }>(
-      `${import.meta.env.BASE_URL}api/game/shop/sell`,
+      `/api/game/shop/sell`,
       { method: "POST", body: JSON.stringify({ itemId }), headers: { "Content-Type": "application/json" } }
     );
     patchPlayerFromShopResponse(resp);
@@ -1037,7 +1037,7 @@ export function GameScreen({
 
   const shopUpgradeApi = async (armorId: string): Promise<ShopUpgradeResult> => {
     const resp = await customFetch<{ success: boolean; message: string; gold: number; player: GameStateResponse["player"] }>(
-      `${import.meta.env.BASE_URL}api/game/shop/upgrade`,
+      `/api/game/shop/upgrade`,
       { method: "POST", body: JSON.stringify({ armorId }), headers: { "Content-Type": "application/json" } }
     );
     patchPlayerFromShopResponse(resp);
