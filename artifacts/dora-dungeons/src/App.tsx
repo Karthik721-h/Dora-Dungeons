@@ -14,6 +14,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { AudioManager } from "@/audio/AudioManager";
 import { SubscriptionOverlay } from "@/components/SubscriptionOverlay";
 import { useIAP } from "@/hooks/useIAP";
+import { RPGProgressionProvider } from "@/context/RPGProgressionContext";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -391,6 +392,7 @@ function App() {
   }
 
   return (
+    <RPGProgressionProvider>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <div className="scanline-overlay" />
@@ -438,6 +440,7 @@ function App() {
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>
+    </RPGProgressionProvider>
   );
 }
 
