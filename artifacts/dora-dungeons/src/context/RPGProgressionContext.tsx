@@ -68,7 +68,9 @@ export type RPGAction =
   /** Unlock a new weapon from the shop and auto-equip it (best weapon wins). */
   | { type: "ADD_WEAPON"; payload: Weapon }
   /** Add or update an armor in the roster and auto-equip it. */
-  | { type: "SYNC_ARMOR"; payload: Armor };
+  | { type: "SYNC_ARMOR"; payload: Armor }
+  /** Restore the .destroy charge — awarded once per dungeon level cleared. */
+  | { type: "RESTORE_DESTROY" };
 
 // ─── Reducer ─────────────────────────────────────────────────────────────────
 
@@ -139,6 +141,17 @@ function rpgReducer(state: RPGState, action: RPGAction): RPGState {
         unlockedAbilities: state.unlockedAbilities.filter(
           (a) => a !== action.payload,
         ),
+      };
+    }
+
+    case "RESTORE_DESTROY": {
+      const alreadyHas = state.unlockedAbilities.includes(".destroy (1 Charge)");
+      if (alreadyHas) return state;
+      console.log("[RPG] RESTORE_DESTROY — .destroy (1 Charge) recharged");
+      return {
+        ...state,
+        destroyConsumed: false,
+        unlockedAbilities: [".destroy (1 Charge)", ...state.unlockedAbilities],
       };
     }
 
@@ -241,6 +254,8 @@ interface RPGContextValue {
   addWeapon: (weapon: Weapon) => void;
   /** Add or update an armor (e.g. after shop upgrade) and auto-equip it. */
   syncArmor: (armor: Armor) => void;
+  /** Recharge .destroy (1 Charge) — called on level-up or to fix accidental use. */
+  restoreDestroy: () => void;
 }
 
 const RPGProgressionContext = createContext<RPGContextValue | null>(null);
@@ -286,9 +301,14 @@ export function RPGProgressionProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const restoreDestroy = useCallback(
+    () => dispatch({ type: "RESTORE_DESTROY" }),
+    [],
+  );
+
   return (
     <RPGProgressionContext.Provider
-      value={{ state, addXP, spendXP, equipItem, removeAbility, addWeapon, syncArmor }}
+      value={{ state, addXP, spendXP, equipItem, removeAbility, addWeapon, syncArmor, restoreDestroy }}
     >
       {children}
     </RPGProgressionContext.Provider>

@@ -93,7 +93,7 @@ export function GameScreen({
   const [inventoryOpen, setInventoryOpen] = useState(false);
 
   // ── RPG Progression context (read state + dispatch actions) ──────────────────
-  const { state: rpgState, addXP, removeAbility, addWeapon, syncArmor } = useRPGProgression();
+  const { state: rpgState, addXP, removeAbility, addWeapon, syncArmor, restoreDestroy } = useRPGProgression();
   // Single ref tracking { equippedWeapon, equippedArmor, unlockedAbilities, playerXP }.
   // Updated in one effect so submitCommand always reads the exact, current values
   // without being recreated on every render (avoids stale-closure bugs).
@@ -102,13 +102,15 @@ export function GameScreen({
   const removeAbilityRef   = useRef(removeAbility);
   const addWeaponRef       = useRef(addWeapon);
   const syncArmorRef       = useRef(syncArmor);
+  const restoreDestroyRef  = useRef(restoreDestroy);
   useEffect(() => {
     currentRpgStateRef.current = rpgState;
     addXPRef.current           = addXP;
     removeAbilityRef.current   = removeAbility;
     addWeaponRef.current       = addWeapon;
     syncArmorRef.current       = syncArmor;
-  }, [rpgState, addXP, removeAbility, addWeapon, syncArmor]);
+    restoreDestroyRef.current  = restoreDestroy;
+  }, [rpgState, addXP, removeAbility, addWeapon, syncArmor, restoreDestroy]);
 
   // ── One-time backend → RPGProgressionContext bootstrap ───────────────────────
   // When the game loads the backend may already have weapons/armors the player
@@ -120,6 +122,10 @@ export function GameScreen({
 
     const backendArmors = (gameState.player.armors ?? []) as ShopArmor[];
     backendArmors.forEach(a => syncArmor(shopArmorToRPGArmor(a)));
+
+    // Restore .destroy if it was previously consumed — the ability recharges
+    // on each dungeon level so the player always enters a new level with it.
+    restoreDestroy();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // intentionally runs once on mount only
 
@@ -1022,8 +1028,10 @@ export function GameScreen({
       gameModeRef.current = "explore";
       setGameMode("explore");
       queryClient.setQueryData(getGetGameStateQueryKey(), data);
+      // Recharge .destroy for the new level
+      restoreDestroyRef.current();
       AudioManager.speak(
-        `Entering dungeon level ${data.player.dungeonLevel}. A new dungeon awaits. Prepare yourself.`,
+        `Entering dungeon level ${data.player.dungeonLevel}. A new dungeon awaits. Prepare yourself. Your destroy ability has recharged.`,
         { interrupt: true }
       );
       speakRoomNarration(data.currentRoom);
