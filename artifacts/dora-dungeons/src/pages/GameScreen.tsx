@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { getGetGameStateQueryKey } from "@workspace/api-client-react";
 import {
   Map, Skull, TerminalSquare, Volume2, VolumeX, Plus, Minus,
-  Eye, Info, LogOut, Swords, ChevronDown, ShoppingBag, Trash2,
+  Eye, Info, LogOut, Swords, ChevronDown, ShoppingBag, Trash2, Backpack,
 } from "lucide-react";
 
 import { AudioManager } from "@/audio/AudioManager";
@@ -16,6 +16,7 @@ import { NarrationFeed } from "@/components/NarrationFeed";
 import { PlayerHUD } from "@/components/PlayerHUD";
 import { VoiceControl } from "@/components/VoiceControl";
 import { ShopPanel, ShopView, ShopBuyResult, ShopSellResult, ShopUpgradeResult } from "@/components/ShopPanel";
+import { RPGMenuOverlay } from "@/components/RPGMenuOverlay";
 import { GameModal, ModalButton } from "@/components/GameModal";
 import { ShopWeapon, ShopArmor, ShopInventoryItem, SHOP_WEAPONS } from "@/shop";
 import {
@@ -86,6 +87,9 @@ export function GameScreen({
   // ── Shop state — backed by server state (player.weapons / player.inventoryItems) ──
   const [shopOpen, setShopOpen] = useState(false);
   const [shopMode, setShopMode] = useState<"main" | "buy" | "sell" | "upgrade">("main");
+
+  // ── RPG Inventory overlay ─────────────────────────────────────────────────────
+  const [inventoryOpen, setInventoryOpen] = useState(false);
 
   // ── Death / restart state ────────────────────────────────────────────────────
   const [restartPending, setRestartPending] = useState(false);
@@ -1394,6 +1398,30 @@ export function GameScreen({
             <ShoppingBag size={10} />
             <span className="hidden sm:inline">Shop</span>
           </motion.button>
+
+          {/* ── Inventory (RPG) button ── */}
+          <motion.button
+            whileHover={{ scale: 1.06 }}
+            whileTap={{ scale: 0.94 }}
+            onClick={() => setInventoryOpen(v => !v)}
+            className="flex items-center gap-1 font-code text-xs uppercase px-2.5 py-1 transition-all"
+            style={{
+              border: inventoryOpen
+                ? "1px solid rgba(58,134,255,0.55)"
+                : "1px solid rgba(58,134,255,0.22)",
+              color: inventoryOpen ? "#60a5fa" : "rgba(58,134,255,0.55)",
+              background: inventoryOpen ? "rgba(58,134,255,0.12)" : "rgba(58,134,255,0.04)",
+              borderRadius: 4,
+              fontSize: "10px",
+              letterSpacing: "0.15em",
+              cursor: "pointer",
+            }}
+            aria-label={inventoryOpen ? "Close inventory" : "Open character inventory"}
+            title="Character / Inventory"
+          >
+            <Backpack size={10} />
+            <span className="hidden sm:inline">Inventory</span>
+          </motion.button>
         </div>
       </div>
 
@@ -1617,6 +1645,13 @@ export function GameScreen({
 
         return null;
       })()}
+
+      {/* ── RPG Inventory overlay ── */}
+      <AnimatePresence>
+        {inventoryOpen && (
+          <RPGMenuOverlay onClose={() => setInventoryOpen(false)} />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
