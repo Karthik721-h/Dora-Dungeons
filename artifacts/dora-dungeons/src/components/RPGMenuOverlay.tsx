@@ -597,32 +597,63 @@ export function RPGMenuOverlay({ onClose }: RPGMenuOverlayProps) {
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.15 }}
-                  style={{ display: "flex", flexDirection: "column", gap: "0.625rem" }}
+                  style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}
                 >
                   {unlockedAbilities.length === 0 ? (
-                    <EmptyState message="No abilities unlocked yet" />
+                    <EmptyState message="No abilities — they're consumed when used" />
                   ) : (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", padding: "0.25rem 0" }}>
-                      {unlockedAbilities.map((ability, idx) => (
-                        <motion.div
-                          key={idx}
-                          initial={{ opacity: 0, scale: 0.9 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          transition={{ duration: 0.18, delay: idx * 0.04 }}
-                          style={{
-                            padding: "0.375rem 0.875rem",
-                            borderRadius: "999px",
-                            border: "1px solid rgba(167,139,250,0.3)",
-                            background: "rgba(167,139,250,0.07)",
-                            fontFamily: "'Fira Code', monospace",
-                            fontSize: "0.65rem",
-                            letterSpacing: "0.1em",
-                            color: "rgba(167,139,250,0.85)",
-                          }}
-                        >
-                          ✦ {ability}
-                        </motion.div>
-                      ))}
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.625rem", padding: "0.25rem 0" }}>
+                      {unlockedAbilities.map((ability, idx) => {
+                        const isDestroy = ability === ".destroy (1 Charge)";
+                        return (
+                          <motion.div
+                            key={idx}
+                            initial={{ opacity: 0, scale: 0.97 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ duration: 0.18, delay: idx * 0.05 }}
+                            style={{
+                              padding: "0.625rem 0.875rem",
+                              borderRadius: "0.625rem",
+                              border: isDestroy
+                                ? "1px solid rgba(239,68,68,0.4)"
+                                : "1px solid rgba(167,139,250,0.3)",
+                              background: isDestroy
+                                ? "rgba(239,68,68,0.07)"
+                                : "rgba(167,139,250,0.07)",
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: "0.3rem",
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontFamily: "'Fira Code', monospace",
+                                fontSize: "0.68rem",
+                                letterSpacing: "0.1em",
+                                color: isDestroy
+                                  ? "rgba(248,113,113,0.9)"
+                                  : "rgba(167,139,250,0.9)",
+                                fontWeight: 700,
+                              }}
+                            >
+                              ✦ {ability}
+                            </span>
+                            {isDestroy && (
+                              <span
+                                style={{
+                                  fontFamily: "'Fira Code', monospace",
+                                  fontSize: "0.58rem",
+                                  letterSpacing: "0.06em",
+                                  color: "rgba(248,113,113,0.55)",
+                                  lineHeight: 1.5,
+                                }}
+                              >
+                                Say <em>"use destroy"</em> or <em>"obliterate"</em> in combat to unleash. One-time use — gone after firing.
+                              </span>
+                            )}
+                          </motion.div>
+                        );
+                      })}
                     </div>
                   )}
                 </motion.div>

@@ -19,7 +19,7 @@ import { VoiceControl } from "@/components/VoiceControl";
 import { ShopPanel, ShopView, ShopBuyResult, ShopSellResult, ShopUpgradeResult } from "@/components/ShopPanel";
 import { RPGMenuOverlay } from "@/components/RPGMenuOverlay";
 import { GameModal, ModalButton } from "@/components/GameModal";
-import { ShopWeapon, ShopArmor, ShopInventoryItem, SHOP_WEAPONS } from "@/shop";
+import { ShopWeapon, ShopArmor, ShopInventoryItem, SHOP_WEAPONS, shopWeaponToRPGWeapon, shopArmorToRPGArmor } from "@/shop";
 import {
   speakShopOpen,
   speakShopExit,
@@ -93,18 +93,35 @@ export function GameScreen({
   const [inventoryOpen, setInventoryOpen] = useState(false);
 
   // ── RPG Progression context (read state + dispatch actions) ──────────────────
-  const { state: rpgState, addXP, removeAbility } = useRPGProgression();
+  const { state: rpgState, addXP, removeAbility, addWeapon, syncArmor } = useRPGProgression();
   // Single ref tracking { equippedWeapon, equippedArmor, unlockedAbilities, playerXP }.
   // Updated in one effect so submitCommand always reads the exact, current values
   // without being recreated on every render (avoids stale-closure bugs).
   const currentRpgStateRef = useRef(rpgState);
   const addXPRef           = useRef(addXP);
   const removeAbilityRef   = useRef(removeAbility);
+  const addWeaponRef       = useRef(addWeapon);
+  const syncArmorRef       = useRef(syncArmor);
   useEffect(() => {
     currentRpgStateRef.current = rpgState;
     addXPRef.current           = addXP;
     removeAbilityRef.current   = removeAbility;
-  }, [rpgState, addXP, removeAbility]);
+    addWeaponRef.current       = addWeapon;
+    syncArmorRef.current       = syncArmor;
+  }, [rpgState, addXP, removeAbility, addWeapon, syncArmor]);
+
+  // ── One-time backend → RPGProgressionContext bootstrap ───────────────────────
+  // When the game loads the backend may already have weapons/armors the player
+  // purchased in earlier sessions (before the sync bridge existed).  Push them
+  // all in so the inventory overlay and LLM context are immediately accurate.
+  useEffect(() => {
+    const backendWeapons = (gameState.player.weapons ?? []) as ShopWeapon[];
+    backendWeapons.forEach(w => addWeapon(shopWeaponToRPGWeapon(w)));
+
+    const backendArmors = (gameState.player.armors ?? []) as ShopArmor[];
+    backendArmors.forEach(a => syncArmor(shopArmorToRPGArmor(a)));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally runs once on mount only
 
   // ── Death / restart state ────────────────────────────────────────────────────
   const [restartPending, setRestartPending] = useState(false);
@@ -1069,10 +1086,15 @@ export function GameScreen({
       { method: "POST", body: JSON.stringify({ weaponId }), headers: { "Content-Type": "application/json" } }
     );
     patchPlayerFromShopResponse(resp);
-    const weaponName = SHOP_WEAPONS.find(w => w.id === weaponId)?.name ?? weaponId;
+    const shopWeapon = SHOP_WEAPONS.find(w => w.id === weaponId);
+    const weaponName = shopWeapon?.name ?? weaponId;
     if (resp.success) {
       if (!isMutedRef.current) speakPurchaseSuccess(weaponName, resp.gold);
       addShopLog(`✓ ${weaponName} purchased.`);
+      // ── Sync into RPGProgressionContext so the inventory overlay + LLM are updated ──
+      if (shopWeapon) {
+        addWeaponRef.current(shopWeaponToRPGWeapon(shopWeapon));
+      }
     } else {
       if (!isMutedRef.current) speakPurchaseFail();
       addShopLog(`✗ ${resp.message}`);
@@ -1107,6 +1129,10 @@ export function GameScreen({
     if (resp.success) {
       if (!isMutedRef.current) speakUpgradeSuccess(armor?.name ?? armorId, armor?.level ?? 0, resp.gold);
       addShopLog(`✓ ${armor?.name ?? armorId} upgraded to level ${armor?.level}.`);
+      // ── Sync upgraded armor into RPGProgressionContext so inventory + LLM reflect it ──
+      if (armor) {
+        syncArmorRef.current(shopArmorToRPGArmor(armor as ShopArmor));
+      }
     } else {
       if (!isMutedRef.current) {
         if (resp.message === "ARMOR_MAX_LEVEL") speakUpgradeMax();

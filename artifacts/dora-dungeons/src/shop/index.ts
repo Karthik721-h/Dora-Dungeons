@@ -40,6 +40,34 @@ export const SHOP_WEAPONS: ShopWeapon[] = [
 
 export const ARMOR_UPGRADE_COSTS: Record<1 | 2, number> = { 1: 20, 2: 30 };
 
+// ── RPG stat bridge ───────────────────────────────────────────────────────────
+// Maps ShopWeapon IDs → RPG damage + specialAbility so purchases can be synced
+// into RPGProgressionContext (which the LLM reads).
+
+export interface RPGWeapon { id: string; name: string; damage: number; specialAbility: string }
+export interface RPGArmor  { id: string; name: string; defense: number }
+
+export const WEAPON_RPG_STATS: Record<string, { damage: number; specialAbility: string }> = {
+  "wooden-sword":   { damage: 2,  specialAbility: "None" },
+  "ashbringer":     { damage: 15, specialAbility: "Holy Fire" },
+  "keyblade":       { damage: 25, specialAbility: "Magic Lock" },
+  "leviathan-axe":  { damage: 40, specialAbility: "Frost Throw" },
+  "gjallarhorn":    { damage: 45, specialAbility: "Thunder Blast" },
+  "buster-sword":   { damage: 55, specialAbility: "Limit Break" },
+  "gunblade":       { damage: 80, specialAbility: "Trigger Happy" },
+};
+
+/** Convert a ShopWeapon into an RPGWeapon (damage + specialAbility from stat bridge). */
+export function shopWeaponToRPGWeapon(w: ShopWeapon): RPGWeapon {
+  const stats = WEAPON_RPG_STATS[w.id] ?? { damage: 10, specialAbility: "None" };
+  return { id: w.id, name: w.name, ...stats };
+}
+
+/** Convert a ShopArmor into an RPGArmor (defense = level × 5). */
+export function shopArmorToRPGArmor(a: ShopArmor): RPGArmor {
+  return { id: a.id, name: a.name, defense: a.level * 5 };
+}
+
 // ── Pure shop functions ───────────────────────────────────────────────────────
 
 export function buyWeapon(
