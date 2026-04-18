@@ -95,8 +95,8 @@ export function GameScreen({
   // ── RPG Progression context (read state + dispatch actions) ──────────────────
   const { state: rpgState, addXP, removeAbility, addWeapon, syncArmor, restoreDestroy } = useRPGProgression();
   // Single ref tracking { equippedWeapon, equippedArmor, unlockedAbilities, playerXP }.
-  // Updated in one effect so submitCommand always reads the exact, current values
-  // without being recreated on every render (avoids stale-closure bugs).
+  // Written synchronously in the render body (see below) so submitCommand always
+  // reads the exact, current values without stale-closure bugs.
   const currentRpgStateRef = useRef(rpgState);
   const addXPRef           = useRef(addXP);
   const removeAbilityRef   = useRef(removeAbility);
@@ -443,10 +443,13 @@ export function GameScreen({
   };
 
   // ── Submit ──────────────────────────────────────────────────────────────────
+  // Ref so the in-flight guard in submitCommand is never stale (isPending is a
+  // closure value that lags one render cycle after sendAction fires).
+  const isPendingRef = useRef(false);
   const submitCommand = useCallback(
     (cmd: string) => {
       const trimmed = cmd.trim();
-      if (!trimmed || isPending) return;
+      if (!trimmed || isPendingRef.current) return;
 
       if (trimmed === "repeat") {
         AudioManager.repeatLast();
@@ -674,7 +677,7 @@ export function GameScreen({
       }
 
       // Build RPG context from the dedicated ref — always millisecond-fresh
-      // because currentRpgStateRef is updated in the same effect that tracks rpgState.
+      // because currentRpgStateRef.current is written synchronously in every render.
       const rpgCtx = {
         equippedWeapon:    currentRpgStateRef.current.equippedWeapon,
         equippedArmor:     currentRpgStateRef.current.equippedArmor,
@@ -696,7 +699,7 @@ export function GameScreen({
       onCommandExecutedRef.current?.();
       sendAction({ data: { command: trimmed, rpgContext: rpgCtx } as Parameters<typeof sendAction>[0]["data"] });
     },
-    [isPending, isMuted, sendAction]
+    [isMuted, sendAction]
   );
 
   // ── Voice ───────────────────────────────────────────────────────────────────
@@ -838,7 +841,12 @@ export function GameScreen({
   voiceGenderRef.current = voiceGender;
   isMutedRef.current = isMuted;
   gameStateRef.current = gameState;
-  shopOpenRef.current      = shopOpen;
+  // Sync rpgState and callback refs synchronously in render — ensures
+  // submitCommand always reads the freshest data, not a stale effect-cycle copy.
+  currentRpgStateRef.current   = rpgState;
+  removeAbilityRef.current     = removeAbility;
+  isPendingRef.current         = isPending;
+  shopOpenRef.current          = shopOpen;
   shopModeRef.current      = shopMode;
   inventoryOpenRef.current = inventoryOpen;
   shopWeaponsRef.current   = shopWeapons;
