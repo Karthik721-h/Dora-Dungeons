@@ -1233,7 +1233,7 @@ export function GameScreen({
   const activeEnemies = currentRoom.enemies.filter(e => !e.isDefeated);
 
   return (
-    <div className="relative flex flex-col h-screen w-full overflow-hidden" style={{ background: "#0b0f14" }}>
+    <div className="relative flex flex-col w-full overflow-hidden" style={{ background: "#07080f", minHeight: "100svh" }}>
 
       {/* ── Background ── */}
       <div className="dungeon-bg" />

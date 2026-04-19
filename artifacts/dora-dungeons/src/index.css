@@ -81,7 +81,7 @@
     font-family: 'Crimson Text', Georgia, serif;
     font-size: 18px;
     line-height: 1.65;
-    background-color: #0b0f14;
+    background-color: #07080f;
   }
 
   h1, h2, h3, h4 {
@@ -189,6 +189,7 @@
   justify-content: space-between;
   gap: 0.5rem;
   padding: 0.4rem 0.75rem;
+  padding-top: env(safe-area-inset-top, 0px);
   background: rgba(6, 8, 16, 0.92);
   border-bottom: 1px solid rgba(200,155,60,0.22);
   backdrop-filter: blur(16px) saturate(1.4);

@@ -1,0 +1,44 @@
+I need to make sure this app looks perfect when wrapped with Capacitor and submitted to the App Store. The UI must not be covered by the iPhone notch, status bar, or home indicator on any iPhone model. Make only these changes:
+
+────────────────────────────────────────
+FILE 1: index.html
+────────────────────────────────────────
+
+Find the <meta name="viewport"> tag and make sure it reads EXACTLY:
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
+
+The critical part is viewport-fit=cover — without it, env(safe-area-inset-*) values return 0 and all safe area CSS is ignored.
+
+────────────────────────────────────────
+FILE 2: src/index.css
+────────────────────────────────────────
+
+Find the .dd-navbar rule and add this ONE line to it:
+padding-top: env(safe-area-inset-top, 0px);
+
+This makes the navbar background bleed behind the iPhone status bar/notch while pushing the actual buttons down to safety.
+
+Also find the body or html rule and make sure this exists:
+background-color: #07080f;
+
+This ensures the notch area shows the game's dark background color instead of white during the status bar bleed.
+
+────────────────────────────────────────
+FILE 3: src/pages/GameScreen.tsx  
+────────────────────────────────────────
+
+Find the main outermost wrapper div of the game screen (the one that wraps everything including the navbar). Make sure it has this inline style property added:
+minHeight: "100svh"
+
+Change any existing 100vh references in this file to 100svh — svh accounts for the browser chrome on mobile Safari correctly, vh does not.
+
+────────────────────────────────────────
+FILE 4: src/components/VoiceControl.tsx
+────────────────────────────────────────
+
+The paddingBottom safe area fix is already in place from the last change. No changes needed here.
+
+────────────────────────────────────────
+After all changes, run: npm run build
+Confirm no errors, then output the final contents of index.html and the modified section of index.css so I can verify.
+────────────────────────────────────────
