@@ -120,7 +120,7 @@ export function VoiceControl({
   return (
     <div
       className="glass-panel p-2 sm:p-3 flex flex-col gap-2 sm:gap-3 overflow-y-auto"
-      style={{ minHeight: 0 }}
+      style={{ minHeight: 0, paddingBottom: "max(env(safe-area-inset-bottom, 0px), 0.75rem)" }}
     >
       {/* ── Top row: mic + transcript ── */}
       <div className="flex items-center gap-3">

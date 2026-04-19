@@ -1244,7 +1244,7 @@ export function GameScreen({
       <div className="scanline-overlay" />
 
       {/* ══════════════ NAVBAR ══════════════ */}
-      <header className="dd-navbar">
+      <header className="dd-navbar" style={{ width: "100%" }}>
         {/* Left: logo + title */}
         <div className="dd-navbar-brand">
           <img

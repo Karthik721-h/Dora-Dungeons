@@ -1,0 +1,74 @@
+I need you to make the game look great on BOTH desktop web and mobile without breaking anything. Make only these specific changes:
+
+────────────────────────────────────────
+FILE 1: src/index.css
+────────────────────────────────────────
+
+1. Find this block:
+#root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+Replace it with:
+#root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+This removes the 600px cap that was squishing the navbar on desktop.
+
+────────────────────────────────────────
+FILE 2: src/pages/GameScreen.tsx
+────────────────────────────────────────
+
+Find the navbar / top bar element. It should have a className containing "dd-navbar" or similar. Make sure it has these properties:
+- width: 100%
+- display: flex
+- align-items: center
+- justify-content: space-between
+- padding: 0.4rem 1.5rem on desktop, 0.4rem 0.75rem on mobile
+- Do NOT add any max-width constraint to this element
+
+Find the right-side controls group (the one containing EXIT, volume, character ID buttons). Make sure it has:
+- display: flex
+- align-items: center  
+- gap: 0.625rem
+- flex-shrink: 0
+- Do NOT hide these on any screen size — remove any "hidden sm:flex" or "hidden md:flex" classes that may be on this group
+
+Find the center badges group (EXPLORING, LVL 1 etc). Make sure it has:
+- display: flex
+- align-items: center
+- gap: 0.625rem
+- flex: 1
+- justify-content: center
+
+────────────────────────────────────────
+FILE 3: src/components/VoiceControl.tsx
+────────────────────────────────────────
+
+The outermost div of this component currently has class "glass-panel p-2 sm:p-3 flex flex-col gap-2 sm:gap-3 overflow-y-auto"
+
+Change the padding to be safe-area aware by adding this inline style to that outermost div:
+paddingBottom: "max(env(safe-area-inset-bottom, 0px), 0.75rem)"
+
+Do not change anything else in this file.
+
+────────────────────────────────────────
+AFTER MAKING CHANGES:
+────────────────────────────────────────
+
+Run: npm run build
+Confirm the build succeeds with no errors.
+Output the final version of any file you modified so I can verify.
+
+Do not refactor, rename, or restructure anything. Only make the changes listed above.

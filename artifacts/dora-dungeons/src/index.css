@@ -111,8 +111,6 @@
   flex-direction: column;
   min-height: 100vh;
   width: 100%;
-  max-width: 600px;
-  margin: 0 auto;
   box-sizing: border-box;
 }
 
@@ -190,7 +188,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
+  padding: 0.4rem 0.75rem;
   background: rgba(6, 8, 16, 0.92);
   border-bottom: 1px solid rgba(200,155,60,0.22);
   backdrop-filter: blur(16px) saturate(1.4);
@@ -206,7 +204,7 @@
 
 @media (min-width: 640px) {
   .dd-navbar {
-    padding: 0.5rem 1.5rem;
+    padding: 0.4rem 1.5rem;
     min-height: 58px;
     gap: 0.75rem;
   }
