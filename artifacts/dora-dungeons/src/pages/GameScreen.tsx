@@ -398,15 +398,12 @@ export function GameScreen({
           unknownHandledLocallyRef.current = false; // always reset after checking
 
           if (!alreadyHandled) {
-            // When .destroy was confirmed used by the LLM, suppress the deterministic
-            // engine's "You don't know 'destroy'" lines — they'd undercut the narration.
-            // The LLM's cinematic destroy narration is already in newLines and will play.
-            const filteredLines = usedDestroy
-              ? newLines.filter(l => !/you don't know|unknown spell/i.test(l))
-              : newLines;
+            // When .destroy fires the backend already strips the engine's wrong output
+            // and returns only the LLM narration in newLines, so no client-side filtering
+            // is needed here.
             const linesToSpeak = isUnknownCommand
               ? ["Say help to hear the available voice commands."]
-              : filteredLines;
+              : newLines;
             AudioManager.speakLines(linesToSpeak, { interrupt: true });
           }
           // Queue exits after narration so visually impaired users always

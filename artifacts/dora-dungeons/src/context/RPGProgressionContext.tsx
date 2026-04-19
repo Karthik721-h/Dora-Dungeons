@@ -179,25 +179,17 @@ function rpgReducer(state: RPGState, action: RPGAction): RPGState {
     }
 
     case "RESTORE_DESTROY": {
-      // Already at full charges → no-op
-      if (state.unlockedAbilities.includes(".destroy (2 Charges)")) return state;
-      // Lingering 1-charge from previous level → upgrade to 2
-      if (state.unlockedAbilities.includes(".destroy (1 Charge)")) {
-        console.log("[RPG] RESTORE_DESTROY — upgraded 1 → 2 Charges");
-        return {
-          ...state,
-          destroyConsumed: false,
-          unlockedAbilities: state.unlockedAbilities.map((a) =>
-            a === ".destroy (1 Charge)" ? ".destroy (2 Charges)" : a,
-          ),
-        };
-      }
-      // Normal recharge after both charges spent
-      console.log("[RPG] RESTORE_DESTROY — .destroy (2 Charges) recharged");
+      // Hard-reset to exactly 2 charges — no partial-charge cases, no no-op.
+      // Called on every dungeon level start so the player ALWAYS enters a new
+      // level with the full 2-charge allotment. Idempotent and unconditional.
+      console.log("[RPG] RESTORE_DESTROY — hard-reset to 2 Charges");
+      const withoutDestroy = state.unlockedAbilities.filter(
+        (a) => !a.startsWith(".destroy"),
+      );
       return {
         ...state,
         destroyConsumed: false,
-        unlockedAbilities: [".destroy (2 Charges)", ...state.unlockedAbilities],
+        unlockedAbilities: [".destroy (2 Charges)", ...withoutDestroy],
       };
     }
 
@@ -258,23 +250,14 @@ function loadState(): RPGState {
     const destroyConsumed = parsed.destroyConsumed === true;
 
     // ── Migration ──────────────────────────────────────────────────────────
-    // v1 saves used ".destroy (1 Charge)" as the per-level ability.
-    // v2 changes the system to 2 charges per level.
-    // Rules:
-    //   • Old ".destroy (1 Charge)" + destroyConsumed=false  → upgrade to 2 Charges
-    //     (player hadn't fired it yet this level; give them the full 2-charge grant)
-    //   • Old ".destroy (1 Charge)" + destroyConsumed=true   → inconsistent state,
-    //     treat as fully spent (remove it; RESTORE_DESTROY will recharge on level-up)
-    //   • No destroy variant + destroyConsumed=false          → add 2 Charges
-    //     (pre-flag saves that never stored the ability explicitly)
-    //   • ".destroy (2 Charges)" already present             → no-op
+    // Strip all legacy .destroy variants (v1 single-charge, v2 partial states)
+    // and unconditionally inject ".destroy (2 Charges)".  The player ALWAYS
+    // loads with 2 charges; per-level consumption is tracked at runtime via
+    // USE_DESTROY.  RESTORE_DESTROY hard-resets to 2 on every level advance.
     let abilities = (parsed.unlockedAbilities ?? []).filter(
-      (a) => a !== ".destroy (1 Charge)", // strip v1 entries unconditionally
+      (a) => !a.startsWith(".destroy"),
     );
-    const hasV2 = abilities.includes(".destroy (2 Charges)");
-    if (!hasV2 && !destroyConsumed) {
-      abilities = [".destroy (2 Charges)", ...abilities];
-    }
+    abilities = [".destroy (2 Charges)", ...abilities];
 
     return {
       playerXP:        parsed.playerXP        ?? DEFAULT_STATE.playerXP,

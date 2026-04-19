@@ -224,6 +224,30 @@ router.post("/action", async (req: Request, res: Response) => {
   // also forwarded to the LLM as the "engine outcome" context.
   const engineNewLogs = updatedState.logs.slice(logCountBefore);
 
+  // ── STATUS: inject RPG abilities (e.g. .destroy charges) into the Abilities line ──
+  // The engine only knows about built-in abilities (Fireball, Heal, etc.).
+  // RPG overlay abilities (stored in the frontend RPGContext) are forwarded
+  // via rpgContext.unlockedAbilities and must be merged in here so the STATUS
+  // voice and the inventory overlay always agree.
+  if (body.command === "status") {
+    const rpgAbilities: string[] = Array.isArray(rpgContext.unlockedAbilities)
+      ? (rpgContext.unlockedAbilities as string[])
+      : [];
+    if (rpgAbilities.length > 0) {
+      for (let i = 0; i < engineNewLogs.length; i++) {
+        if (engineNewLogs[i].startsWith("Abilities:")) {
+          const enhanced = `${engineNewLogs[i]}, ${rpgAbilities.join(", ")}`;
+          engineNewLogs[i] = enhanced;
+          const liveIdx = logCountBefore + i;
+          if (liveIdx < updatedState.logs.length) {
+            updatedState.logs[liveIdx] = enhanced;
+          }
+          break;
+        }
+      }
+    }
+  }
+
   // ── LLM Game Master narration ─────────────────────────────────────────────
   // Skip the LLM entirely for UI / informational commands (status, look, shop,
   // inventory, help, etc.) — the engine already produces clear system messages
@@ -250,6 +274,15 @@ router.post("/action", async (req: Request, res: Response) => {
     );
   }
 
+  // ── .destroy suppression ──────────────────────────────────────────────────
+  // The engine doesn't recognise .destroy as a valid command and produces a
+  // "You don't have X" error line.  When the LLM confirms the ability was used,
+  // strip those wrong engine lines from the visual log and send only the
+  // cinematic LLM narration to the client for TTS.
+  if (gmResult.used_destroy_ability) {
+    updatedState.logs.splice(logCountBefore, engineNewLogs.length);
+  }
+
   // Push the GM narration into the live log so it appears in the visual
   // terminal (logs are serialized from updatedState.logs).  Without this,
   // narration is spoken via TTS but never rendered on screen ("Ghost Text").
@@ -258,10 +291,12 @@ router.post("/action", async (req: Request, res: Response) => {
   }
 
   // Build final newLogs: engine lines + GM narration (if any).
-  // These are sent separately so the client can diff exactly what changed.
-  const newLogs = gmResult.narration
-    ? [...engineNewLogs, gmResult.narration]
-    : engineNewLogs;
+  // For .destroy: engine produced wrong output — send ONLY the LLM narration.
+  const newLogs = gmResult.used_destroy_ability
+    ? (gmResult.narration ? [gmResult.narration] : [])
+    : gmResult.narration
+      ? [...engineNewLogs, gmResult.narration]
+      : engineNewLogs;
 
   await saveSession(userId, updatedState);
 

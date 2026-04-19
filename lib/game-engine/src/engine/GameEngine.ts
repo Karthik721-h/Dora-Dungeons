@@ -462,7 +462,15 @@ export class GameEngine {
       weapon,
       armor,
       `Abilities: ${p.abilities.map((a) => a.name).join(", ")}`,
-      `Inventory: ${p.inventory.length > 0 ? p.inventory.map((i) => i.name).join(", ") : "empty"}`,
+      `Inventory: ${
+        (() => {
+          const equippedNames = new Set<string>();
+          if (p.equippedWeapon?.name) equippedNames.add(p.equippedWeapon.name);
+          if (p.equippedArmor?.name)  equippedNames.add(p.equippedArmor.name);
+          const items = p.inventory.filter((i) => !equippedNames.has(i.name));
+          return items.length > 0 ? items.map((i) => i.name).join(", ") : "empty";
+        })()
+      }`,
       `Status Effects: ${effects}`,
     ];
   }
