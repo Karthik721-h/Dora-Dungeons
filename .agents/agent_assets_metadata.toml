@@ -18,3 +18,9 @@ id = "oxVM8Pn6NCFQ_XAs-ffu3"
 uri = "file://dora-dungeons-voltbuilder.zip"
 type = "unspecified"
 title = "Dora Dungeons — VoltBuilder Package"
+
+[[outputs]]
+id = "h814Bt7cKAV9pcqFbzCCT"
+uri = "file://dora-dungeons-build.zip"
+type = "unspecified"
+title = "Dora Dungeons — Production Build (dist/public)"
