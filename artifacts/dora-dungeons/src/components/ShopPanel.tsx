@@ -93,6 +93,9 @@ function FeedbackMessage({ msg }: { msg: string | null }) {
   return (
     <motion.div
       key={msg}
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       style={{
@@ -308,6 +311,9 @@ export function ShopPanel({
 
   return (
     <motion.div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Merchant's Shop"
       initial={{ opacity: 0, scale: 0.97, y: 6 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.97, y: 6 }}
@@ -371,9 +377,12 @@ export function ShopPanel({
         </div>
 
         {/* Gold display */}
-        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginLeft: "auto", marginRight: "0.75rem" }}>
-          <Coins size={11} style={{ color: "#c89b3c" }} />
-          <span style={{
+        <div
+          aria-label={`${gold} gold`}
+          style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginLeft: "auto", marginRight: "0.75rem" }}
+        >
+          <Coins size={11} aria-hidden="true" style={{ color: "#c89b3c" }} />
+          <span aria-hidden="true" style={{
             fontFamily: "'Fira Code', monospace",
             fontSize: "0.75rem",
             color: "#c89b3c",

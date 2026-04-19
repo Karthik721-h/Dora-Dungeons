@@ -98,7 +98,7 @@ function LogMessage({ log, isNew, index }: { log: string; isNew: boolean; index:
       role="listitem"
     >
       {prefix && (
-        <span style={{ opacity: 0.75, marginRight: "0.3rem" }}>{prefix}</span>
+        <span aria-hidden="true" style={{ opacity: 0.75, marginRight: "0.3rem" }}>{prefix}</span>
       )}
       {log}
     </motion.div>

@@ -35,12 +35,14 @@ function Bar({
     <div className="space-y-1">
       <div className="flex justify-between items-center">
         <span
+          aria-hidden="true"
           className="font-code text-xs uppercase tracking-widest"
           style={{ color: "rgba(200,190,180,0.4)", letterSpacing: "0.18em", fontSize: "9px" }}
         >
           {label}
         </span>
         <span
+          aria-hidden="true"
           className="font-code text-xs"
           style={{
             color: textColor,
@@ -52,7 +54,14 @@ function Bar({
           {value} / {max}
         </span>
       </div>
+      {/* progressbar provides the accessible value — label + number spans above are decorative */}
       <div
+        role="progressbar"
+        aria-label={label}
+        aria-valuenow={value}
+        aria-valuemin={0}
+        aria-valuemax={max}
+        aria-valuetext={`${value} of ${max}`}
         className="relative h-2 w-full overflow-hidden"
         style={{ background: "rgba(255,255,255,0.05)", borderRadius: "999px" }}
       >
@@ -86,6 +95,8 @@ export function PlayerHUD({
 
   return (
     <div
+      role="region"
+      aria-label="Player stats"
       className="glass-panel p-2 sm:p-4 flex flex-col gap-2 sm:gap-4 overflow-y-auto"
       style={{
         borderColor: isCombat ? "rgba(139,30,30,0.4)" : undefined,
@@ -110,6 +121,7 @@ export function PlayerHUD({
         </div>
         <div className="flex flex-col items-end gap-1 flex-shrink-0">
           <div
+            aria-label={`Level ${level}`}
             className="font-display text-center"
             style={{
               border: "1px solid rgba(200,155,60,0.35)",
@@ -122,9 +134,10 @@ export function PlayerHUD({
               whiteSpace: "nowrap",
             }}
           >
-            LVL {level}
+            <span aria-hidden="true">LVL {level}</span>
           </div>
           <div
+            aria-label={`Dungeon ${dungeonLevel}`}
             className="font-display text-center"
             style={{
               border: "1px solid rgba(58,134,255,0.35)",
@@ -137,7 +150,7 @@ export function PlayerHUD({
               whiteSpace: "nowrap",
             }}
           >
-            DUNGEON {dungeonLevel}
+            <span aria-hidden="true">DUNGEON {dungeonLevel}</span>
           </div>
         </div>
       </div>
@@ -168,14 +181,16 @@ export function PlayerHUD({
       >
         {/* Attack */}
         <div
+          aria-label={`Attack: ${attack}`}
           className="flex items-center gap-2 rounded-lg p-2"
           style={{ background: "rgba(139,30,30,0.08)", border: "1px solid rgba(139,30,30,0.18)" }}
         >
           <div>
-            <div className="font-display font-bold" style={{ color: "#f87171", fontSize: "1.1rem", lineHeight: 1 }}>
+            <div aria-hidden="true" className="font-display font-bold" style={{ color: "#f87171", fontSize: "1.1rem", lineHeight: 1 }}>
               {attack}
             </div>
             <div
+              aria-hidden="true"
               className="font-code uppercase tracking-wider mt-0.5"
               style={{ color: "rgba(200,190,180,0.35)", fontSize: "9px" }}
             >
@@ -186,14 +201,16 @@ export function PlayerHUD({
 
         {/* Defense */}
         <div
+          aria-label={`Defense: ${defense}`}
           className="flex items-center gap-2 rounded-lg p-2"
           style={{ background: "rgba(58,134,255,0.07)", border: "1px solid rgba(58,134,255,0.18)" }}
         >
           <div>
-            <div className="font-display font-bold" style={{ color: "#60a5fa", fontSize: "1.1rem", lineHeight: 1 }}>
+            <div aria-hidden="true" className="font-display font-bold" style={{ color: "#60a5fa", fontSize: "1.1rem", lineHeight: 1 }}>
               {defense}
             </div>
             <div
+              aria-hidden="true"
               className="font-code uppercase tracking-wider mt-0.5"
               style={{ color: "rgba(200,190,180,0.35)", fontSize: "9px" }}
             >

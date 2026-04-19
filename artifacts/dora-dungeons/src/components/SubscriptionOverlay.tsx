@@ -72,6 +72,7 @@ interface SubscriptionOverlayProps {
 export function SubscriptionOverlay({ onClose, onPurchase, onRestorePurchases }: SubscriptionOverlayProps) {
   const [selectedId, setSelectedId] = useState<Tier["id"]>("lifetime");
   const [, navigate] = useLocation();
+  const titleId = "sub-overlay-title";
 
   const selected = TIERS.find(t => t.id === selectedId)!;
 
@@ -134,6 +135,9 @@ export function SubscriptionOverlay({ onClose, onPurchase, onRestorePurchases }:
         }}
       >
         <motion.div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={titleId}
           initial={{ opacity: 0, y: 32, scale: 0.97 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 16, scale: 0.97 }}
@@ -158,9 +162,10 @@ export function SubscriptionOverlay({ onClose, onPurchase, onRestorePurchases }:
                 marginBottom: "0.5rem",
               }}
             >
-              ⚔ Trial Ended
+              <span aria-hidden="true">⚔ </span>Trial Ended
             </p>
             <h2
+              id={titleId}
               style={{
                 fontFamily: "'Cinzel', serif",
                 fontSize: "clamp(1.3rem, 4vw, 1.75rem)",
@@ -215,7 +220,7 @@ export function SubscriptionOverlay({ onClose, onPurchase, onRestorePurchases }:
                   letterSpacing: "0.03em",
                 }}
               >
-                <span style={{ fontSize: "1.1rem" }}>{f.icon}</span>
+                <span aria-hidden="true" style={{ fontSize: "1.1rem" }}>{f.icon}</span>
                 {f.label}
               </div>
             ))}
@@ -235,6 +240,8 @@ export function SubscriptionOverlay({ onClose, onPurchase, onRestorePurchases }:
                 <button
                   key={tier.id}
                   type="button"
+                  aria-pressed={active}
+                  aria-label={`${tier.title} plan, ${tier.price}${tier.period ? " " + tier.period : ""}, ${tier.subtext}${tier.badge ? ", " + tier.badge : ""}`}
                   onClick={() => setSelectedId(tier.id)}
                   style={{
                     position: "relative",
@@ -340,6 +347,7 @@ export function SubscriptionOverlay({ onClose, onPurchase, onRestorePurchases }:
           {/* ── CTA button ── */}
           <button
             type="button"
+            aria-label={`${selected.ctaLabel}. ${selected.ctaSub}`}
             onClick={handlePurchase}
             style={{
               width: "100%",
