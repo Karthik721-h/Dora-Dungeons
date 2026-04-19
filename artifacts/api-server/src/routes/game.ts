@@ -235,7 +235,15 @@ router.post("/action", async (req: Request, res: Response) => {
   //   1. Abilities line  → append .destroy charges (RPG overlay abilities tab)
   //   2. Inventory line  → replace with full blue-bag contents:
   //                        all owned weapons + all owned armor (overlay tabs 1+2)
-  if (body.command === "status") {
+  //
+  // The engine recognises many aliases for the STATUS command (stats, hp, health,
+  // bag, pack, inventory, me, self, level, abilities).  We must patch ALL of them,
+  // not just the literal "status" word, so typed aliases work too.
+  const STATUS_COMMAND_ALIASES = new Set([
+    "status", "stats", "stat", "health", "hp", "inventory",
+    "me", "self", "level", "bag", "pack", "abilities",
+  ]);
+  if (STATUS_COMMAND_ALIASES.has(body.command.toLowerCase())) {
     const rpgAbilities: string[] = Array.isArray(rpgContext.unlockedAbilities)
       ? (rpgContext.unlockedAbilities as string[]) : [];
     const ownedWeapons = (rpgContext.unlockedWeapons ?? []) as { name: string }[];

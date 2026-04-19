@@ -316,6 +316,10 @@ export function GameScreen({
         setCommand("");
         setIntentHint(null);
 
+        // Keep the shop's sell-list in sync after any action (combat drops, looting,
+        // etc. can add items to player.inventory without going through the shop API).
+        setShopItems((newData.player.inventoryItems ?? []) as ShopInventoryItem[]);
+
         const prevLen = prevLogsRef.current.length;
         prevLogsRef.current = newData.logs;
         setNewFromIndex(prevLen);
