@@ -143,6 +143,32 @@ router.post("/start", async (req: Request, res: Response) => {
 });
 
 /**
+ * Returns true for UI / informational commands that don't need LLM narration.
+ * The engine handles these with plain system messages — calling the GM for them
+ * wastes tokens and adds latency.
+ *
+ * Kept deliberately narrow: only pure meta / overlay commands.  Game actions
+ * (attack, move, cast, defend, flee, .destroy, buy, sell, equip) all receive
+ * full cinematic narration from the Game Master.
+ */
+function shouldSkipGM(cmd: string): boolean {
+  const c = cmd.trim().toLowerCase();
+  // Exact UI meta commands
+  const SKIP_EXACT = new Set([
+    // Informational / stats — engine output is already clear
+    "status", "help",
+    // Overlay openers — these just trigger UI panels, no narrative needed
+    "shop", "open_shop",
+    "inventory", "open_inventory",
+    // Meta / session commands
+    "repeat", "change_voice", "logout",
+    "replay_prompt", "replay_level", "next_level", "exit_to_login",
+    // NOTE: "look" is intentionally excluded — the LLM narrates room descriptions well.
+  ]);
+  return SKIP_EXACT.has(c);
+}
+
+/**
  * POST /game/action
  * Load the user's session, process a command, save updated state.
  */
@@ -199,17 +225,22 @@ router.post("/action", async (req: Request, res: Response) => {
   const engineNewLogs = updatedState.logs.slice(logCountBefore);
 
   // ── LLM Game Master narration ─────────────────────────────────────────────
+  // Skip the LLM entirely for UI / informational commands (status, look, shop,
+  // inventory, help, etc.) — the engine already produces clear system messages
+  // for these and calling gpt-5.2 here wastes tokens and adds latency.
   const room = updatedState.dungeon.rooms.get(updatedState.currentRoomId)!;
-  const gmResult = await callGameMaster(
-    body.command,
-    engineNewLogs,
-    updatedState.gameStatus,
-    updatedState.player.hp,
-    updatedState.player.maxHp,
-    room.name,
-    room.description,
-    rpgContext,
-  );
+  const gmResult = shouldSkipGM(body.command)
+    ? { narration: "", xp_awarded: 0, hp_change: 0, used_destroy_ability: false, ui_command: "none" as const }
+    : await callGameMaster(
+        body.command,
+        engineNewLogs,
+        updatedState.gameStatus,
+        updatedState.player.hp,
+        updatedState.player.maxHp,
+        room.name,
+        room.description,
+        rpgContext,
+      );
 
   // Apply LLM-awarded HP change (clamped to valid range)
   if (gmResult.hp_change !== 0) {
