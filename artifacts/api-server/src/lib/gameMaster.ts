@@ -104,8 +104,9 @@ export async function callGameMaster(
   let raw = "";
   try {
     const completion = await client.chat.completions.create({
-      model: "gpt-5.2",
-      max_completion_tokens: 400,
+      model: "gpt-4o-mini",
+      max_tokens: 400,
+      response_format: { type: "json_object" },
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user",   content: userPayload },
