@@ -210,6 +210,10 @@ router.post("/action", async (req: Request, res: Response) => {
       id: "tattered-robe", name: "Tattered Robe", defense: 2,
     },
     unlockedAbilities: req.body?.rpgContext?.unlockedAbilities ?? [],
+    // Full collections — allow STATUS voice and LLM to reflect everything in the overlay.
+    unlockedWeapons:   req.body?.rpgContext?.unlockedWeapons  ?? [],
+    unlockedArmor:     req.body?.rpgContext?.unlockedArmor    ?? [],
+    destroyConsumed:   req.body?.rpgContext?.destroyConsumed  ?? false,
     playerXP: req.body?.rpgContext?.playerXP ?? 0,
   };
 
@@ -224,28 +228,58 @@ router.post("/action", async (req: Request, res: Response) => {
   // also forwarded to the LLM as the "engine outcome" context.
   const engineNewLogs = updatedState.logs.slice(logCountBefore);
 
-  // ── STATUS: inject RPG abilities (e.g. .destroy charges) into the Abilities line ──
-  // The engine only knows about built-in abilities (Fireball, Heal, etc.).
-  // RPG overlay abilities (stored in the frontend RPGContext) are forwarded
-  // via rpgContext.unlockedAbilities and must be merged in here so the STATUS
-  // voice and the inventory overlay always agree.
+  // ── STATUS: synchronise engine output with full RPG inventory overlay data ──
+  // The engine knows only equipped weapon/armor + built-in abilities.
+  // The frontend RPGContext carries the complete picture: all owned weapons,
+  // all owned armor, and RPG abilities (.destroy charges).  We patch the engine
+  // STATUS lines here so the voice matches EXACTLY what the visual overlay shows.
   if (body.command === "status") {
+    // Helper: patch one line in both engineNewLogs AND the live updatedState.logs
+    const patchLine = (idx: number, replacement: string) => {
+      engineNewLogs[idx] = replacement;
+      const liveIdx = logCountBefore + idx;
+      if (liveIdx < updatedState.logs.length) updatedState.logs[liveIdx] = replacement;
+    };
+
     const rpgAbilities: string[] = Array.isArray(rpgContext.unlockedAbilities)
-      ? (rpgContext.unlockedAbilities as string[])
-      : [];
-    if (rpgAbilities.length > 0) {
-      for (let i = 0; i < engineNewLogs.length; i++) {
-        if (engineNewLogs[i].startsWith("Abilities:")) {
-          const enhanced = `${engineNewLogs[i]}, ${rpgAbilities.join(", ")}`;
-          engineNewLogs[i] = enhanced;
-          const liveIdx = logCountBefore + i;
-          if (liveIdx < updatedState.logs.length) {
-            updatedState.logs[liveIdx] = enhanced;
-          }
-          break;
-        }
+      ? (rpgContext.unlockedAbilities as string[]) : [];
+    const ownedWeapons = (rpgContext.unlockedWeapons ?? []) as { name: string }[];
+    const ownedArmors  = (rpgContext.unlockedArmor  ?? []) as { name: string }[];
+
+    // Extra lines to splice in after the Weapon / Armor / Abilities engine lines
+    const extraAfterWeapon:   string[] = ownedWeapons.length > 1
+      ? [`Owned Weapons: ${ownedWeapons.map(w => w.name).join(", ")}`] : [];
+    const extraAfterArmor:    string[] = ownedArmors.length > 1
+      ? [`Owned Armor: ${ownedArmors.map(a => a.name).join(", ")}`]  : [];
+
+    for (let i = 0; i < engineNewLogs.length; i++) {
+      const line = engineNewLogs[i];
+
+      // Inject RPG abilities (.destroy) into the engine's Abilities line
+      if (line.startsWith("Abilities:") && rpgAbilities.length > 0) {
+        patchLine(i, `${line}, ${rpgAbilities.join(", ")}`);
       }
     }
+
+    // Splice "Owned Weapons / Owned Armor" lines into both arrays right after
+    // the engine's Weapon / Armor lines (insert in reverse so indices stay valid).
+    const insertExtraLines = (
+      searchPrefix: string,
+      extraLines: string[],
+    ) => {
+      if (extraLines.length === 0) return;
+      const idx = engineNewLogs.findIndex(l => l.startsWith(searchPrefix));
+      if (idx === -1) return;
+      // Splice into engineNewLogs
+      engineNewLogs.splice(idx + 1, 0, ...extraLines);
+      // Mirror into updatedState.logs
+      updatedState.logs.splice(logCountBefore + idx + 1, 0, ...extraLines);
+    };
+
+    // Insert "Owned Armor" first so that inserting "Owned Weapons" doesn't
+    // shift the Armor index.  Both are relative to the Weapon/Armor prefix.
+    insertExtraLines("Armor:", extraAfterArmor);
+    insertExtraLines("Weapon:", extraAfterWeapon);
   }
 
   // ── LLM Game Master narration ─────────────────────────────────────────────

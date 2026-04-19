@@ -702,6 +702,13 @@ export function GameScreen({
         equippedWeapon:    currentRpgStateRef.current.equippedWeapon,
         equippedArmor:     currentRpgStateRef.current.equippedArmor,
         unlockedAbilities: currentRpgStateRef.current.unlockedAbilities,
+        // Full weapon/armor collections — used by STATUS voice and LLM context so
+        // both match exactly what the visual inventory overlay shows.
+        unlockedWeapons:   currentRpgStateRef.current.unlockedWeapons,
+        unlockedArmor:     currentRpgStateRef.current.unlockedArmor,
+        // Explicit flag so the LLM can immediately tell when both destroy charges
+        // have been consumed without having to parse the abilities string.
+        destroyConsumed:   currentRpgStateRef.current.destroyConsumed,
         // Use engine XP as the authoritative value — it includes both combat XP
         // and LLM narrative XP (applied via /api/game/add-xp), so the Game Master
         // always sees the same XP that the STATUS voice and overlay display.
