@@ -1387,7 +1387,12 @@ export function GameScreen({
           </div>
 
           {/* Rate control */}
-          <div className="hidden xl:flex items-center gap-0.5" style={{ color: "rgba(200,190,180,0.35)" }}>
+          <div
+            role="group"
+            aria-label={`Narrator speed: ${speechRate.toFixed(1)}`}
+            className="hidden xl:flex items-center gap-0.5"
+            style={{ color: "rgba(200,190,180,0.35)" }}
+          >
             <button
               onClick={() => adjustRate(-0.1)}
               className="p-1 hover:text-white transition-colors rounded"
@@ -1396,6 +1401,7 @@ export function GameScreen({
               <Minus size={11} />
             </button>
             <span
+              aria-hidden="true"
               className="font-code w-7 text-center"
               style={{ fontSize: "11px", color: "rgba(200,190,180,0.5)" }}
             >
@@ -1420,8 +1426,9 @@ export function GameScreen({
             {isMuted ? <VolumeX size={15} /> : <Volume2 size={15} />}
           </button>
 
-          {/* Session ID */}
+          {/* Session ID — decorative, not useful to screen readers */}
           <div
+            aria-hidden="true"
             className="font-code hidden lg:flex items-center gap-1"
             style={{ color: "rgba(200,190,180,0.2)", fontSize: "10px" }}
           >
