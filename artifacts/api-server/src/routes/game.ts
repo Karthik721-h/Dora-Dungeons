@@ -155,8 +155,12 @@ function shouldSkipGM(cmd: string): boolean {
   const c = cmd.trim().toLowerCase();
   // Exact UI meta commands
   const SKIP_EXACT = new Set([
-    // Informational / stats — engine output is already clear
-    "status", "help",
+    // Informational / stats — engine output is already clear; all aliases
+    // that the CommandParser maps to ActionType.STATUS must be listed here so
+    // they never get unwanted LLM narration on top of the engine STATUS block.
+    "status", "stats", "stat", "health", "hp",
+    "me", "self", "level", "bag", "pack", "abilities",
+    "help",
     // Overlay openers — these just trigger UI panels, no narrative needed
     "shop", "open_shop",
     "inventory", "open_inventory",
@@ -264,17 +268,24 @@ router.post("/action", async (req: Request, res: Response) => {
         patchLine(i, `${line}, ${rpgAbilities.join(", ")}`);
       }
 
-      // 2. Inventory: replace the engine's dungeon-drops line with the full
-      //    blue-bag contents — all owned weapons + all owned armor.
-      //    This is exactly what the player sees when they open the blue bag overlay.
+      // 2. Inventory: merge the full blue-bag contents (owned weapons + armor from
+      //    RPGContext) with the engine's dungeon drops (sellable items still in
+      //    player.inventory after this command).  This ensures:
+      //    - Selling a dungeon drop immediately removes it from the STATUS voice.
+      //    - All owned gear still appears so the player has a complete picture.
+      //    Items are deduplicated by name in case any name appears in both sets.
       if (line.startsWith("Inventory:")) {
-        const bagItems: string[] = [
+        const dungeonDropNames = updatedState.player.inventory.map((i: Item) => i.name);
+        const gearNames: string[] = [
           ...ownedWeapons.map(w => w.name),
           ...ownedArmors.map(a => a.name),
         ];
-        const bagText = bagItems.length > 0
-          ? bagItems.join(", ")
-          : "empty";
+        const seen = new Set<string>();
+        const bagItems: string[] = [];
+        for (const name of [...gearNames, ...dungeonDropNames]) {
+          if (!seen.has(name)) { seen.add(name); bagItems.push(name); }
+        }
+        const bagText = bagItems.length > 0 ? bagItems.join(", ") : "empty";
         patchLine(i, `Inventory: ${bagText}`);
       }
     }

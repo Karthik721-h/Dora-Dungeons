@@ -316,9 +316,14 @@ export function GameScreen({
         setCommand("");
         setIntentHint(null);
 
-        // Keep the shop's sell-list in sync after any action (combat drops, looting,
-        // etc. can add items to player.inventory without going through the shop API).
+        // Keep all shop lists in sync after every game action so buy/sell/upgrade
+        // views always reflect the authoritative server state.
+        // - shopItems: combat drops / looting update player.inventory
+        // - shopWeapons / shopArmors: ensure the buy/upgrade tabs never show
+        //   stale ownership data if a server-side event grants or removes gear.
         setShopItems((newData.player.inventoryItems ?? []) as ShopInventoryItem[]);
+        setShopWeapons((newData.player.weapons ?? []) as ShopWeapon[]);
+        setShopArmors((newData.player.armors ?? []) as ShopArmor[]);
 
         const prevLen = prevLogsRef.current.length;
         prevLogsRef.current = newData.logs;
@@ -1029,6 +1034,11 @@ export function GameScreen({
       setShopOpen(false);
       setShopMode("main");
       setGameMode("explore");
+      // Re-sync all shop local state from server so sell/buy/upgrade tabs
+      // reflect the authoritative post-restart player state.
+      setShopWeapons((data.player.weapons ?? []) as ShopWeapon[]);
+      setShopArmors((data.player.armors ?? []) as ShopArmor[]);
+      setShopItems((data.player.inventoryItems ?? []) as ShopInventoryItem[]);
       queryClient.setQueryData(getGetGameStateQueryKey(), data);
       AudioManager.speak(
         "You rise again at the beginning of the dungeon. Your weapons, armor, and gold are intact. Stay vigilant.",
@@ -1073,6 +1083,10 @@ export function GameScreen({
       setShopMode("main");
       gameModeRef.current = "explore";
       setGameMode("explore");
+      // Re-sync all shop local state from the new-level server response.
+      setShopWeapons((data.player.weapons ?? []) as ShopWeapon[]);
+      setShopArmors((data.player.armors ?? []) as ShopArmor[]);
+      setShopItems((data.player.inventoryItems ?? []) as ShopInventoryItem[]);
       queryClient.setQueryData(getGetGameStateQueryKey(), data);
       // Recharge .destroy for the new level
       restoreDestroyRef.current();
@@ -1111,6 +1125,10 @@ export function GameScreen({
       setShopMode("main");
       gameModeRef.current = "explore";
       setGameMode("explore");
+      // Re-sync all shop local state from server.
+      setShopWeapons((data.player.weapons ?? []) as ShopWeapon[]);
+      setShopArmors((data.player.armors ?? []) as ShopArmor[]);
+      setShopItems((data.player.inventoryItems ?? []) as ShopInventoryItem[]);
       queryClient.setQueryData(getGetGameStateQueryKey(), data);
       AudioManager.speak(
         "You return to the start of this level. The dungeon awaits. Good luck.",
@@ -1157,12 +1175,14 @@ export function GameScreen({
   };
 
   const shopSellApi = async (itemId: string): Promise<ShopSellResult> => {
+    // Capture the item name synchronously before the async server call so
+    // the sell TTS always uses the correct name even after state is patched.
+    const itemName = shopItemsRef.current.find(i => i.id === itemId)?.name ?? itemId;
     const resp = await customFetch<{ success: boolean; message: string; gold: number; player: GameStateResponse["player"] }>(
       `/api/game/shop/sell`,
       { method: "POST", body: JSON.stringify({ itemId }), headers: { "Content-Type": "application/json" } }
     );
     patchPlayerFromShopResponse(resp);
-    const itemName = shopItemsRef.current.find(i => i.id === itemId)?.name ?? itemId;
     if (resp.success) {
       if (!isMutedRef.current) speakSellSuccess(itemName, resp.gold);
       addShopLog(`✓ ${itemName} sold.`);

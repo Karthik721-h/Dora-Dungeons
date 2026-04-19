@@ -53,6 +53,9 @@ export function buyWeapon(player: Player, weaponId: string): ShopResult {
   if (!weapon) {
     return { success: false, message: "ITEM_NOT_FOUND", updatedPlayer: player };
   }
+  if (player.weapons.some((w) => w.id === weaponId)) {
+    return { success: false, message: "ALREADY_OWNED", updatedPlayer: player };
+  }
   if (player.gold < weapon.price) {
     return { success: false, message: "NOT_ENOUGH_GOLD", updatedPlayer: player };
   }
