@@ -93,12 +93,11 @@ export function GameScreen({
   const [inventoryOpen, setInventoryOpen] = useState(false);
 
   // ── RPG Progression context (read state + dispatch actions) ──────────────────
-  const { state: rpgState, addXP, removeAbility, useDestroy, addWeapon, syncArmor, restoreDestroy } = useRPGProgression();
-  // Single ref tracking { equippedWeapon, equippedArmor, unlockedAbilities, playerXP }.
+  const { state: rpgState, removeAbility, useDestroy, addWeapon, syncArmor, restoreDestroy } = useRPGProgression();
+  // Single ref tracking { equippedWeapon, equippedArmor, unlockedAbilities }.
   // Written synchronously in the render body (see below) so submitCommand always
   // reads the exact, current values without stale-closure bugs.
   const currentRpgStateRef = useRef(rpgState);
-  const addXPRef           = useRef(addXP);
   const removeAbilityRef   = useRef(removeAbility);
   const useDestroyRef      = useRef(useDestroy);
   const addWeaponRef       = useRef(addWeapon);
@@ -106,13 +105,12 @@ export function GameScreen({
   const restoreDestroyRef  = useRef(restoreDestroy);
   useEffect(() => {
     currentRpgStateRef.current = rpgState;
-    addXPRef.current           = addXP;
     removeAbilityRef.current   = removeAbility;
     useDestroyRef.current      = useDestroy;
     addWeaponRef.current       = addWeapon;
     syncArmorRef.current       = syncArmor;
     restoreDestroyRef.current  = restoreDestroy;
-  }, [rpgState, addXP, removeAbility, useDestroy, addWeapon, syncArmor, restoreDestroy]);
+  }, [rpgState, removeAbility, useDestroy, addWeapon, syncArmor, restoreDestroy]);
 
   // ── One-time backend → RPGProgressionContext bootstrap ───────────────────────
   // When the game loads the backend may already have weapons/armors the player
@@ -331,15 +329,27 @@ export function GameScreen({
 
         // ── RPG Progression: award XP granted by the LLM Game Master ─────────
         // Safely coerce: guard against undefined, non-number, and NaN coming
-        // back from the API so the RPGContext reducer never receives a bad value.
+        // back from the API so we never send a bad value to the backend.
         const rawXp = (newData as unknown as Record<string, unknown>).xp_awarded;
         const xpAwarded: number =
           typeof rawXp === "number" && !Number.isNaN(rawXp) ? rawXp : 0;
         // hp_change is applied server-side and reflected in newData.player.hp —
         // no client-side hp manipulation needed (avoids double-apply bugs).
         if (xpAwarded > 0) {
-          addXPRef.current(xpAwarded);
-          console.log(`[RPG] xp_awarded from Game Master: +${xpAwarded}`);
+          // Apply narrative XP to the engine backend so the STATUS voice output,
+          // the inventory overlay, and player.xp all use the same single value.
+          // Fire-and-forget: failures are non-critical (XP deferred to next action).
+          console.log(`[RPG] xp_awarded from Game Master: +${xpAwarded} — posting to engine`);
+          customFetch<GameStateResponse>("/api/game/add-xp", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ amount: xpAwarded }),
+          }).then((updated) => {
+            queryClient.setQueryData(getGetGameStateQueryKey(), updated);
+            console.log(`[RPG] engine XP updated: ${updated.player.xp}/${updated.player.xpToNextLevel} (Lv.${updated.player.level})`);
+          }).catch((err) => {
+            console.warn("[RPG] add-xp failed (non-critical):", err);
+          });
         }
 
         // ── .destroy ability: 2 charges per level — decrement on each use ────
@@ -695,7 +705,10 @@ export function GameScreen({
         equippedWeapon:    currentRpgStateRef.current.equippedWeapon,
         equippedArmor:     currentRpgStateRef.current.equippedArmor,
         unlockedAbilities: currentRpgStateRef.current.unlockedAbilities,
-        playerXP:          currentRpgStateRef.current.playerXP,
+        // Use engine XP as the authoritative value — it includes both combat XP
+        // and LLM narrative XP (applied via /api/game/add-xp), so the Game Master
+        // always sees the same XP that the STATUS voice and overlay display.
+        playerXP:          gameStateRef.current.player.xp,
       };
 
       if (trimmed === "look" || trimmed === "status") {
@@ -1811,7 +1824,14 @@ export function GameScreen({
       {/* ── RPG Inventory overlay ── */}
       <AnimatePresence>
         {inventoryOpen && (
-          <RPGMenuOverlay onClose={() => setInventoryOpen(false)} />
+          <RPGMenuOverlay
+            onClose={() => setInventoryOpen(false)}
+            enginePlayer={{
+              level:        gameState.player.level,
+              xp:           gameState.player.xp,
+              xpToNextLevel: gameState.player.xpToNextLevel,
+            }}
+          />
         )}
       </AnimatePresence>
     </div>

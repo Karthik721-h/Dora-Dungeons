@@ -9,6 +9,7 @@ import {
   Ability,
   Weapon,
   Armor,
+  calculateXpToNextLevel,
 } from "@workspace/game-engine";
 import {
   StartGameBody,
@@ -263,6 +264,46 @@ router.get("/state", async (req: Request, res: Response) => {
 
   const response = GetGameStateResponse.parse(serializeGameState(session.state));
   res.json(response);
+});
+
+/**
+ * POST /game/add-xp
+ * Apply LLM narrative XP award directly to the engine's player state so that
+ * the STATUS voice output and the inventory overlay always agree.
+ * Handles level-up the same way the engine's private applyXpAndGold does.
+ */
+router.post("/add-xp", async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  const amount = Number(req.body?.amount ?? 0);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    res.status(400).json({ error: "INVALID", message: "amount must be a positive number" });
+    return;
+  }
+
+  const session = await loadSession(userId);
+  if (!session) {
+    res.status(404).json({ error: "NOT_FOUND", message: "No active game session." });
+    return;
+  }
+
+  const { state } = session;
+  const p = state.player;
+
+  p.xp += amount;
+
+  // Mirror the engine's applyXpAndGold level-up loop
+  while (p.xp >= p.xpToNextLevel) {
+    p.xp -= p.xpToNextLevel;
+    p.level += 1;
+    p.xpToNextLevel = calculateXpToNextLevel(p.level);
+    // Increase max HP by 10% and heal fully on level-up (matches engine behaviour)
+    p.maxHp = Math.round(p.maxHp * 1.1);
+    p.hp = Math.min(p.hp + Math.round(p.maxHp * 0.1), p.maxHp);
+    state.logs.push(`Level Up! You are now level ${p.level}!`);
+  }
+
+  await saveSession(userId, state);
+  res.json(serializeGameState(state));
 });
 
 // ── Shop routes ───────────────────────────────────────────────────────────────

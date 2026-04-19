@@ -318,15 +318,23 @@ function EmptyState({ message }: { message: string }) {
 
 // ─── Main overlay ─────────────────────────────────────────────────────────────
 
-interface RPGMenuOverlayProps {
-  onClose: () => void;
+interface EnginePlayer {
+  level: number;
+  xp: number;
+  xpToNextLevel: number;
 }
 
-export function RPGMenuOverlay({ onClose }: RPGMenuOverlayProps) {
+interface RPGMenuOverlayProps {
+  onClose: () => void;
+  /** Engine-authoritative level / XP — matches the STATUS voice output exactly. */
+  enginePlayer: EnginePlayer;
+}
+
+export function RPGMenuOverlay({ onClose, enginePlayer }: RPGMenuOverlayProps) {
   const { state, equipItem } = useRPGProgression();
   const [activeTab, setActiveTab] = useState<Tab>("weapons");
 
-  const { playerXP, unlockedWeapons, equippedWeapon, unlockedArmor, equippedArmor, unlockedAbilities } = state;
+  const { unlockedWeapons, equippedWeapon, unlockedArmor, equippedArmor, unlockedAbilities } = state;
 
   return (
     <>
@@ -418,7 +426,7 @@ export function RPGMenuOverlay({ onClose }: RPGMenuOverlayProps) {
               </h2>
             </div>
 
-            {/* XP badge */}
+            {/* Level + XP badge — sourced from the engine, matches STATUS voice */}
             <div
               style={{
                 display: "flex",
@@ -429,18 +437,19 @@ export function RPGMenuOverlay({ onClose }: RPGMenuOverlayProps) {
                 border: "1px solid rgba(200,155,60,0.3)",
                 background: "rgba(200,155,60,0.07)",
                 flexShrink: 0,
+                gap: "0.05rem",
               }}
             >
               <span
                 style={{
                   fontFamily: "'Fira Code', monospace",
-                  fontSize: "0.55rem",
-                  letterSpacing: "0.22em",
+                  fontSize: "0.52rem",
+                  letterSpacing: "0.2em",
                   textTransform: "uppercase",
                   color: GOLD_DIM,
                 }}
               >
-                Total XP
+                Level
               </span>
               <span
                 style={{
@@ -448,11 +457,22 @@ export function RPGMenuOverlay({ onClose }: RPGMenuOverlayProps) {
                   fontSize: "1.3rem",
                   fontWeight: 900,
                   color: "#f0d060",
-                  lineHeight: 1.1,
+                  lineHeight: 1,
                   textShadow: "0 0 14px rgba(200,155,60,0.5)",
                 }}
               >
-                {playerXP.toLocaleString()}
+                {enginePlayer.level}
+              </span>
+              <span
+                style={{
+                  fontFamily: "'Fira Code', monospace",
+                  fontSize: "0.5rem",
+                  letterSpacing: "0.06em",
+                  color: "rgba(200,155,60,0.45)",
+                  marginTop: "0.1rem",
+                }}
+              >
+                {enginePlayer.xp} / {enginePlayer.xpToNextLevel} XP
               </span>
             </div>
 
