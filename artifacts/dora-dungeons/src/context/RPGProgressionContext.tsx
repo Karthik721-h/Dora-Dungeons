@@ -247,26 +247,17 @@ function loadState(): RPGState {
     if (!raw) return DEFAULT_STATE;
     const parsed = JSON.parse(raw) as Partial<RPGState>;
 
-    const destroyConsumed = parsed.destroyConsumed === true;
-
-    // ── Migration ──────────────────────────────────────────────────────────
-    // Strip all legacy .destroy variants (v1 single-charge, v2 partial states)
-    // and unconditionally inject ".destroy (2 Charges)".  The player ALWAYS
-    // loads with 2 charges; per-level consumption is tracked at runtime via
-    // USE_DESTROY.  RESTORE_DESTROY hard-resets to 2 on every level advance.
-    let abilities = (parsed.unlockedAbilities ?? []).filter(
-      (a) => !a.startsWith(".destroy"),
-    );
-    abilities = [".destroy (2 Charges)", ...abilities];
-
+    // Strictly restore the saved charge state — no free refills on refresh.
+    // RESTORE_DESTROY is the only code path that resets to 2 charges, and it
+    // only fires on an explicit level-up, not on component mount.
     return {
-      playerXP:        parsed.playerXP        ?? DEFAULT_STATE.playerXP,
-      unlockedWeapons: parsed.unlockedWeapons  ?? DEFAULT_STATE.unlockedWeapons,
-      equippedWeapon:  parsed.equippedWeapon   ?? DEFAULT_STATE.equippedWeapon,
-      unlockedArmor:   parsed.unlockedArmor    ?? DEFAULT_STATE.unlockedArmor,
-      equippedArmor:   parsed.equippedArmor    ?? DEFAULT_STATE.equippedArmor,
-      unlockedAbilities: abilities,
-      destroyConsumed,
+      playerXP:          parsed.playerXP          ?? DEFAULT_STATE.playerXP,
+      unlockedWeapons:   parsed.unlockedWeapons    ?? DEFAULT_STATE.unlockedWeapons,
+      equippedWeapon:    parsed.equippedWeapon     ?? DEFAULT_STATE.equippedWeapon,
+      unlockedArmor:     parsed.unlockedArmor      ?? DEFAULT_STATE.unlockedArmor,
+      equippedArmor:     parsed.equippedArmor      ?? DEFAULT_STATE.equippedArmor,
+      unlockedAbilities: parsed.unlockedAbilities  ?? DEFAULT_STATE.unlockedAbilities,
+      destroyConsumed:   parsed.destroyConsumed === true,
     };
   } catch {
     return DEFAULT_STATE;
