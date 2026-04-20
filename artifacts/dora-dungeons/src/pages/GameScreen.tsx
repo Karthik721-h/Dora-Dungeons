@@ -357,6 +357,12 @@ export function GameScreen({
           l => l.trim() && !l.startsWith(">")
         );
 
+        // Extract gmNarration early so the TTS guard can use it even when
+        // newLogs is absent (older deployed backends omit this field, making
+        // newLines empty — without this check the prologue/narration would
+        // show on screen but never be spoken).
+        const gmNarration = (newData as unknown as Record<string, unknown>).gm_narration as string | undefined;
+
         // ── RPG Progression: award XP granted by the LLM Game Master ─────────
         // Safely coerce: guard against undefined, non-number, and NaN coming
         // back from the API so we never send a bad value to the backend.
@@ -415,18 +421,13 @@ export function GameScreen({
         // isHydratingRef is true from mount until the opening narration finishes.
         // This prevents terminal logs from being spoken when the page first loads
         // (e.g. if a user submits a command in the brief window before TTS drains).
-        if (!transitioningToDeath && !isMutedRef.current && !isHydratingRef.current && newLines.length > 0) {
+        // Use gmNarration as a fallback signal even when newLogs is absent
+        // (older deployed backends omit newLogs, making newLines empty).
+        if (!transitioningToDeath && !isMutedRef.current && !isHydratingRef.current && (newLines.length > 0 || !!gmNarration)) {
           // When the engine returns an "Unknown command" response, replace the
           // verbose hint text with a single accessible prompt instead of reading
           // out the raw developer-facing command syntax.
           const isUnknownCommand = newLines.some(l => /^Unknown command:/i.test(l));
-
-          // When the LLM produced narration, speak ONLY that — skip the raw
-          // engine output lines (combat results, movement confirmations, etc.)
-          // so the player hears one clean cinematic voice, not the system log.
-          // Commands in shouldSkipGM return empty gm_narration, so they keep
-          // their existing system-voice engine lines unchanged.
-          const gmNarration = (newData as unknown as Record<string, unknown>).gm_narration as string | undefined;
           const linesToSpeak = gmNarration
             ? [gmNarration]
             : isUnknownCommand
