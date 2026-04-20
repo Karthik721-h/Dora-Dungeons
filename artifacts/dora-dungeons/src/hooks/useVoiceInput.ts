@@ -55,7 +55,7 @@ interface UseVoiceInputResult {
 const DEBOUNCE_MS       = 1000; // ignore same command within this window
 const PROCESSING_MS     = 400;  // "processing" badge duration
 const TTS_COOLDOWN_MS   = 500;  // discard buffered TTS transcripts after speech ends
-const SILENCE_TIMEOUT_MS = 1500; // auto-submit after 1.5 s of silence with interim text
+const SILENCE_TIMEOUT_MS = 3500; // auto-submit after 3.5 s of silence with interim text
 
 export function useVoiceInput({
   onFinalTranscript,
@@ -193,6 +193,15 @@ export function useVoiceInput({
         silenceTimerRef.current = setTimeout(() => {
           const pending = currentTranscriptRef.current.trim();
           if (!pending || isProcessingCommandRef.current || isSpeakingRef.current) return;
+
+          // Discard obvious noise/garbage: require at least 2 words so single-word
+          // ambient fragments ("hm", "uh", stray sounds) never fire a command.
+          const wordCount = pending.split(/\s+/).filter(w => w.length > 1).length;
+          if (wordCount < 2) {
+            currentTranscriptRef.current = "";
+            setInterimTranscript("");
+            return;
+          }
 
           currentTranscriptRef.current = "";
           setInterimTranscript("");

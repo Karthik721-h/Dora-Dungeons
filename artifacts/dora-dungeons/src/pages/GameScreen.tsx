@@ -168,9 +168,6 @@ export function GameScreen({
   const prevLogsRef             = useRef<string[]>(gameState.logs);
   const isMutedRef              = useRef(isMuted);
   const gameStateRef            = useRef(gameState);
-  // Set to true when an unknown command is caught client-side so onSuccess
-  // knows to skip the backend's "Unknown command:" narration (already spoken).
-  const unknownHandledLocallyRef = useRef(false);
   const queryClient = useQueryClient();
   const stopListeningRef    = useRef<() => void>(() => {});
   const startListeningRef   = useRef<() => void>(() => {});
@@ -400,21 +397,13 @@ export function GameScreen({
           // out the raw developer-facing command syntax.
           const isUnknownCommand = newLines.some(l => /^Unknown command:/i.test(l));
 
-          // If the client already handled an unknown command locally (via
-          // IntentProcessor's matched=false path), skip the backend narration so
-          // we don't speak the same message twice.
-          const alreadyHandled = unknownHandledLocallyRef.current && isUnknownCommand;
-          unknownHandledLocallyRef.current = false; // always reset after checking
-
-          if (!alreadyHandled) {
-            // When .destroy fires the backend already strips the engine's wrong output
-            // and returns only the LLM narration in newLines, so no client-side filtering
-            // is needed here.
-            const linesToSpeak = isUnknownCommand
-              ? ["Say help to hear the available voice commands."]
-              : newLines;
-            AudioManager.speakLines(linesToSpeak, { interrupt: true });
-          }
+          // When the backend returns an "Unknown command" response (edge case —
+          // normally unknown commands are caught client-side and never sent),
+          // speak a clean accessible prompt rather than the raw hint text.
+          const linesToSpeak = isUnknownCommand
+            ? ["Say help to hear the available voice commands."]
+            : newLines;
+          AudioManager.speakLines(linesToSpeak, { interrupt: true });
           // Queue exits after narration so visually impaired users always
           // know where they can go. Skip on VICTORY — the dungeon is cleared
           // and there are no meaningful exits to navigate at that point.
@@ -424,9 +413,6 @@ export function GameScreen({
               { interrupt: false }
             );
           }
-        } else if (transitioningToDeath) {
-          // Reset the unknown-command flag so it doesn't leak into the restart
-          unknownHandledLocallyRef.current = false;
         }
         if (!transitioningToDeath && !isMutedRef.current) {
           if (newData.gameStatus === "IN_COMBAT" && gameStateRef.current.gameStatus !== "IN_COMBAT") {
@@ -841,27 +827,25 @@ export function GameScreen({
       }
 
       // ── Unknown command: no intent pattern matched ─────────────────────────
-      // Give instant client-side feedback without an API round-trip.
-      // We still fall through to submitCommand so the backend engine can attempt
-      // to parse it (it may recognise commands the client-side patterns don't cover).
-      if (!matched && !isMutedRef.current) {
-        const spokenMsg = suggestion
-          ? `Unknown command. Did you mean: ${suggestion}? Say help to hear all commands.`
-          : "Unknown command. Say help to hear the available voice commands.";
+      // Give instant client-side feedback and stop here — do NOT also send to
+      // the backend, which would queue engine + LLM responses on top of this
+      // message and cause the "unknown command → unrelated narration" stacking bug.
+      if (!matched) {
+        if (!isMutedRef.current) {
+          const spokenMsg = suggestion
+            ? `Unknown command. Did you mean: ${suggestion}? Say help to hear all commands.`
+            : "Unknown command. Say help to hear the available voice commands.";
 
-        const terminalMsg = suggestion
-          ? `Unknown command. Did you mean: ${suggestion}?`
-          : "Unknown command. Say help to hear the available voice commands.";
+          const terminalMsg = suggestion
+            ? `Unknown command. Did you mean: ${suggestion}?`
+            : "Unknown command. Say help to hear the available voice commands.";
 
-        AudioManager.speak(spokenMsg, { interrupt: true });
-        setLocalExtraLogs(prev => {
-          setNewFromIndex(logs.length + shopExtraLogs.length + prev.length);
-          return [...prev, terminalMsg];
-        });
-        // Flag so onSuccess skips the backend's duplicate "Unknown command" narration
-        unknownHandledLocallyRef.current = true;
-        // Still forward to backend — it may handle commands the client patterns miss
-        submitCommand(canonical);
+          AudioManager.speak(spokenMsg, { interrupt: true });
+          setLocalExtraLogs(prev => {
+            setNewFromIndex(logs.length + shopExtraLogs.length + prev.length);
+            return [...prev, terminalMsg];
+          });
+        }
         return;
       }
 
