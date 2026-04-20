@@ -83,6 +83,13 @@ export function GameScreen({
   const [intentHint, setIntentHint] = useState<string | null>(null);
   const [newFromIndex, setNewFromIndex] = useState(gameState.logs.length);
   const [voiceGender, setVoiceGender] = useState<"female" | "male">(() => AudioManager.getVoiceGender());
+  // True for fresh new games until the first LLM prologue response arrives.
+  // While pending, raw engine boot logs are hidden from the terminal so the
+  // player sees a blank cinematic canvas instead of "Dungeon seed: ..." text.
+  const [prologuePending, setProloguePending] = useState(
+    () => (gameState.turnCount ?? 0) === 0 && gameState.player.xp === 0
+  );
+  const initialLogCountRef = useRef(gameState.logs.length);
   const [voiceDropdownOpen, setVoiceDropdownOpen] = useState(false);
 
   // ── Shop state — backed by server state (player.weapons / player.inventoryItems) ──
@@ -204,14 +211,25 @@ export function GameScreen({
   // point it flips to false. The onSuccess handler checks this flag before
   // calling speakLines so terminal-log narration never fires during the
   // initial load window.
-  const hasAutoStartedRef = useRef(false);
-  const isHydratingRef    = useRef(true);
+  const hasAutoStartedRef  = useRef(false);
+  const isHydratingRef     = useRef(true);
+  // Stable ref to submitCommand so the hydration useEffect ([] deps, runs once)
+  // can call it without a stale-closure bug.
+  const submitCommandRef   = useRef<(cmd: string) => void>(() => {});
+  const prologueFiredRef   = useRef(false);
   useEffect(() => {
     if (hasAutoStartedRef.current) return;
     // When audio is off (muted or not supported), collapse the hydration window
     // immediately so subsequent command narration isn't permanently blocked.
     if (isMuted || !voiceSupported) {
       isHydratingRef.current = false;
+      // Still fire the prologue for new games even when muted — the text will
+      // appear in the terminal once the LLM responds.
+      const isNewSession = (gameState.turnCount ?? 0) === 0;
+      if (isNewSession && !prologueFiredRef.current) {
+        prologueFiredRef.current = true;
+        setTimeout(() => submitCommandRef.current("START_PROLOGUE"), 1200);
+      }
       return;
     }
     if (!gameState.logs.length) return;
@@ -265,6 +283,12 @@ export function GameScreen({
         isHydratingRef.current = false;
         if (!hasAutoStartedRef.current) return;
         startListening();
+        // Fire the cinematic prologue once welcome audio has drained — only for
+        // brand-new sessions (not restores) and only once per mount.
+        if (!isRestore && !prologueFiredRef.current) {
+          prologueFiredRef.current = true;
+          setTimeout(() => submitCommandRef.current("START_PROLOGUE"), 300);
+        }
       });
     }, 700);
 
@@ -858,6 +882,7 @@ export function GameScreen({
   });
 
   // Keep refs fresh so submitCommand (a useCallback) always has current values
+  submitCommandRef.current  = submitCommand;
   stopListeningRef.current = stopListening;
   onLogoutRef.current = onLogout;
   onCommandExecutedRef.current = onCommandExecuted;
@@ -961,13 +986,26 @@ export function GameScreen({
   const { player, currentRoom, logs, gameStatus, parsedCommand } = gameState;
   const isCombat = gameStatus === "IN_COMBAT";
 
+  // Once the LLM prologue response arrives (logs grow beyond the boot-time
+  // snapshot), lift the prologue veil so the terminal becomes visible.
+  useEffect(() => {
+    if (!prologuePending) return;
+    if (gameState.logs.length > initialLogCountRef.current) {
+      setProloguePending(false);
+    }
+  }, [gameState.logs.length, prologuePending]);
+
   // Merge server logs with any shop action messages AND client-side feedback
   // (e.g. unknown command notices) so they all appear in the terminal.
-  const displayLogs = [
-    ...logs,
-    ...shopExtraLogs,
-    ...localExtraLogs,
-  ];
+  // In the prologue phase, hide raw engine boot logs so the player sees a
+  // clean cinematic canvas — text will appear once the LLM responds.
+  const displayLogs = prologuePending
+    ? []
+    : [
+        ...logs,
+        ...shopExtraLogs,
+        ...localExtraLogs,
+      ];
 
   /** Append a shop action result to the terminal log feed. */
   const addShopLog = (msg: string) => {
