@@ -17,13 +17,11 @@ LOOT & ECONOMY: To support the game's economy, frequently narrate the discovery 
 
 MECHANICS: The payload includes equipped_weapon, equipped_armor, owned_weapons, owned_armor, and unlocked_abilities. Use ALL of these to determine combat descriptions and contextual flavor. Award XP (10-100) for defeating your invented enemies, clever problem-solving, or highly entertaining interactions.
 
-DESTROY ABILITY: If the player invokes the '.destroy' ability (command contains "destroy", "obliterate", or similar phrasing), follow this exact decision tree:
-1. IGNORE engine_outcome entirely — the game engine does NOT understand this ability and will always produce an error (e.g., "Unknown command"). Never use engine_outcome to judge whether destroy is available.
-2. Check ONLY these two fields in the payload:
-   - destroy_depleted: if true → deny with a brief flavor line, set "used_destroy_ability": false.
-   - unlocked_abilities: if the array contains any entry starting with ".destroy" → the ability IS available, allow it.
-3. If available: narrate the player instantly and brutally obliterating their opponent in a god-like display of overwhelming power. Set "used_destroy_ability": true and award maximum XP (100).
-4. If depleted: deny with a short flavor line explaining the charges are spent. Set "used_destroy_ability": false.
+DESTROY ABILITY: When the player's command contains "destroy", "obliterate", "annihilate", or "incinerate":
+1. IGNORE engine_outcome completely — the engine always errors on this command; that error means nothing.
+2. Read the single pre-computed field "can_use_destroy" from the payload. This field is already resolved for you — do NOT look at unlocked_abilities or destroy_depleted to second-guess it:
+   - "can_use_destroy": true  → Allow. Narrate the player obliterating their enemy in a brutal, god-like display of overwhelming power. Set "used_destroy_ability": true, award 100 XP.
+   - "can_use_destroy": false → Deny. One sentence of flavor ("the charges are spent for this level"). Set "used_destroy_ability": false, award 0 XP.
 
 UI COMMANDS: You may trigger React UI overlays by setting the "ui_command" field.
 - To check gear, bag, or inventory: "open_inventory"
@@ -104,6 +102,13 @@ export async function callGameMaster(
   const client = getClient();
   if (!client) return FALLBACK;
 
+  // Pre-compute the destroy availability so the LLM reads a single boolean
+  // rather than having to parse the abilities array itself (which caused
+  // false denials when the model mis-read ".destroy (2 Charges)").
+  const canUseDestroy =
+    !rpgContext.destroyConsumed &&
+    rpgContext.unlockedAbilities.some(a => a.startsWith(".destroy"));
+
   const userPayload = JSON.stringify({
     command,
     engine_outcome:     engineLogs.join("\n"),
@@ -115,7 +120,7 @@ export async function callGameMaster(
     owned_weapons:      rpgContext.unlockedWeapons,
     owned_armor:        rpgContext.unlockedArmor,
     unlocked_abilities: rpgContext.unlockedAbilities,
-    destroy_depleted:   rpgContext.destroyConsumed,
+    can_use_destroy:    canUseDestroy,   // pre-computed — LLM must use ONLY this field
     player_xp:          rpgContext.playerXP,
   });
 
