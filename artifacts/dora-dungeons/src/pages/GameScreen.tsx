@@ -250,14 +250,15 @@ export function GameScreen({
       AudioManager.stopAll();
       if (!isRestore) {
         // ── New game ────────────────────────────────────────────────────────
-        // Speak welcome → room name + description → exits.
-        // Terminal logs are intentionally omitted: new players hear only the
-        // contextual dungeon state, not raw engine output.
-        AudioManager.speak(
-          "Welcome to Dora Dungeons. Voice control is active. Say help at any time to hear the list of commands."
-        );
-        AudioManager.speak(`${room.name}. ${room.description}`, { interrupt: false });
-        AudioManager.speak(buildExitsAnnouncement(room.exits), { interrupt: false });
+        // Skip ALL system voice — the LLM prologue is the very first thing
+        // the player hears.  Fire START_PROLOGUE immediately and open the mic.
+        isHydratingRef.current = false;
+        if (!prologueFiredRef.current) {
+          prologueFiredRef.current = true;
+          submitCommandRef.current("START_PROLOGUE");
+        }
+        startListening();
+        return;
       } else if (gameState.gameStatus === "IN_COMBAT") {
         // ── Restore: mid-combat ────────────────────────────────────────────
         const living = room.enemies.filter(e => !e.isDefeated);
@@ -283,12 +284,6 @@ export function GameScreen({
         isHydratingRef.current = false;
         if (!hasAutoStartedRef.current) return;
         startListening();
-        // Fire the cinematic prologue once welcome audio has drained — only for
-        // brand-new sessions (not restores) and only once per mount.
-        if (!isRestore && !prologueFiredRef.current) {
-          prologueFiredRef.current = true;
-          setTimeout(() => submitCommandRef.current("START_PROLOGUE"), 300);
-        }
       });
     }, 700);
 
