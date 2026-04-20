@@ -243,7 +243,7 @@ export function ShopPanel({
                   {owned ? "owned" : `${w.price}g`}
                 </span>
               </span>
-              <span style={{ display: "block", fontFamily: "'Crimson Text', serif", fontStyle: "italic", fontSize: "0.75rem", marginTop: "0.1rem", opacity: 0.55, textTransform: "none", letterSpacing: "0.01em" }}>
+              <span style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", fontFamily: "'Crimson Text', serif", fontStyle: "italic", fontSize: "0.75rem", marginTop: "0.1rem", opacity: 0.55, textTransform: "none", letterSpacing: "0.01em" }}>
                 {w.description}
               </span>
             </ShopBtn>
