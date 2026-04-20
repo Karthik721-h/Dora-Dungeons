@@ -625,6 +625,12 @@ export function RPGMenuOverlay({ onClose, enginePlayer }: RPGMenuOverlayProps) {
                     <div style={{ display: "flex", flexDirection: "column", gap: "0.625rem", padding: "0.25rem 0" }}>
                       {unlockedAbilities.map((ability, idx) => {
                         const isDestroy = ability.startsWith(".destroy");
+                        // Parse live charge count from ability name:
+                        //   ".destroy (2 Charges)" → 2
+                        //   ".destroy (1 Charge)"  → 1
+                        const chargeMatch = isDestroy ? ability.match(/\((\d+)\s+Charge/i) : null;
+                        const charges = chargeMatch ? parseInt(chargeMatch[1], 10) : 0;
+                        const chargeLabel = charges === 1 ? "1 charge remaining" : `${charges} charges remaining`;
                         return (
                           <motion.div
                             key={idx}
@@ -645,19 +651,47 @@ export function RPGMenuOverlay({ onClose, enginePlayer }: RPGMenuOverlayProps) {
                               gap: "0.3rem",
                             }}
                           >
-                            <span
-                              style={{
-                                fontFamily: "'Fira Code', monospace",
-                                fontSize: "0.68rem",
-                                letterSpacing: "0.1em",
-                                color: isDestroy
-                                  ? "rgba(248,113,113,0.9)"
-                                  : "rgba(167,139,250,0.9)",
-                                fontWeight: 700,
-                              }}
-                            >
-                              ✦ {ability}
-                            </span>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
+                              <span
+                                style={{
+                                  fontFamily: "'Fira Code', monospace",
+                                  fontSize: "0.68rem",
+                                  letterSpacing: "0.1em",
+                                  color: isDestroy
+                                    ? "rgba(248,113,113,0.9)"
+                                    : "rgba(167,139,250,0.9)",
+                                  fontWeight: 700,
+                                }}
+                              >
+                                ✦ {isDestroy ? ".destroy" : ability}
+                              </span>
+                              {isDestroy && (
+                                <span
+                                  aria-label={chargeLabel}
+                                  style={{
+                                    display: "flex",
+                                    gap: "0.3rem",
+                                    alignItems: "center",
+                                  }}
+                                >
+                                  {[1, 2].map(pip => (
+                                    <span
+                                      key={pip}
+                                      style={{
+                                        width: "0.55rem",
+                                        height: "0.55rem",
+                                        borderRadius: "50%",
+                                        background: pip <= charges
+                                          ? "rgba(248,113,113,0.9)"
+                                          : "rgba(248,113,113,0.18)",
+                                        border: "1px solid rgba(248,113,113,0.4)",
+                                        display: "inline-block",
+                                      }}
+                                    />
+                                  ))}
+                                </span>
+                              )}
+                            </div>
                             {isDestroy && (
                               <span
                                 style={{
@@ -668,7 +702,7 @@ export function RPGMenuOverlay({ onClose, enginePlayer }: RPGMenuOverlayProps) {
                                   lineHeight: 1.5,
                                 }}
                               >
-                                Say <em>"use destroy"</em> or <em>"obliterate"</em> in combat to unleash. Two charges per level — each use depletes one charge.
+                                {chargeLabel} — say <em>"use destroy"</em> or <em>"obliterate"</em> in combat.
                               </span>
                             )}
                           </motion.div>
