@@ -757,6 +757,13 @@ export function AuthScreen({ auth }: AuthScreenProps) {
               )}
             </AnimatePresence>
 
+            <p
+              className="text-xs text-center max-w-md px-4 mb-3"
+              style={{ color: "rgba(200,190,180,0.38)", lineHeight: 1.6, letterSpacing: "0.02em" }}
+            >
+              Dora Dungeons uses OpenAI to generate dynamic, real-time adventures. By entering, you agree to share your gameplay commands with our AI engine.
+            </p>
+
             <button
               type="submit"
               disabled={manualBusy}
