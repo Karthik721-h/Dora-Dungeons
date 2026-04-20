@@ -5,7 +5,7 @@ import { Player, Weapon, Armor, Item } from "../types/index.js";
 const AVAILABLE_WEAPONS: Weapon[] = [
   { id: "ashbringer",    name: "Ashbringer",    description: "A holy blade that burns with righteous fire.",        price: 10  },
   { id: "keyblade",     name: "Keyblade",      description: "A mysterious key-shaped weapon of ancient power.",     price: 20  },
-  { id: "leviathan-axe",name: "Leviathan Axe", description: "A frost-forged axe of Norse legend.",                 price: 45  },
+  { id: "leviathan-axe",name: "Inferno Axe",   description: "A rune-carved axe that erupts in searing flames on every strike. Each swing releases a torrent of magical fire.", price: 45  },
   { id: "gjallarhorn",  name: "Gjallarhorn",   description: "A legendary horn whose blast shakes the heavens.",     price: 50  },
   { id: "buster-sword", name: "Buster Sword",  description: "An enormous blade carried by a legendary mercenary.",  price: 60  },
   { id: "gunblade",     name: "Gunblade",      description: "A hybrid weapon that fires when it strikes.",          price: 100 },
