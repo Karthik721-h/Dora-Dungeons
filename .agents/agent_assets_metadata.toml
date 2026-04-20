@@ -24,3 +24,9 @@ id = "h814Bt7cKAV9pcqFbzCCT"
 uri = "file://dora-dungeons-build.zip"
 type = "unspecified"
 title = "Dora Dungeons — Production Build (dist/public)"
+
+[[outputs]]
+id = "Bej0iuEE8ZYdrtARvgjdU"
+uri = "file://www.zip"
+type = "unspecified"
+title = "www.zip — Dora Dungeons production build"
