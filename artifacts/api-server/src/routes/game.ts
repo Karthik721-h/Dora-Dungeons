@@ -296,11 +296,24 @@ router.post("/action", async (req: Request, res: Response) => {
   // inventory, help, etc.) — the engine already produces clear system messages
   // for these and calling gpt-5.2 here wastes tokens and adds latency.
   const room = updatedState.dungeon.rooms.get(updatedState.currentRoomId)!;
+
+  // ── Destroy override: replace engine output before sending to LLM ─────────
+  // The game engine does NOT understand ".destroy" — it always produces an
+  // error (e.g., "Unknown command").  If we send that error as engine_outcome,
+  // the LLM might incorrectly conclude the ability is unavailable.  Instead,
+  // replace the engine logs entirely with a neutral signal so the LLM can
+  // evaluate availability purely from destroy_depleted + unlocked_abilities.
+  const DESTROY_PHRASES = /\b(destroy|obliterate|annihilate|incinerate)\b/i;
+  const isDestroyCommand = DESTROY_PHRASES.test(body.command);
+  const logsForGM = isDestroyCommand
+    ? ["Player invoked .destroy ability"]
+    : engineNewLogs;
+
   const gmResult = shouldSkipGM(body.command)
     ? { narration: "", xp_awarded: 0, hp_change: 0, used_destroy_ability: false, ui_command: "none" as const }
     : await callGameMaster(
         body.command,
-        engineNewLogs,
+        logsForGM,
         updatedState.gameStatus,
         updatedState.player.hp,
         updatedState.player.maxHp,
