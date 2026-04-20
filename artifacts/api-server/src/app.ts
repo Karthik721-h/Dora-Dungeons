@@ -28,13 +28,8 @@ app.use(
 );
 app.use(
   cors({
-    origin: [
-      "capacitor://localhost", // iOS Capacitor WebView
-      "http://localhost:3000",
-      "http://localhost:8080",
-      "http://localhost",
-    ],
-    credentials: true, // allow dd_jwt cookie/token to be sent cross-origin
+    origin: "*",
+    methods: ["GET", "POST", "OPTIONS"],
   }),
 );
 app.use(express.json());
