@@ -352,6 +352,7 @@ router.post("/action", async (req: Request, res: Response) => {
     xp_awarded:           gmResult.xp_awarded,
     used_destroy_ability: gmResult.used_destroy_ability,
     ui_command:           gmResult.ui_command,
+    gm_narration:         gmResult.narration,  // separate field so client speaks ONLY this
   });
 });
 

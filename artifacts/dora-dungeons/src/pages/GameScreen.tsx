@@ -421,12 +421,17 @@ export function GameScreen({
           // out the raw developer-facing command syntax.
           const isUnknownCommand = newLines.some(l => /^Unknown command:/i.test(l));
 
-          // When the backend returns an "Unknown command" response (edge case —
-          // normally unknown commands are caught client-side and never sent),
-          // speak a clean accessible prompt rather than the raw hint text.
-          const linesToSpeak = isUnknownCommand
-            ? ["Say help to hear the available voice commands."]
-            : newLines;
+          // When the LLM produced narration, speak ONLY that — skip the raw
+          // engine output lines (combat results, movement confirmations, etc.)
+          // so the player hears one clean cinematic voice, not the system log.
+          // Commands in shouldSkipGM return empty gm_narration, so they keep
+          // their existing system-voice engine lines unchanged.
+          const gmNarration = (newData as unknown as Record<string, unknown>).gm_narration as string | undefined;
+          const linesToSpeak = gmNarration
+            ? [gmNarration]
+            : isUnknownCommand
+              ? ["Say help to hear the available voice commands."]
+              : newLines;
           AudioManager.speakLines(linesToSpeak, { interrupt: true });
           // Queue exits after narration so visually impaired users always
           // know where they can go. Skip on VICTORY — the dungeon is cleared
