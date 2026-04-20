@@ -334,7 +334,16 @@ export function RPGMenuOverlay({ onClose, enginePlayer }: RPGMenuOverlayProps) {
   const { state, equipItem } = useRPGProgression();
   const [activeTab, setActiveTab] = useState<Tab>("weapons");
 
-  const { unlockedWeapons, equippedWeapon, unlockedArmor, equippedArmor, unlockedAbilities } = state;
+  const { unlockedWeapons, equippedWeapon, unlockedArmor, equippedArmor, unlockedAbilities, destroyConsumed } = state;
+
+  // Always show a .destroy entry — even when both charges are spent (in which
+  // case it's removed from unlockedAbilities but destroyConsumed is true).
+  const hasDestroyInList = unlockedAbilities.some(a => a.startsWith(".destroy"));
+  const displayAbilities: string[] = hasDestroyInList
+    ? unlockedAbilities
+    : destroyConsumed
+      ? [".destroy (0 Charges)", ...unlockedAbilities]
+      : unlockedAbilities;
 
   return (
     <>
@@ -619,33 +628,41 @@ export function RPGMenuOverlay({ onClose, enginePlayer }: RPGMenuOverlayProps) {
                   transition={{ duration: 0.15 }}
                   style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}
                 >
-                  {unlockedAbilities.length === 0 ? (
-                    <EmptyState message="No abilities — they're consumed when used" />
+                  {displayAbilities.length === 0 ? (
+                    <EmptyState message="No abilities unlocked yet" />
                   ) : (
                     <div style={{ display: "flex", flexDirection: "column", gap: "0.625rem", padding: "0.25rem 0" }}>
-                      {unlockedAbilities.map((ability, idx) => {
+                      {displayAbilities.map((ability, idx) => {
                         const isDestroy = ability.startsWith(".destroy");
                         // Parse live charge count from ability name:
                         //   ".destroy (2 Charges)" → 2
                         //   ".destroy (1 Charge)"  → 1
+                        //   ".destroy (0 Charges)" → 0 (depleted)
                         const chargeMatch = isDestroy ? ability.match(/\((\d+)\s+Charge/i) : null;
                         const charges = chargeMatch ? parseInt(chargeMatch[1], 10) : 0;
-                        const chargeLabel = charges === 1 ? "1 charge remaining" : `${charges} charges remaining`;
+                        const depleted = isDestroy && charges === 0;
+                        const chargeLabel = depleted
+                          ? "depleted — recharges next level"
+                          : charges === 1 ? "1 charge remaining" : `${charges} charges remaining`;
                         return (
                           <motion.div
                             key={idx}
                             initial={{ opacity: 0, scale: 0.97 }}
-                            animate={{ opacity: 1, scale: 1 }}
+                            animate={{ opacity: depleted ? 0.55 : 1, scale: 1 }}
                             transition={{ duration: 0.18, delay: idx * 0.05 }}
                             style={{
                               padding: "0.625rem 0.875rem",
                               borderRadius: "0.625rem",
-                              border: isDestroy
-                                ? "1px solid rgba(239,68,68,0.4)"
-                                : "1px solid rgba(167,139,250,0.3)",
-                              background: isDestroy
-                                ? "rgba(239,68,68,0.07)"
-                                : "rgba(167,139,250,0.07)",
+                              border: depleted
+                                ? "1px solid rgba(239,68,68,0.15)"
+                                : isDestroy
+                                  ? "1px solid rgba(239,68,68,0.4)"
+                                  : "1px solid rgba(167,139,250,0.3)",
+                              background: depleted
+                                ? "rgba(239,68,68,0.03)"
+                                : isDestroy
+                                  ? "rgba(239,68,68,0.07)"
+                                  : "rgba(167,139,250,0.07)",
                               display: "flex",
                               flexDirection: "column",
                               gap: "0.3rem",
@@ -698,11 +715,13 @@ export function RPGMenuOverlay({ onClose, enginePlayer }: RPGMenuOverlayProps) {
                                   fontFamily: "'Fira Code', monospace",
                                   fontSize: "0.58rem",
                                   letterSpacing: "0.06em",
-                                  color: "rgba(248,113,113,0.55)",
+                                  color: depleted ? "rgba(248,113,113,0.35)" : "rgba(248,113,113,0.55)",
                                   lineHeight: 1.5,
                                 }}
                               >
-                                {chargeLabel} — say <em>"use destroy"</em> or <em>"obliterate"</em> in combat.
+                                {depleted
+                                  ? "Both charges spent — recharges when you reach the next level."
+                                  : `${chargeLabel} — say "use destroy" or "obliterate" in combat.`}
                               </span>
                             )}
                           </motion.div>
