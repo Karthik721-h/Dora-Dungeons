@@ -411,6 +411,24 @@ export function AuthScreen({ auth }: AuthScreenProps) {
                 </p>
               </motion.div>
 
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.45, duration: 0.5 }}
+                style={{
+                  fontFamily: "'Crimson Text', serif",
+                  fontSize: "0.72rem",
+                  color: "rgba(200,190,180,0.38)",
+                  textAlign: "center",
+                  maxWidth: "22rem",
+                  lineHeight: 1.6,
+                  letterSpacing: "0.02em",
+                  padding: "0 1rem",
+                }}
+              >
+                Dora Dungeons uses OpenAI to generate dynamic, real-time adventures. By entering, you agree to share your gameplay commands with our AI engine.
+              </motion.p>
+
               <motion.div
                 initial={{ opacity: 0, scale: 0.92 }}
                 animate={{ opacity: 1, scale: 1 }}
