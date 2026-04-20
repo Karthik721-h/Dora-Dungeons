@@ -75,6 +75,7 @@ function ShopBtn({
         textAlign: "left",
         cursor: disabled ? "not-allowed" : "pointer",
         opacity: disabled ? 0.55 : 1,
+        overflow: "hidden",
         transition: "background 0.15s, border-color 0.15s",
       }}
       onMouseEnter={e => { if (!disabled) (e.currentTarget as HTMLButtonElement).style.background = colors.hover; }}
