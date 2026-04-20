@@ -1692,13 +1692,13 @@ export function GameScreen({
             >
               DUNGEON LOG
             </span>
-            {parsedCommand && (
+            {parsedCommand && parsedCommand.action !== "UNKNOWN" && (
               <span
                 className="font-code ml-auto"
-                style={{ color: "rgba(200,190,180,0.25)", fontSize: "10px", letterSpacing: "0.14em" }}
+                style={{ color: "rgba(200,190,180,0.22)", fontSize: "10px", letterSpacing: "0.14em" }}
               >
-                {parsedCommand.action}
-                {parsedCommand.direction ? ` · ${parsedCommand.direction}` : ""}
+                {parsedCommand.action.toLowerCase().replace(/_/g, " ")}
+                {parsedCommand.direction ? ` · ${parsedCommand.direction.toLowerCase()}` : ""}
                 {parsedCommand.target ? ` · ${parsedCommand.target}` : ""}
               </span>
             )}

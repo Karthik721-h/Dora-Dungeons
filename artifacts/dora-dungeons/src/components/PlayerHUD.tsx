@@ -106,29 +106,25 @@ export function PlayerHUD({
         minHeight: 0,
       }}
     >
-      {/* Name + level */}
-      <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0">
-          <h2
-            className="font-display font-bold tracking-wider truncate"
-            style={{ color: "#e8e0d0", fontSize: "clamp(0.85rem, 2vw, 1rem)" }}
-          >
-            {name}
-          </h2>
-          <p className="font-code text-xs" style={{ color: "rgba(200,155,60,0.55)", fontSize: "10px" }}>
-            adventurer
-          </p>
-        </div>
-        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+      {/* Name + level — name gets full width, badges sit below it */}
+      <div className="flex flex-col gap-1">
+        <h2
+          className="font-display font-bold tracking-wider truncate"
+          style={{ color: "#e8e0d0", fontSize: "clamp(0.9rem, 3.5vw, 1.05rem)" }}
+          title={name}
+        >
+          {name}
+        </h2>
+        <div className="flex items-center gap-2">
           <div
             aria-label={`Level ${level}`}
-            className="font-display text-center"
+            className="font-display"
             style={{
               border: "1px solid rgba(200,155,60,0.35)",
               color: "rgba(200,155,60,0.9)",
-              fontSize: "10px",
+              fontSize: "9px",
               letterSpacing: "0.15em",
-              padding: "3px 10px",
+              padding: "2px 8px",
               borderRadius: "999px",
               background: "rgba(200,155,60,0.07)",
               whiteSpace: "nowrap",
@@ -138,7 +134,7 @@ export function PlayerHUD({
           </div>
           <div
             aria-label={`Dungeon ${dungeonLevel}`}
-            className="font-display text-center"
+            className="font-display"
             style={{
               border: "1px solid rgba(58,134,255,0.35)",
               color: "rgba(58,134,255,0.85)",
@@ -155,16 +151,9 @@ export function PlayerHUD({
         </div>
       </div>
 
-      {/* Bars */}
+      {/* Bars — HP and XP only (no spell system to drain MP) */}
       <div className="space-y-3">
         <Bar label="HP" value={hp} max={maxHp} color={hpColor} textColor="#f87171" />
-        <Bar
-          label="MP"
-          value={mp}
-          max={maxMp}
-          color="linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%)"
-          textColor="#60a5fa"
-        />
         <Bar
           label="XP"
           value={xp}

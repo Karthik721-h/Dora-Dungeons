@@ -144,7 +144,10 @@ export function VoiceControl({
             aria-label={isListening ? "Stop voice input" : "Start voice input"}
             title={isListening ? "Listening — click to stop" : "Click to speak a command"}
           >
-            {isListening ? <Mic size={22} /> : <MicOff size={22} />}
+            {isListening || audioState === "speaking" || audioState === "processing"
+              ? <Mic size={22} />
+              : <MicOff size={22} />
+            }
           </motion.button>
         )}
 
@@ -213,23 +216,23 @@ export function VoiceControl({
         </div>
       )}
 
-      {/* ── Movement pad ── */}
-      <div>
-        <div
-          className="font-code text-xs uppercase tracking-widest mb-2"
-          style={{ color: "rgba(200,155,60,0.4)", fontSize: "9px", letterSpacing: "0.2em" }}
-        >
-          — Movement —
-        </div>
-        <div className="flex items-center justify-start gap-1">
-          <ActionBtn icon={<ArrowLeft  size={12} />} label="W" onClick={() => onSubmit("move west")}  disabled={isPending || isGameOver || isModalOpen} small />
-          <div className="flex flex-col gap-1">
-            <ActionBtn icon={<ArrowUp   size={12} />} label="N" onClick={() => onSubmit("move north")} disabled={isPending || isGameOver || isModalOpen} small />
-            <ActionBtn icon={<ArrowDown size={12} />} label="S" onClick={() => onSubmit("move south")} disabled={isPending || isGameOver || isModalOpen} small />
+      {/* ── Movement pad — single row to save vertical space on mobile ── */}
+      {!isCombat && (
+        <div>
+          <div
+            className="font-code uppercase tracking-widest mb-1.5"
+            style={{ color: "rgba(200,155,60,0.35)", fontSize: "8px", letterSpacing: "0.2em" }}
+          >
+            — Move —
           </div>
-          <ActionBtn icon={<ArrowRight size={12} />} label="E" onClick={() => onSubmit("move east")}  disabled={isPending || isGameOver || isModalOpen} small />
+          <div className="flex gap-1">
+            <ActionBtn icon={<ArrowUp    size={12} />} label="N" onClick={() => onSubmit("move north")} disabled={isPending || isGameOver || isModalOpen} small />
+            <ActionBtn icon={<ArrowDown  size={12} />} label="S" onClick={() => onSubmit("move south")} disabled={isPending || isGameOver || isModalOpen} small />
+            <ActionBtn icon={<ArrowLeft  size={12} />} label="W" onClick={() => onSubmit("move west")}  disabled={isPending || isGameOver || isModalOpen} small />
+            <ActionBtn icon={<ArrowRight size={12} />} label="E" onClick={() => onSubmit("move east")}  disabled={isPending || isGameOver || isModalOpen} small />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ── Command input ── */}
       <div className="flex gap-2 mt-auto">
@@ -246,7 +249,7 @@ export function VoiceControl({
             onChange={(e) => onCommandChange(e.target.value)}
             onKeyDown={handleKeyDown}
             disabled={isPending || isGameOver || isModalOpen}
-            placeholder={isListening ? "Listening..." : "Type command..."}
+            placeholder={isListening ? "Listening…" : "Command…"}
             autoComplete="off"
             spellCheck="false"
             className="command-input w-full pl-8 pr-3 py-2 font-code text-sm disabled:opacity-40 transition-all"
