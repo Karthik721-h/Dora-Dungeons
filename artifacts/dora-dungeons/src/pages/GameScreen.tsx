@@ -1062,8 +1062,9 @@ export function GameScreen({
       setShopArmors((data.player.armors ?? []) as ShopArmor[]);
       setShopItems((data.player.inventoryItems ?? []) as ShopInventoryItem[]);
       queryClient.setQueryData(getGetGameStateQueryKey(), data);
+      restoreDestroyRef.current();
       AudioManager.speak(
-        "You rise again at the beginning of the dungeon. Your weapons, armor, and gold are intact. Stay vigilant.",
+        "You rise again at the beginning of the dungeon. Your weapons, armor, and gold are intact. Your destroy ability has recharged. Stay vigilant.",
         { interrupt: true }
       );
     } catch {
@@ -1152,8 +1153,9 @@ export function GameScreen({
       setShopArmors((data.player.armors ?? []) as ShopArmor[]);
       setShopItems((data.player.inventoryItems ?? []) as ShopInventoryItem[]);
       queryClient.setQueryData(getGetGameStateQueryKey(), data);
+      restoreDestroyRef.current();
       AudioManager.speak(
-        "You return to the start of this level. The dungeon awaits. Good luck.",
+        "You return to the start of this level. Your destroy ability has recharged. The dungeon awaits.",
         { interrupt: true }
       );
       speakRoomNarration(data.currentRoom);
