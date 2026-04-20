@@ -923,10 +923,14 @@ export function GameScreen({
 
   // True whenever any modal is covering the screen — used to visually disable
   // all interactive controls that sit behind the portal overlay.
-  // isModalOpen = true whenever any blocking overlay is active.
   // Covers: death screen, level decision, and the shop/inventory overlays.
   // Consumed by VoiceControl to disable all action buttons when focus is elsewhere.
   const isModalOpen = isGameOver || gameMode !== "explore" || inventoryOpen || shopOpen;
+
+  // Narrower block for the text input + Go button — only blocks during truly
+  // hard stops (pending request, game over, level-decision). Shop and inventory
+  // overlays should NOT block typing so the player can voice-navigate them.
+  const isInputBlocked = isPending || isGameOver || gameMode !== "explore";
 
   // ── Restore decision mode if the page was refreshed during a VICTORY ────────
   // gameMode is React state and resets to "explore" on every mount. If the DB
@@ -1756,6 +1760,7 @@ export function GameScreen({
             isPending={isPending}
             isGameOver={isGameOver}
             isModalOpen={isModalOpen}
+            isInputBlocked={isInputBlocked}
             isCombat={isCombat}
             command={command}
             onCommandChange={setCommand}

@@ -16,6 +16,9 @@ interface VoiceControlProps {
   isPending: boolean;
   isGameOver: boolean;
   isModalOpen: boolean;
+  /** Narrower block — only hard-stops (pending, game-over, level decision).
+   *  Does NOT include shopOpen/inventoryOpen so typing works inside overlays. */
+  isInputBlocked?: boolean;
   isCombat: boolean;
   command: string;
   onCommandChange: (v: string) => void;
@@ -74,7 +77,7 @@ function ActionBtn({ icon, label, onClick, disabled, variant = "default", small 
 
 export function VoiceControl({
   isSupported, audioState, isListening, interimTranscript, intentHint,
-  isPending, isGameOver, isModalOpen, isCombat, command, onCommandChange, onSubmit, onToggleListen,
+  isPending, isGameOver, isModalOpen, isInputBlocked = isModalOpen, isCombat, command, onCommandChange, onSubmit, onToggleListen,
 }: VoiceControlProps) {
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -248,7 +251,7 @@ export function VoiceControl({
             value={command}
             onChange={(e) => onCommandChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            disabled={isPending || isGameOver || isModalOpen}
+            disabled={isInputBlocked}
             placeholder={isListening ? "Listening…" : "Command…"}
             autoComplete="off"
             spellCheck="false"
@@ -263,18 +266,18 @@ export function VoiceControl({
           />
         </div>
         <motion.button
-          whileHover={{ scale: isPending || !command.trim() || isGameOver || isModalOpen ? 1 : 1.04 }}
-          whileTap={{ scale: isPending || !command.trim() || isGameOver || isModalOpen ? 1 : 0.95 }}
+          whileHover={{ scale: isInputBlocked || !command.trim() ? 1 : 1.04 }}
+          whileTap={{ scale: isInputBlocked || !command.trim() ? 1 : 0.95 }}
           onClick={() => { if (command.trim()) onSubmit(command); }}
-          disabled={isPending || !command.trim() || isGameOver || isModalOpen}
+          disabled={isInputBlocked || !command.trim()}
           className="action-btn px-4 font-display text-xs tracking-widest uppercase transition-all"
           style={{
             background: "rgba(139,30,30,0.18)",
             border: "1px solid rgba(139,30,30,0.5)",
             color: "#f87171",
             borderRadius: "0.5rem",
-            opacity: isPending || !command.trim() || isGameOver || isModalOpen ? 0.3 : 1,
-            cursor: isPending || !command.trim() || isGameOver || isModalOpen ? "not-allowed" : "pointer",
+            opacity: isInputBlocked || !command.trim() ? 0.3 : 1,
+            cursor: isInputBlocked || !command.trim() ? "not-allowed" : "pointer",
             letterSpacing: "0.14em",
             whiteSpace: "nowrap",
           }}
