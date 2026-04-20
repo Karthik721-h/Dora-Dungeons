@@ -131,6 +131,12 @@ export function IntroVideo({ onComplete }: IntroVideoProps) {
           >
             Click to begin
           </p>
+          <p
+            className="text-xs text-center max-w-md px-4 mb-4"
+            style={{ color: "rgba(200,190,180,0.38)", lineHeight: 1.5, letterSpacing: "0.02em" }}
+          >
+            Dora Dungeons uses OpenAI to generate dynamic, real-time adventures. By entering, you agree to share your gameplay commands with our AI engine.
+          </p>
           <button
             onClick={() => {
               setPlayBlocked(false);
