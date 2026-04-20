@@ -257,7 +257,12 @@ export function GameScreen({
           prologueFiredRef.current = true;
           submitCommandRef.current("START_PROLOGUE");
         }
-        startListening();
+        // Delay mic start by 50 ms so React has time to re-render and flip
+        // isPendingRef.current = true before recognition begins.  Without this
+        // delay the mic can open in the same tick as the mutation, before
+        // isPending is reflected in the ref, allowing ambient noise to submit
+        // a second command that races the prologue response.
+        setTimeout(() => startListening(), 50);
         return;
       } else if (gameState.gameStatus === "IN_COMBAT") {
         // ── Restore: mid-combat ────────────────────────────────────────────
@@ -427,7 +432,18 @@ export function GameScreen({
             : isUnknownCommand
               ? ["Say help to hear the available voice commands."]
               : newLines;
-          AudioManager.speakLines(linesToSpeak, { interrupt: true });
+
+          // If it's a bare "unknown command" with no LLM narration AND something
+          // is already playing (e.g. the destroy ability narration or the prologue),
+          // drop the "say help" utterance entirely rather than cutting off the
+          // ongoing speech.  This closes the race where mic noise during a long
+          // narration submits a stale command whose error response kills the TTS.
+          const isBareUnknown = isUnknownCommand && !gmNarration;
+          if (isBareUnknown && AudioManager.isActive()) {
+            // Swallow — a real narration is in progress; don't interrupt it.
+          } else {
+            AudioManager.speakLines(linesToSpeak, { interrupt: true });
+          }
           // Queue exits after narration so visually impaired users always
           // know where they can go. Skip on VICTORY — the dungeon is cleared
           // and there are no meaningful exits to navigate at that point.

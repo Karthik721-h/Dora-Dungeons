@@ -452,6 +452,16 @@ class AudioManagerClass {
     return this.isSpeaking;
   }
 
+  /**
+   * Returns true while ANY narration is active — either between sentences
+   * (isSpeaking=false momentarily, but speakLockHeld=true) or mid-utterance.
+   * Use this to suppress interrupting speech for low-priority events like
+   * "Unknown command" responses that arrive during LLM narration.
+   */
+  isActive(): boolean {
+    return this.speakLockHeld || this.isSpeaking;
+  }
+
   // ── Spatial / effect tones (Web Audio API) ─────────────────────────────────
 
   /**
