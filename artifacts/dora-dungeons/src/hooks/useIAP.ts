@@ -99,33 +99,32 @@ export function useIAP(onPurchase: (tier: string) => void) {
         },
       ]);
 
-      CdvPurchase.store.when()
-        // ── New purchase approved → unlock + acknowledge ──────────────────────
-        .approved((transaction) => {
-          const productId = transaction.products[0]?.id ?? "";
-          const tier      = tierFromProductId(productId) ?? productId;
+      // ── New purchase approved → unlock + acknowledge ──────────────────────
+      CdvPurchase.store.when().approved((transaction) => {
+        const productId = transaction.products[0]?.id ?? "";
+        const tier      = tierFromProductId(productId) ?? productId;
 
-          onPurchase(tier);
+        onPurchase(tier);
 
-          AudioManager.speak(
-            "Payment successful. Your legendary journey is now unlimited.",
-            { interrupt: true }
-          );
+        AudioManager.speak(
+          "Payment successful. Your legendary journey is now unlimited.",
+          { interrupt: true }
+        );
 
-          // Acknowledge so Apple doesn't re-deliver the transaction.
-          transaction.finish();
-        })
+        // Acknowledge so Apple doesn't re-deliver the transaction.
+        transaction.finish();
+      });
 
-        // ── Product is owned (fires on mount + after refresh/restore) ─────────
-        // This is the authoritative unlock path — receipt validated by Apple.
-        .owned((product) => {
-          const tier = tierFromProductId(product.id) ?? product.id;
-          onPurchase(tier);
-        })
+      // ── Product is owned (fires on mount + after refresh/restore) ─────────
+      // This is the authoritative unlock path — receipt validated by Apple.
+      CdvPurchase.store.when().owned((product) => {
+        const tier = tierFromProductId(product.id) ?? product.id;
+        onPurchase(tier);
+      });
 
-        .finished((transaction) => {
-          console.log("[IAP] Transaction finished:", transaction.products);
-        });
+      CdvPurchase.store.when().finished((transaction) => {
+        console.log("[IAP] Transaction finished:", transaction.products);
+      });
 
       // Ask Apple for current ownership status. This triggers .owned() for any
       // product the user already owns, without requiring a new purchase.
