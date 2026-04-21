@@ -128,6 +128,7 @@ export function useIAP(onPurchase: (tier: string) => void) {
 
       // Ask Apple for current ownership status. This triggers .owned() for any
       // product the user already owns, without requiring a new purchase.
+      CdvPurchase.store.initialize([CdvPurchase.Platform.APPLE_APPSTORE]);
       CdvPurchase.store.update();
     };
 
