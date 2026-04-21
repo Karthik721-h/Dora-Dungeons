@@ -72,63 +72,76 @@ function tierFromProductId(productId: string): IapTierId | null {
 export function useIAP(onPurchase: (tier: string) => void) {
   // ── Store initialisation ──────────────────────────────────────────────────
   useEffect(() => {
-    if (typeof CdvPurchase === "undefined") return; // web/dev — skip
+    const initIAP = () => {
+      if (typeof CdvPurchase === "undefined") return; // web/dev — skip
 
-    // Register all 4 products.
-    CdvPurchase.store.register([
-      {
-        id:       IAP_IDS.WEEKLY,
-        type:     CdvPurchase.ProductType.PAID_SUBSCRIPTION,
-        platform: CdvPurchase.Platform.APPLE_APPSTORE,
-      },
-      {
-        id:       IAP_IDS.MONTHLY,
-        type:     CdvPurchase.ProductType.PAID_SUBSCRIPTION,
-        platform: CdvPurchase.Platform.APPLE_APPSTORE,
-      },
-      {
-        id:       IAP_IDS.YEARLY,
-        type:     CdvPurchase.ProductType.PAID_SUBSCRIPTION,
-        platform: CdvPurchase.Platform.APPLE_APPSTORE,
-      },
-      {
-        id:       IAP_IDS.LIFETIME,
-        type:     CdvPurchase.ProductType.NON_CONSUMABLE,
-        platform: CdvPurchase.Platform.APPLE_APPSTORE,
-      },
-    ]);
+      // Register all 4 products.
+      CdvPurchase.store.register([
+        {
+          id:       IAP_IDS.WEEKLY,
+          type:     CdvPurchase.ProductType.PAID_SUBSCRIPTION,
+          platform: CdvPurchase.Platform.APPLE_APPSTORE,
+        },
+        {
+          id:       IAP_IDS.MONTHLY,
+          type:     CdvPurchase.ProductType.PAID_SUBSCRIPTION,
+          platform: CdvPurchase.Platform.APPLE_APPSTORE,
+        },
+        {
+          id:       IAP_IDS.YEARLY,
+          type:     CdvPurchase.ProductType.PAID_SUBSCRIPTION,
+          platform: CdvPurchase.Platform.APPLE_APPSTORE,
+        },
+        {
+          id:       IAP_IDS.LIFETIME,
+          type:     CdvPurchase.ProductType.NON_CONSUMABLE,
+          platform: CdvPurchase.Platform.APPLE_APPSTORE,
+        },
+      ]);
 
-    CdvPurchase.store.when()
-      // ── New purchase approved → unlock + acknowledge ──────────────────────
-      .approved((transaction) => {
-        const productId = transaction.products[0]?.id ?? "";
-        const tier      = tierFromProductId(productId) ?? productId;
+      CdvPurchase.store.when()
+        // ── New purchase approved → unlock + acknowledge ──────────────────────
+        .approved((transaction) => {
+          const productId = transaction.products[0]?.id ?? "";
+          const tier      = tierFromProductId(productId) ?? productId;
 
-        onPurchase(tier);
+          onPurchase(tier);
 
-        AudioManager.speak(
-          "Payment successful. Your legendary journey is now unlimited.",
-          { interrupt: true }
-        );
+          AudioManager.speak(
+            "Payment successful. Your legendary journey is now unlimited.",
+            { interrupt: true }
+          );
 
-        // Acknowledge so Apple doesn't re-deliver the transaction.
-        transaction.finish();
-      })
+          // Acknowledge so Apple doesn't re-deliver the transaction.
+          transaction.finish();
+        })
 
-      // ── Product is owned (fires on mount + after refresh/restore) ─────────
-      // This is the authoritative unlock path — receipt validated by Apple.
-      .owned((product) => {
-        const tier = tierFromProductId(product.id) ?? product.id;
-        onPurchase(tier);
-      })
+        // ── Product is owned (fires on mount + after refresh/restore) ─────────
+        // This is the authoritative unlock path — receipt validated by Apple.
+        .owned((product) => {
+          const tier = tierFromProductId(product.id) ?? product.id;
+          onPurchase(tier);
+        })
 
-      .finished((transaction) => {
-        console.log("[IAP] Transaction finished:", transaction.products);
-      });
+        .finished((transaction) => {
+          console.log("[IAP] Transaction finished:", transaction.products);
+        });
 
-    // Ask Apple for current ownership status. This triggers .owned() for any
-    // product the user already owns, without requiring a new purchase.
-    CdvPurchase.store.update();
+      // Ask Apple for current ownership status. This triggers .owned() for any
+      // product the user already owns, without requiring a new purchase.
+      CdvPurchase.store.update();
+    };
+
+    if (typeof CdvPurchase !== "undefined") {
+      // Cordova already ready (e.g. hot reload in dev)
+      initIAP();
+    } else {
+      document.addEventListener("deviceready", initIAP, { once: true });
+    }
+
+    return () => {
+      document.removeEventListener("deviceready", initIAP);
+    };
 
   // onPurchase identity is stable (useCallback in App). Listing it would cause
   // re-registration on every render, so it is deliberately omitted.
