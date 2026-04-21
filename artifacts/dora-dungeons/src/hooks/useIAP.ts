@@ -1,16 +1,12 @@
 /**
  * useIAP — CdvPurchase (Cordova In-App Purchases v13+) integration.
  *
- * Responsibilities:
- *  - Register the 4 Dora Dungeons products with the Apple App Store on mount.
- *  - Listen for `approved` events → unlock premium, speak TTS confirmation,
- *    finish the transaction.
- *  - Listen for `finished` events → log only.
- *  - Expose `restorePurchases()` so the paywall footer can trigger a restore
- *    with TTS/visual feedback.
+ * Source of truth for premium status is the Apple receipt, validated via
+ * the `.owned()` listener that fires on mount (after store.update()) and
+ * again after every restore/refresh. localStorage is never used here.
  *
- * On web / dev builds, CdvPurchase is not defined — every guard below is a
- * no-op, which keeps the mock purchase flow working without changes.
+ * On web / dev builds, CdvPurchase is not defined — every guard is a no-op
+ * so the mock purchase flow in SubscriptionOverlay continues to work.
  */
 
 import { useEffect, useCallback } from "react";
@@ -23,14 +19,14 @@ import { IAP_IDS, type IapTierId } from "@/config/iap";
 declare const CdvPurchase: {
   store: {
     register: (products: CdvProduct[]) => void;
-    when: () => CdvWhen;
-    update: () => void;
-    order: (productId: string) => void;
-    restorePurchases: () => void;
+    when:     () => CdvWhen;
+    update:   () => void;
+    refresh:  () => void;
+    order:    (productId: string) => void;
   };
   ProductType: {
     PAID_SUBSCRIPTION: string;
-    NON_CONSUMABLE: string;
+    NON_CONSUMABLE:    string;
   };
   Platform: {
     APPLE_APPSTORE: string;
@@ -38,19 +34,24 @@ declare const CdvPurchase: {
 };
 
 interface CdvProduct {
-  id: string;
-  type: string;
+  id:       string;
+  type:     string;
   platform: string;
 }
 
 interface CdvTransaction {
   products: Array<{ id: string }>;
-  finish: () => void;
+  finish:   () => void;
+}
+
+interface CdvOwnedProduct {
+  id: string;
 }
 
 interface CdvWhen {
-  approved:  (cb: (t: CdvTransaction) => void) => CdvWhen;
-  finished:  (cb: (t: CdvTransaction) => void) => CdvWhen;
+  approved: (cb: (t: CdvTransaction)    => void) => CdvWhen;
+  finished: (cb: (t: CdvTransaction)    => void) => CdvWhen;
+  owned:    (cb: (p: CdvOwnedProduct)   => void) => CdvWhen;
 }
 
 // ---------------------------------------------------------------------------
@@ -64,9 +65,9 @@ function tierFromProductId(productId: string): IapTierId | null {
 }
 
 /**
- * @param onPurchase  Callback fired when a purchase is approved.
- *                    Receives the tier key (e.g. "lifetime") or the raw
- *                    product ID if the reverse-lookup fails.
+ * @param onPurchase  Called whenever a product becomes owned (new purchase or
+ *                    restore). Receives the tier key ("lifetime", "yearly", …)
+ *                    or the raw product ID if the reverse-lookup fails.
  */
 export function useIAP(onPurchase: (tier: string) => void) {
   // ── Store initialisation ──────────────────────────────────────────────────
@@ -97,47 +98,54 @@ export function useIAP(onPurchase: (tier: string) => void) {
       },
     ]);
 
-    // Set up event listeners.
     CdvPurchase.store.when()
+      // ── New purchase approved → unlock + acknowledge ──────────────────────
       .approved((transaction) => {
-        // Identify the tier that was purchased.
         const productId = transaction.products[0]?.id ?? "";
-        const tier = tierFromProductId(productId) ?? productId;
+        const tier      = tierFromProductId(productId) ?? productId;
 
-        // Unlock premium, persist state, close paywall.
         onPurchase(tier);
 
-        // Speak TTS confirmation.
         AudioManager.speak(
           "Payment successful. Your legendary journey is now unlimited.",
           { interrupt: true }
         );
 
-        // Acknowledge the transaction with Apple so it isn't re-delivered.
+        // Acknowledge so Apple doesn't re-deliver the transaction.
         transaction.finish();
       })
+
+      // ── Product is owned (fires on mount + after refresh/restore) ─────────
+      // This is the authoritative unlock path — receipt validated by Apple.
+      .owned((product) => {
+        const tier = tierFromProductId(product.id) ?? product.id;
+        onPurchase(tier);
+      })
+
       .finished((transaction) => {
         console.log("[IAP] Transaction finished:", transaction.products);
       });
 
-    // Fetch latest prices and subscription status from Apple.
+    // Ask Apple for current ownership status. This triggers .owned() for any
+    // product the user already owns, without requiring a new purchase.
     CdvPurchase.store.update();
-  // onPurchase identity is stable (useCallback in App), but listing it would
-  // cause re-registration on every render — deliberately omitted.
+
+  // onPurchase identity is stable (useCallback in App). Listing it would cause
+  // re-registration on every render, so it is deliberately omitted.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Restore purchases ─────────────────────────────────────────────────────
+  // store.refresh() re-validates all receipts with Apple and re-fires .owned()
+  // for anything the user legitimately owns. This is the correct API for
+  // "Restore Purchases" per Apple guidelines (not store.restorePurchases()).
   const restorePurchases = useCallback(() => {
-    // Speak feedback immediately so the user knows something is happening.
     AudioManager.speak("Checking for previous purchases.", { interrupt: true });
 
     if (typeof CdvPurchase !== "undefined") {
-      // If a previous purchase exists, the approved event fires again and
-      // onPurchase() handles the unlock — no extra code needed here.
-      CdvPurchase.store.restorePurchases();
+      CdvPurchase.store.refresh();
     }
-    // On web, the TTS message above is sufficient feedback for the mock path.
+    // On web the TTS feedback above is sufficient for the mock path.
   }, []);
 
   return { restorePurchases };

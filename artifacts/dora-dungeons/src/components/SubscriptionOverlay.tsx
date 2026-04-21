@@ -77,11 +77,8 @@ export function SubscriptionOverlay({ onClose, onPurchase, onRestorePurchases }:
   const selected = TIERS.find(t => t.id === selectedId)!;
 
   function completePurchase(tierId: string) {
-    // Persist premium status so it survives page refreshes.
-    try {
-      localStorage.setItem("dora_isPremium", "true");
-      localStorage.setItem("dora_premiumTier", tierId);
-    } catch { /* localStorage unavailable */ }
+    // Web/dev mock path only — on iOS this is handled by the useIAP .owned()
+    // listener which is the Apple-validated source of truth.
     onPurchase?.(tierId);
     onClose?.();
   }

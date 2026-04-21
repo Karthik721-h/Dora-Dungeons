@@ -258,24 +258,22 @@ function App() {
   // Only commands issued AFTER onboarding count toward the free-trial limit.
   const hasCompletedOnboardingRef = useRef(false);
 
-  // dungeonCommandCount and isPremium are persisted to localStorage so the
-  // free-trial counter survives page refreshes and premium status is never lost.
+  // dungeonCommandCount is persisted so the free-trial counter survives refreshes.
+  // isPremium is intentionally NOT seeded from localStorage — the authoritative
+  // source is the Apple receipt via the useIAP .owned() listener (fires on mount).
+  // On web/dev builds CdvPurchase is undefined, so the mock purchase path in
+  // SubscriptionOverlay calls handlePurchase() directly to unlock for testing.
   const [dungeonCommandCount, setDungeonCommandCount] = useState<number>(() => {
     try { return parseInt(localStorage.getItem("dora_commandCount") ?? "0", 10) || 0; }
     catch { return 0; }
   });
-  const [isPremium, setIsPremium] = useState<boolean>(() => {
-    try { return localStorage.getItem("dora_isPremium") === "true"; }
-    catch { return false; }
-  });
-  // showSubscription is derived from persisted state on mount so the paywall
-  // re-appears immediately if the user refreshes after hitting the free-trial
-  // limit (rather than only when the counter transitions 5→6 mid-session).
+  const [isPremium, setIsPremium] = useState<boolean>(false);
+  // showSubscription is derived from the command count on mount so the paywall
+  // re-appears immediately if the user refreshes after hitting the free-trial limit.
   const [showSubscription, setShowSubscription] = useState<boolean>(() => {
     try {
       const count = parseInt(localStorage.getItem("dora_commandCount") ?? "0", 10) || 0;
-      const premium = localStorage.getItem("dora_isPremium") === "true";
-      return count >= 6 && !premium;
+      return count >= 6;
     } catch { return false; }
   });
 
@@ -291,12 +289,9 @@ function App() {
     });
   }, [isPremium]);
 
-  // Called when the user completes a subscription purchase (any tier).
-  const handlePurchase = useCallback((tier: string) => {
-    try {
-      localStorage.setItem("dora_isPremium", "true");
-      localStorage.setItem("dora_premiumTier", tier);
-    } catch { /* ok */ }
+  // Called when the Apple receipt confirms ownership (new purchase or .owned()
+  // listener on mount/restore). This is the only place isPremium flips to true.
+  const handlePurchase = useCallback((_tier: string) => {
     setIsPremium(true);
     setShowSubscription(false);
   }, []);
