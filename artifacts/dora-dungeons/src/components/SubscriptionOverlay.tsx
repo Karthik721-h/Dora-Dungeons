@@ -87,16 +87,13 @@ export function SubscriptionOverlay({ onClose, onPurchase, onRestorePurchases }:
     // Map the lowercase UI tier key to the UPPERCASE Apple product ID.
     const appleProductId = IAP_IDS[selectedId.toUpperCase() as keyof typeof IAP_IDS];
     // @ts-ignore — CdvPurchase is injected by Capacitor In-App Purchases plugin
-    if (typeof CdvPurchase !== "undefined") {
+    if (typeof CdvPurchase === "undefined" || !window.cordova) {
+      console.warn("Native bridge not ready. Purchase aborted.");
+      return;
+    }
       // @ts-ignore
       CdvPurchase.store.order(appleProductId);
       // Unlock happens in the useIAP `approved` listener → onPurchase callback.
-    } else {
-      // Web / dev mock path — alert + immediate state update.
-      console.log("Mock Purchase triggered for", selectedId, appleProductId);
-      alert(`Premium Unlocked: ${selected.title} (Web Simulation)`);
-      completePurchase(selectedId);
-    }
   }
 
   function handleRestore() {
